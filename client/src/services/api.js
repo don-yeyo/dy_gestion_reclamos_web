@@ -55,4 +55,10 @@ export const publicApi = {
         api.post('/public/actions/supervisor-imposibilidad', { token, motivo })
 };
 
+export const supervisoresApi = {
+    getInfo: () => api.get('/supervisores/info'),
+    lookup: (lat, lng) => api.get('/supervisores/lookup', { params: { lat, lng } }),
+    uploadGeoJSON: (geojsonData) => api.post('/supervisores/upload', geojsonData)
+};
+
 export default api;

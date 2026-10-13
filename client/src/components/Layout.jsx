@@ -4,10 +4,12 @@ import { Header } from './Header';
 import { Drawer } from './Drawer';
 import { useAuth } from '../config/AuthContext';
 import LoginScreen from './LoginScreen';
+import { CoberturaSupervisoresModal } from './CoberturaSupervisoresModal';
 
 export const Layout = () => {
     const { isAuthenticated, loading } = useAuth();
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+    const [isCoberturaOpen, setIsCoberturaOpen] = useState(false);
     const [darkMode, setDarkMode] = useState(() => {
         return localStorage.getItem('dy_theme') === 'dark';
     });
@@ -50,10 +52,15 @@ export const Layout = () => {
             <Drawer
                 isOpen={isDrawerOpen}
                 onClose={closeDrawer}
+                onOpenCobertura={() => setIsCoberturaOpen(true)}
             />
             <main className="main-content">
                 <Outlet />
             </main>
+            <CoberturaSupervisoresModal
+                isOpen={isCoberturaOpen}
+                onClose={() => setIsCoberturaOpen(false)}
+            />
         </div>
     );
 };

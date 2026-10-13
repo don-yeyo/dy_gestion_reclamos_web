@@ -49,11 +49,18 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Logging
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
+const authRoutes = require('./routes/authRoutes');
+const reclamosRoutes = require('./routes/reclamosRoutes');
+const publicActionRoutes = require('./routes/publicActionRoutes');
+const cronRoutes = require('./routes/cronRoutes');
+const supervisoresRoutes = require('./routes/supervisoresRoutes');
+
 // Rutas de API
 app.use('/api/auth', authRoutes);
 app.use('/api/reclamos', reclamosRoutes);
 app.use('/api/public/actions', publicActionRoutes);
 app.use('/api/cron', cronRoutes);
+app.use('/api/supervisores', supervisoresRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -1,9 +1,9 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Inbox, UserCheck, ShieldAlert, X, ChevronRight, HelpCircle } from 'lucide-react';
+import { LayoutDashboard, Inbox, UserCheck, ShieldAlert, X, ChevronRight, HelpCircle, Map } from 'lucide-react';
 import { useAuth } from '../config/AuthContext';
 
-export const Drawer = ({ isOpen, onClose }) => {
+export const Drawer = ({ isOpen, onClose, onOpenCobertura }) => {
     const { user, isAdmin, isInocuidad } = useAuth();
 
     return (
@@ -78,6 +78,23 @@ export const Drawer = ({ isOpen, onClose }) => {
                             <ShieldAlert size={18} color="#e40521" />
                             <span>Inocuidad y Calidad</span>
                         </NavLink>
+                    )}
+
+                    {isAdmin && (
+                        <>
+                            <div className="drawer-section-title">Configuración</div>
+                            <button
+                                onClick={() => {
+                                    onClose();
+                                    if (onOpenCobertura) onOpenCobertura();
+                                }}
+                                className="drawer-nav-item"
+                                style={{ width: '100%', background: 'transparent', border: 'none', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}
+                            >
+                                <Map size={18} color="#f59e0b" />
+                                <span>Cobertura Supervisores</span>
+                            </button>
+                        </>
                     )}
 
                     <div className="drawer-section-title">Información de Sistema</div>
