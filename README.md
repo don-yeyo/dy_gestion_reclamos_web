@@ -55,7 +55,7 @@ Cada parte se levanta desde su propio directorio para evitar duplicación de var
 cd server
 npm install
 npm run dev
-# Servidor Express activo en http://localhost:3001
+# Inicia la API de Express en el puerto configurado
 ```
 
 ### Frontend (`client`)
@@ -63,7 +63,7 @@ npm run dev
 cd client
 npm install
 npm run dev
-# Interfaz Web activa en http://localhost:5173
+# Inicia el cliente React en el navegador
 ```
 
 ---
@@ -99,24 +99,24 @@ Este sistema implementa un modelo de seguridad estricto para evitar elevación d
 ## ⚙️ Variables de Entorno
 
 ### Backend (`server/.env`)
-| Variable | Descripción | Valor Configurado |
+| Variable | Descripción | Ejemplo / Formato |
 | :--- | :--- | :--- |
-| `PORT` | Puerto del servidor Express | `3001` |
-| `APP_SECRET` | Clave secreta para firma de JWT y tokens de acción | `dy_reclamos_secret_...` |
-| `GOOGLE_SHEET_ID` | ID de la hoja de cálculo de Reclamos | `1mIfYKCbjkTcNJM9Uek_DGgogVL8nXPhkfHXN4szV-S4` |
+| `PORT` | Puerto del servidor Express local | `3001` |
+| `APP_SECRET` | Clave secreta para firma de JWT y tokens de acción | *(string secreto)* |
+| `GOOGLE_SHEET_ID` | ID de la hoja de cálculo de Reclamos | *(Google Spreadsheet ID)* |
 | `GOOGLE_SHEET_TAB` | Nombre de la pestaña de reclamos | `Reclamos 2023` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Ruta al JSON de la cuenta de servicio | `credentials/reclamos-service-account.json` |
-| `RECLAMOS_NUMERO_CORTE` | ID numérico de reclamo a partir del cual se gestionan | `20233357` |
-| `EMAILS_ADMINS` | Correos con rol de Administrador | `administracion@donyeyo.com.ar` |
-| `EMAILS_INOCUIDAD` | Correos de Calidad e Inocuidad | `inocuidad@donyeyo.com.ar` |
-| `SMTP_*` | Credenciales del servidor de correo saliente | Host: `vps-1722445-x.dattaweb.com` / Port: `465` |
+| `RECLAMOS_NUMERO_CORTE` | ID numérico de corte a partir del cual se gestionan | `20233357` |
+| `EMAILS_ADMINS` | Correos con rol de Administrador | `admin1@empresa.com,admin2@empresa.com` |
+| `EMAILS_INOCUIDAD` | Correos de Calidad e Inocuidad | `calidad@empresa.com` |
+| `SMTP_*` | Credenciales del servidor de correo saliente | Host, Puerto, Usuario y Clave SMTP |
 
 ### Frontend (`client/.env`)
-| Variable | Descripción | Valor Configurado |
+| Variable | Descripción | Ejemplo / Formato |
 | :--- | :--- | :--- |
-| `VITE_API_URL` | URL base de la API del servidor | `http://localhost:3001/api` |
-| `VITE_AZURE_AD_CLIENT_ID` | Client ID de la App registrada en Azure Entra ID | `07bfe8e1-8030-4bee-b423-9f7429de0f03` |
-| `VITE_AZURE_AD_TENANT_ID` | Tenant ID de Microsoft Office 365 | `fd8a7e94-3179-471f-b79c-a64f8bfc8536` |
+| `VITE_API_URL` | URL base de la API del servidor | `/api` *(en producción)* o `http://localhost:3001/api` |
+| `VITE_AZURE_AD_CLIENT_ID` | Client ID de la App registrada en Azure Entra ID | *(UUID Azure Application Client ID)* |
+| `VITE_AZURE_AD_TENANT_ID` | Tenant ID de Microsoft Office 365 | *(UUID Directory Tenant ID)* |
 | `VITE_MOCK_AUTH` | Habilitar usuario mock para desarrollo local | `false` |
 
 ---
