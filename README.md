@@ -80,6 +80,46 @@ En las variables de entorno de la configuración de Netlify (Site Settings -> En
 
 ---
 
+## 🔑 Configuración en Microsoft Entra ID (Azure AD SSO)
+
+Para habilitar el inicio de sesión corporativo con cuentas `@donyeyo.com.ar` mediante MSAL:
+
+1. **Acceder al Portal de Administración:**
+   - Ingresá al [Centro de Administración de Microsoft Entra](https://entra.microsoft.com/) o al [Portal de Azure - App Registrations](https://portal.azure.com/#view/Microsoft_AAD_IAM/ActiveDirectoryMenuBlade/~/RegisteredApps).
+
+2. **Crear el Registro de la Aplicación:**
+   - Navegá a **Microsoft Entra ID** → **App registrations (Registro de aplicaciones)** → **New registration (Nuevo registro)**.
+   - **Name (Nombre):** `Gestión de Reclamos Web - Don Yeyo`.
+   - **Supported account types (Tipos de cuenta admitidos):** 
+     - Seleccionar `Accounts in this organizational directory only (Don Yeyo S.A. only - Single tenant)`.
+
+3. **Configurar la Plataforma y Redirect URIs:**
+   - En la sección **Redirect URI (URI de redirección)**:
+     - Seleccionar tipo: **Single-page application (SPA)** *(Importante: no seleccionar "Web")*.
+     - Agregar los URIs correspondientes:
+       - Desarrollo local: `http://localhost:5173`
+       - Producción (Netlify): `https://<tu-sitio>.netlify.app`
+   - *(Podés agregar ambos URIs en cualquier momento desde **Authentication** → **Single-page application**).*
+
+4. **Flujos Implícitos (Authentication):**
+   - En el menú lateral **Authentication**:
+     - En **Implicit grant and hybrid flows**, marcar:
+       - `ID tokens (used for implicit and hybrid flows)`
+       - `Access tokens (used for implicit flows)`
+     - Guardar los cambios.
+
+5. **Permisos de API (API Permissions):**
+   - En **API permissions**, verificar que esté presente `Microsoft Graph` con el permiso delegado:
+     - `User.Read` (Delegated)
+   - Hacer clic en **Grant admin consent for Don Yeyo S.A.** (Conceder consentimiento de administrador) para que los usuarios no reciban solicitudes de aprobación en su primer acceso.
+
+6. **Copiar Parámetros de Entorno:**
+   - Ir a **Overview (Información general)** y copiar:
+     - **Application (client) ID:** colocar en `VITE_AZURE_AD_CLIENT_ID`
+     - **Directory (tenant) ID:** colocar en `VITE_AZURE_AD_TENANT_ID`
+
+---
+
 ## 🔐 Seguridad y Principio de Cero Confianza (Zero-Trust)
 
 Este sistema implementa un modelo de seguridad estricto para evitar elevación de privilegios:
