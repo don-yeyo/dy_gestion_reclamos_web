@@ -1,22 +1,53 @@
+const fs = require('fs');
 const path = require('path');
 const { google } = require('googleapis');
 
 class GoogleSheetsService {
     constructor() {
-        const keyFilePath = path.resolve(
-            __dirname,
-            '..',
-            process.env.GOOGLE_SERVICE_ACCOUNT_JSON_PATH || 'credentials/reclamos-service-account.json'
-        );
+        this.spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID || process.env.GOOGLE_SHEET_ID;
+        this.tabName = process.env.GOOGLE_SHEETS_TAB_NAME || process.env.GOOGLE_SHEET_TAB || 'Reclamos 2023';
 
-        this.auth = new google.auth.GoogleAuth({
-            keyFile: keyFilePath,
+        // Opciones de autenticación con Google
+        const authOptions = {
             scopes: ['https://www.googleapis.com/auth/spreadsheets']
-        });
+        };
 
+        // Si se pasa el JSON completo por variable de entorno (ideal para Netlify)
+        if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+            try {
+                authOptions.credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
+            } catch (e) {
+                console.error('[SHEETS AUTH] Error parseando GOOGLE_SERVICE_ACCOUNT_JSON:', e.message);
+            }
+        }
+
+        // Si no se cargó por credentials directas, buscar archivo local
+        if (!authOptions.credentials) {
+            const possiblePaths = [
+                process.env.GOOGLE_SERVICE_ACCOUNT_JSON_PATH,
+                process.env.GOOGLE_APPLICATION_CREDENTIALS,
+                'credentials/reclamos-501813-311b1979c9e5.json',
+                'credentials/reclamos-service-account.json'
+            ].filter(Boolean);
+
+            let resolvedKeyPath = null;
+            for (const p of possiblePaths) {
+                const absPath = path.isAbsolute(p) ? p : path.resolve(__dirname, '..', p);
+                if (fs.existsSync(absPath)) {
+                    resolvedKeyPath = absPath;
+                    break;
+                }
+            }
+
+            if (resolvedKeyPath) {
+                authOptions.keyFile = resolvedKeyPath;
+            } else {
+                console.warn('[SHEETS AUTH] No se encontró archivo de credenciales en rutas conocidas.');
+            }
+        }
+
+        this.auth = new google.auth.GoogleAuth(authOptions);
         this.sheets = google.sheets({ version: 'v4', auth: this.auth });
-        this.spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
-        this.tabName = process.env.GOOGLE_SHEETS_TAB_NAME || 'Reclamos 2023';
     }
 
     /**
