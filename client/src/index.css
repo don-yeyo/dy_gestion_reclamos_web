@@ -556,3 +556,107 @@ body {
   border-color: var(--dy-blue);
   background: var(--surface);
 }
+
+/* ==============================================================================
+   ESTÁNDAR DON YEYO: LOGIN SCREEN & BOTÓN MICROSOFT
+   ============================================================================== */
+.login-container {
+  padding: 24px;
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  height: 100vh;
+}
+
+.mode-toggle {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  color: var(--text);
+  transition: all 0.2s ease;
+}
+
+.mode-toggle:hover {
+  background: var(--surface-hover);
+  transform: scale(1.05);
+}
+
+.login-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  align-items: center;
+  margin-top: 16px;
+}
+
+/* Modo Claro: Fondo AZUL (#0d2c5c) con letras BLANCAS (#ffffff) */
+.btn-microsoft {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px 24px !important;
+  gap: 14px !important;
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  border-radius: 12px !important;
+  width: 100% !important;
+  max-width: 320px !important;
+  min-width: 280px !important;
+  white-space: nowrap !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  background-color: var(--dy-blue, #0d2c5c) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--dy-blue, #0d2c5c) !important;
+  box-shadow: 0 4px 12px rgba(13, 44, 92, 0.2) !important;
+  cursor: pointer !important;
+}
+
+.btn-microsoft:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 8px 20px rgba(13, 44, 92, 0.35) !important;
+  background-color: #0a234a !important;
+  border-color: #0a234a !important;
+}
+
+/* Modo Oscuro: Fondo BLANCO (#ffffff) con letras AZULES (#0d2c5c) */
+[data-theme="dark"] .btn-microsoft,
+.dark-theme .btn-microsoft {
+  background-color: #ffffff !important;
+  color: #0d2c5c !important;
+  border: 1px solid #ffffff !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-theme="dark"] .btn-microsoft:hover,
+.dark-theme .btn-microsoft:hover {
+  background-color: #f8fafc !important;
+  color: #0d2c5c !important;
+  border-color: #ffffff !important;
+  box-shadow: 0 8px 24px rgba(255, 255, 255, 0.25) !important;
+  transform: translateY(-3px) !important;
+}
+
+@media (max-width: 480px) {
+  .login-container {
+    padding: 32px 16px !important;
+  }
+
+  .btn-microsoft {
+    padding: 14px 20px !important;
+    font-size: 1.05rem !important;
+    width: 100% !important;
+  }
+}

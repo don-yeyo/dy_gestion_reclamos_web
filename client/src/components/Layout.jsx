@@ -3,10 +3,10 @@ import { Outlet } from 'react-router-dom';
 import { Header } from './Header';
 import { Drawer } from './Drawer';
 import { useAuth } from '../config/AuthContext';
-import { LogIn, ShieldAlert } from 'lucide-react';
+import LoginScreen from './LoginScreen';
 
 export const Layout = () => {
-    const { isAuthenticated, loading, authError, loginMicrosoft } = useAuth();
+    const { isAuthenticated, loading } = useAuth();
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [darkMode, setDarkMode] = useState(() => {
         return localStorage.getItem('dy_theme') === 'dark';
@@ -37,40 +37,7 @@ export const Layout = () => {
     }
 
     if (!isAuthenticated) {
-        return (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--background)', padding: 20 }}>
-                <div className="glass" style={{ maxWidth: 440, width: '100%', padding: 40, borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
-                    <div style={{ marginBottom: 20 }}>
-                        <h1 style={{ color: 'var(--dy-red)', margin: 0, fontWeight: 900, fontSize: '2rem' }}>DON YEYO</h1>
-                        <p style={{ color: 'var(--dy-blue)', margin: '4px 0 0 0', fontWeight: 600 }}>Gestión de Reclamos Web</p>
-                    </div>
-
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: 28, lineHeight: 1.5 }}>
-                        Acceso exclusivo para personal autorizado de Don Yeyo S.A. Iniciá sesión con tu cuenta corporativa de Microsoft Office 365.
-                    </p>
-
-                    {authError && (
-                        <div style={{ background: 'var(--error-bg)', color: '#b91c1c', border: '1px solid rgba(239, 68, 68, 0.3)', padding: 12, borderRadius: 'var(--radius-sm)', marginBottom: 20, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left' }}>
-                            <ShieldAlert size={20} style={{ flexShrink: 0 }} />
-                            <span>{authError}</span>
-                        </div>
-                    )}
-
-                    <button
-                        className="btn btn-primary"
-                        onClick={loginMicrosoft}
-                        style={{ width: '100%', padding: '14px 20px', fontSize: '0.95rem' }}
-                    >
-                        <LogIn size={18} />
-                        <span>Iniciar Sesión con Microsoft</span>
-                    </button>
-
-                    <div style={{ marginTop: 24, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        Don Yeyo S.A. | Seguridad y Control de Calidad
-                    </div>
-                </div>
-            </div>
-        );
+        return <LoginScreen />;
     }
 
     return (
