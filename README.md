@@ -6,7 +6,7 @@ Sistema integral corporativo para la recepción, triaje geográfico, aprobación
 
 ## 🏗 Arquitectura del Proyecto
 
-El proyecto está estructurado como un **Monorepo** con separación estricta entre Frontend y Backend:
+El proyecto está organizado en dos componentes desacoplados con sus propios entornos y dependencias independientes, preparado para despliegue serverless continuo en **Netlify**:
 
 ```
 dy_gestion_reclamos_web/
@@ -19,7 +19,8 @@ dy_gestion_reclamos_web/
 │   │   ├── index.css           # Sistema de diseño Don Yeyo (Dark/Light + Glassmorphism)
 │   │   ├── App.jsx             # Enrutamiento con React Router DOM
 │   │   └── main.jsx            # Entry point
-│   ├── .env.template           # Variables de entorno del cliente
+│   ├── .env                    # Variables locales de entorno del cliente
+│   ├── .env.template           # Plantilla documentada
 │   └── package.json
 │
 ├── server/                     # Backend API REST en Node.js + Express
@@ -33,13 +34,49 @@ dy_gestion_reclamos_web/
 │   │   ├── emailWorkflowService.js  # Envío de correos y generación de tokens HMAC seguros
 │   │   └── cronFollowupService.js   # Reglas de seguimiento de días N, M, O, P, F
 │   ├── index.js                # Servidor Express con Helmet, CORS y Rate Limiting
-│   ├── .env.template           # Variables de entorno del servidor
+│   ├── netlify-handler.js      # Handler Serverless para Netlify Functions
+│   ├── .env                    # Variables locales de entorno del servidor
+│   ├── .env.template           # Plantilla documentada
 │   └── package.json
 │
+├── netlify.toml                # Orquestación de build, redirects SPA y funciones serverless
 ├── .gitignore                  # Exclusión de credenciales y node_modules
-├── package.json                # Scripts raíz para orquestación con Concurrently
 └── README.md
 ```
+
+---
+
+## 🚀 Ejecución en Desarrollo Local
+
+Cada parte se levanta desde su propio directorio para evitar duplicación de variables de entorno:
+
+### Backend (`server`)
+```bash
+cd server
+npm install
+npm run dev
+# Servidor Express activo en http://localhost:3001
+```
+
+### Frontend (`client`)
+```bash
+cd client
+npm install
+npm run dev
+# Interfaz Web activa en http://localhost:5173
+```
+
+---
+
+## ☁️ Despliegue en Netlify
+
+El archivo [netlify.toml](file:///C:/Users/gabrielt/Documents/Proyectos/GestionReclamosWeb/dy_gestion_reclamos_web/netlify.toml) ubicado en la raíz se encarga de:
+1. Instalar dependencias en `server` y `client` y construir el bundle de producción del cliente (`publish = "client/dist"`).
+2. Empaquetar el backend de Express como una **Netlify Function** serverless (`functions = "server"` con `netlify-handler.js`).
+3. Redirigir llamadas de `/api/*` automáticamente al handler serverless (`/.netlify/functions/netlify-handler/:splat`).
+4. Redirigir rutas de navegación SPA (`/*`) a `/index.html`.
+
+En las variables de entorno de la configuración de Netlify (Site Settings -> Environment variables), ingresar las mismas variables detalladas en `server/.env` y `client/.env`.
 
 ---
 
@@ -62,55 +99,25 @@ Este sistema implementa un modelo de seguridad estricto para evitar elevación d
 ## ⚙️ Variables de Entorno
 
 ### Backend (`server/.env`)
-| Variable | Descripción | Ejemplo |
+| Variable | Descripción | Valor Configurado |
 | :--- | :--- | :--- |
 | `PORT` | Puerto del servidor Express | `3001` |
-| `APP_SECRET` | Clave secreta para firma de JWT y tokens de acción | `clavesecretacompleja2026` |
+| `APP_SECRET` | Clave secreta para firma de JWT y tokens de acción | `dy_reclamos_secret_...` |
 | `GOOGLE_SHEET_ID` | ID de la hoja de cálculo de Reclamos | `1mIfYKCbjkTcNJM9Uek_DGgogVL8nXPhkfHXN4szV-S4` |
 | `GOOGLE_SHEET_TAB` | Nombre de la pestaña de reclamos | `Reclamos 2023` |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Ruta al JSON de la cuenta de servicio | `credentials/reclamos-service-account.json` |
 | `RECLAMOS_NUMERO_CORTE` | ID numérico de reclamo a partir del cual se gestionan | `20233357` |
-| `EMAILS_ADMINS` | Correos con rol de Administrador (separados por coma) | `administracion@donyeyo.com.ar` |
+| `EMAILS_ADMINS` | Correos con rol de Administrador | `administracion@donyeyo.com.ar` |
 | `EMAILS_INOCUIDAD` | Correos de Calidad e Inocuidad | `inocuidad@donyeyo.com.ar` |
-| `SMTP_*` | Credenciales del servidor de correo saliente | `smtp.office365.com` / `587` |
+| `SMTP_*` | Credenciales del servidor de correo saliente | Host: `vps-1722445-x.dattaweb.com` / Port: `465` |
 
 ### Frontend (`client/.env`)
-| Variable | Descripción | Ejemplo |
+| Variable | Descripción | Valor Configurado |
 | :--- | :--- | :--- |
 | `VITE_API_URL` | URL base de la API del servidor | `http://localhost:3001/api` |
-| `VITE_AZURE_AD_CLIENT_ID` | Client ID de la App registrada en Azure Entra ID | `uuid-azure-app` |
-| `VITE_AZURE_AD_TENANT_ID` | Tenant ID de Microsoft Office 365 | `uuid-azure-tenant` |
-| `VITE_MOCK_AUTH` | Habilitar usuario mock para desarrollo local | `true` / `false` |
-| `VITE_MOCK_AUTH_EMAIL` | Email del usuario mock para testing | `administracion@donyeyo.com.ar` |
-
----
-
-## 🚀 Instalación y Puesta en Marcha
-
-### Prerrequisitos
-- **Node.js** >= 18.x
-- **npm** >= 9.x
-
-### 1. Clonar e Instalar Dependencias
-Desde la raíz del proyecto:
-```bash
-# Instala las dependencias en raíz, server y client simultáneamente
-npm run install-all
-```
-
-### 2. Configurar Variables de Entorno
-Copiar las plantillas en `server` y `client`:
-```bash
-cp server/.env.template server/.env
-cp client/.env.template client/.env
-```
-*(Completar los valores reales según corresponda).*
-
-### 3. Ejecutar en Modo Desarrollo
-Para iniciar ambos servidores (Express en puerto `3001` y Vite en puerto `5173`) con un solo comando:
-```bash
-npm run dev
-```
+| `VITE_AZURE_AD_CLIENT_ID` | Client ID de la App registrada en Azure Entra ID | `07bfe8e1-8030-4bee-b423-9f7429de0f03` |
+| `VITE_AZURE_AD_TENANT_ID` | Tenant ID de Microsoft Office 365 | `fd8a7e94-3179-471f-b79c-a64f8bfc8536` |
+| `VITE_MOCK_AUTH` | Habilitar usuario mock para desarrollo local | `false` |
 
 ---
 
@@ -122,12 +129,12 @@ npm run dev
    - El reclamo nace con `estado_admin: Pendiente`, `estado_supervisor: Pendiente`, `estado_inocuidad: Pendiente`.
 
 2. **Aprobación de Administración:**
-   - El administrador ingresa a la plataforma web corporativa.
+   - El administrador ingresa a la plataforma web corporativa con SSO Microsoft.
    - Revisa las fotos/evidencias y decide: **Aprobar** o **Desaprobar** (indicando motivo).
    - Al aprobar, se dispara un correo con el producto de cortesía calculado al supervisor asignado.
 
 3. **Acción del Supervisor:**
-   - El supervisor recibe el correo con botones de acción directa: **Confirmar Entrega** o **Informar Imposibilidad**.
+   - El supervisor recibe el correo con botones de acción directa: **Confirmar Entrega** o **Informar Imposibilidad** (enlace tokenizado).
    - Si no responde transcurridos $N$ días, el cron de seguimiento envía recordatorios y escala a administración si se superan los plazos máximos.
 
 4. **Validación del Consumidor:**

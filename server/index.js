@@ -78,11 +78,15 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Iniciar servidor
-app.listen(PORT, () => {
-    console.log(`====================================================`);
-    console.log(`🚀 DY-GESTIÓN-RECLAMOS API Server corriendo en puerto ${PORT}`);
-    console.log(`📍 Entorno: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`✂️  Corte de Reclamos: ID >= ${process.env.RECLAMOS_NUMERO_CORTE || '0'}`);
-    console.log(`====================================================`);
-});
+// Iniciar servidor local si no está corriendo como Serverless Function de Netlify
+if (!process.env.NETLIFY) {
+    app.listen(PORT, () => {
+        console.log(`====================================================`);
+        console.log(`🚀 DY-GESTIÓN-RECLAMOS API Server corriendo en puerto ${PORT}`);
+        console.log(`📍 Entorno: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`✂️  Corte de Reclamos: ID >= ${process.env.RECLAMOS_NUMERO_CORTE || '0'}`);
+        console.log(`====================================================`);
+    });
+}
+
+module.exports = app;
