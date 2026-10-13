@@ -23,8 +23,8 @@ export const Header = ({ onToggleDrawer, darkMode, onToggleTheme }) => {
                     <Menu size={22} />
                 </button>
                 <div className="app-logo">
-                    <span style="color: var(--dy-red); font-weight: 900;">DON YEYO</span>
-                    <span style="opacity: 0.85; font-size: 0.95rem; font-weight: 500;">Reclamos Web</span>
+                    <span style={{ color: 'var(--dy-red)', fontWeight: 900 }}>DON YEYO</span>
+                    <span style={{ opacity: 0.85, fontSize: '0.95rem', fontWeight: 500 }}>Reclamos Web</span>
                 </div>
                 <span className="app-version-tag">v1.0.0</span>
             </div>
