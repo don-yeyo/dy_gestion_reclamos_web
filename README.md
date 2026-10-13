@@ -143,9 +143,9 @@ Este sistema implementa un modelo de seguridad estricto para evitar elevación d
 | :--- | :--- | :--- |
 | `PORT` | Puerto del servidor Express local | `3001` |
 | `APP_SECRET` | Clave secreta para firma de JWT y tokens de acción | *(string secreto)* |
-| `GOOGLE_SHEET_ID` | ID de la hoja de cálculo de Reclamos | *(Google Spreadsheet ID)* |
-| `GOOGLE_SHEET_TAB` | Nombre de la pestaña de reclamos | `Reclamos 2023` |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Ruta al JSON de la cuenta de servicio | `credentials/reclamos-service-account.json` |
+| `GOOGLE_SHEETS_SPREADSHEET_ID` | ID de la hoja de cálculo de Reclamos | *(Google Spreadsheet ID)* |
+| `GOOGLE_SHEETS_TAB_NAME` | Nombre de la pestaña de reclamos | `Reclamos 2023` |
+| `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` | Ruta al JSON de la cuenta de servicio | `credentials/reclamos-501813-311b1979c9e5.json` |
 | `RECLAMOS_NUMERO_CORTE` | ID numérico de corte a partir del cual se gestionan | `20233357` |
 | `EMAILS_ADMINS` | Correos con rol de Administrador | `admin1@empresa.com,admin2@empresa.com` |
 | `EMAILS_INOCUIDAD` | Correos de Calidad e Inocuidad | `calidad@empresa.com` |
