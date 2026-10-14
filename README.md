@@ -203,32 +203,28 @@ Este sistema implementa un modelo de seguridad estricto para evitar elevación d
    - El reclamo nace con `estado_admin: Pendiente`, `estado_supervisor: Pendiente`, `estado_inocuidad: Pendiente`, `estado_consumidor: Pendiente`.
    - Se envía un correo interno a administración con un **enlace único y seguro (Webhook Anti-tampering con JWT/HMAC)** para iniciar la gestión con un solo clic.
 
-2. **Inicio de Gestión Administrativa ("En curso"):**
-   - El administrador puede pulsar el botón **"Poner En Curso"** directamente desde su correo electrónico o seleccionarlo desde el panel del Gestor Web.
+2. **Inicio de Acción de Compensación ("En curso"):**
+   - El administrador inicia la **Acción de Compensación** desde el correo electrónico inicial o desde el diagrama del Gestor Web.
    - **Efectos automáticos:**
      - `estado_admin` pasa a **"En curso"**.
-     - `estado_consumidor` se sincroniza automáticamente a **"En curso"**.
-     - Se blanquean motivos de desaprobación previos.
-     - **Disparo del flujo:** Se envía automáticamente el correo con las instrucciones de la acción comercial requerida (cortesía o reposición) al **Supervisor asignado**.
+     - `estado_consumidor` se sincroniza a **"En curso"**.
+     - Se asigna o ratifica el supervisor comercial y su `estado_supervisor` se coloca en **"Pendiente"**.
+     - **Disparo del flujo:** Se despacha un correo con las instrucciones detalladas de reposición y retribución (productos de cortesía) al **Supervisor asignado**.
 
-3. **Decisiones de Administración (Workflow Interactivo):**
-   - El detalle del reclamo cuenta con un diagrama de flujo interactivo por etapas (`1. Recepción` ➔ `2. En Curso` ➔ `3. Aprobado` / `Desaprobado`).
-   - Permite transiciones bidireccionales según corresponda:
-     - **Pendiente ➔ En curso:** Inicia gestión y alerta al supervisor.
-     - **En curso ➔ Pendiente:** Reversión a estado de recepción en caso de apertura por error.
-     - **En curso ➔ Aprobado / Desaprobado:** Conclusión de la gestión administrativa.
-     - **Aprobado / Desaprobado ➔ Reabrir / Reconsiderar:** Permite volver a poner el reclamo en curso si se recibe nueva evidencia.
-   - **Desaprobar:** Requiere ingresar el motivo correspondiente; automáticamente pasa `estado_supervisor`, `estado_consumidor` y `estado_inocuidad` a *"Sin acciones"*.
-
-4. **Acción del Supervisor:**
-   - El supervisor recibe el correo con botones de acción directa: **Pude Resolver la Acción** (webhook instantáneo) o **Existe una Imposibilidad** (enlace seguro tokenizado al formulario web corporativo).
-   - Si no responde transcurridos $N$ días, el cron de seguimiento envía recordatorios y escala a administración si se superan los plazos máximos.
-
-5. **Validación del Consumidor:**
-   - Tras la resolución por parte del supervisor, se consulta automáticamente al consumidor sobre la recepción del producto (Conforme, Disconforme, No resuelto).
-
-6. **Dictamen de Calidad / Inocuidad:**
-   - El departamento de Inocuidad evalúa lote, vencimiento, defecto y evidencias ZIP, registrando dictamen de **Resuelto** o **Imposibilidad**.
+3. **Ciclo de Vida y Ramas de Decisión:**
+   - **Recepción (Pendiente Admin):** Etapa de ingreso y evaluación de procedencia.
+     - **Desaprobar:** Válido únicamente en Recepción. Requiere motivo de rechazo; pasa los estados derivados a *"Sin acciones"*.
+     - **Iniciar Compensación:** Requiere tener un supervisor asignado. Deriva al flujo de compensación en campo.
+   - **Acción de Compensación (Supervisor):**
+     - Al cabo de $N$ días (`CRON_SUPERVISOR_DIAS_CONSULTA`, por defecto 5), el cron automatizado envía un correo de seguimiento con botones de acción directa:
+       - **Concreté la Entrega / Resuelto:** Webhook instantáneo con token criptográfico HMAC.
+       - **Existe un Impedimento / Imposibilidad:** Enlace seguro tokenizado para indicar el motivo del impedimento.
+     - Si no responde transcurrido el intervalo (`CRON_SUPERVISOR_DIAS_REINTENTO`), se reenvía el correo hasta alcanzar el tope configurado (`CRON_SUPERVISOR_MAX_REINTENTOS`).
+     - Al agotarse los reintentos sin respuesta, el sistema escala el reclamo a administración automáticamente.
+   - **Control de Inocuidad y Calidad:**
+     - El departamento de Inocuidad evalúa lote, vencimiento, defecto y evidencias ZIP, registrando dictamen de **Resuelto** o **Imposibilidad**.
+   - **Validación del Consumidor:**
+     - Tras la entrega de la compensación, el cron consulta automáticamente al consumidor sobre su conformidad (`CRON_CONSUMIDOR_DIAS_CONSULTA`).
 
 ---
 

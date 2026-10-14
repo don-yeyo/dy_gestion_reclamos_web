@@ -18,7 +18,8 @@ import {
     RotateCcw,
     GitBranch,
     Clock,
-    CheckCircle2
+    CheckCircle2,
+    Gift
 } from 'lucide-react';
 
 const SUPERVISORES_LISTA = [
@@ -58,20 +59,20 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
 
     const handlePonerEnCurso = async () => {
         if (!hasSupervisor) {
-            alert('Debe asignar un supervisor comercial antes de poner el reclamo En Curso.');
+            alert('Debe asignar un supervisor comercial antes de iniciar la Acción de Compensación.');
             return;
         }
 
-        if (!window.confirm(`¿Iniciar gestión comercial para el reclamo #${claim.id}?\n\nEl reclamo pasará a "En curso" y se enviará automáticamente el correo con instrucciones al supervisor ${claim.supervisor}.`)) return;
+        if (!window.confirm(`¿Iniciar Acción de Compensación para el reclamo #${claim.id}?\n\nEl reclamo pasará a "En curso" y se enviará automáticamente un correo electrónico con instrucciones al supervisor ${claim.supervisor} para entregar la reposición y retribución al consumidor.`)) return;
 
         setUpdating(true);
         setActionMsg(null);
         try {
             await reclamosApi.updateEstadoAdmin(claim.id, 'En curso');
-            setActionMsg({ type: 'success', text: 'Reclamo puesto "En curso". Se notificó al supervisor con las instrucciones correspondientes.' });
+            setActionMsg({ type: 'success', text: 'Acción de Compensación iniciada. Se notificó al supervisor con las instrucciones de reposición/retribución.' });
             onRefresh();
         } catch (e) {
-            setActionMsg({ type: 'error', text: 'Error al poner en curso: ' + (e.response?.data?.error || e.message) });
+            setActionMsg({ type: 'error', text: 'Error al iniciar Acción de Compensación: ' + (e.response?.data?.error || e.message) });
         } finally {
             setUpdating(false);
         }
@@ -247,7 +248,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                             <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
                                 {isEnRecepcion && 'Reclamo pendiente de evaluación administrativa.'}
                                 {isDesaprobado && 'Reclamo desaprobado y cerrado.'}
-                                {isEnCurso && 'Recepción superada. Reclamo en gestión comercial.'}
+                                {isEnCurso && 'Recepción superada. Reclamo en Acción de Compensación.'}
                             </div>
 
                             {isEnRecepcion && (
@@ -255,7 +256,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                     className="wf-node-btn wf-danger"
                                     onClick={() => setShowDesaprobarPrompt(true)}
                                     disabled={updating}
-                                    title="Desaprobar reclamo: Marca el reclamo como no procedente desde recepción y cancela las derivaciones comerciales."
+                                    title="Desaprobar reclamo: Marca el reclamo como no procedente desde recepción y cancela las derivaciones de compensación."
                                 >
                                     <X size={14} />
                                     <span>Desaprobar</span>
@@ -270,11 +271,11 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                             )}
                         </div>
 
-                        {/* RAMA 2: GESTIÓN COMERCIAL (SUPERVISOR) */}
+                        {/* RAMA 2: ACCIÓN DE COMPENSACIÓN (SUPERVISOR) */}
                         <div className={`wf-branch-card ${isEnCurso ? 'active' : ''}`}>
                             <div className="wf-branch-title">
-                                <GitBranch size={14} style={{ color: 'var(--primary)' }} />
-                                <span>2. Gestión Comercial</span>
+                                <Gift size={14} style={{ color: 'var(--primary)' }} />
+                                <span>2. Acción de Compensación</span>
                             </div>
 
                             {/* Asignación de Supervisor */}
@@ -300,34 +301,39 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                         className="btn btn-secondary"
                                         onClick={handleGuardarSupervisor}
                                         disabled={updating || !selectedSupervisor || selectedSupervisor === claim.supervisor}
-                                        title="Guardar reasignación del supervisor comercial para este reclamo"
+                                        title="Guardar asignación del supervisor para la Acción de Compensación"
                                     >
                                         Asignar
                                     </button>
                                 </div>
                             )}
 
-                            {/* Botón de inicio de gestión en En Curso */}
+                            {/* Botón de inicio de compensación */}
                             {isEnRecepcion && (
                                 <button
                                     className="wf-node-btn wf-primary"
                                     onClick={handlePonerEnCurso}
                                     disabled={updating || !hasSupervisor}
                                     title={!hasSupervisor
-                                        ? "Debe asignar un supervisor comercial antes de poder iniciar la gestión comercial"
-                                        : "Iniciar Gestión Comercial: Envía las instrucciones al supervisor comercial asignado y pasa el reclamo a En Curso"}
+                                        ? "Debe asignar un supervisor comercial antes de poder iniciar la Acción de Compensación"
+                                        : "Iniciar Acción de Compensación: Dispara el correo de instrucciones al supervisor asignado para entregar la reposición y retribución al consumidor. El estado del supervisor queda en Pendiente para seguimiento automático."}
                                 >
                                     <Play size={14} />
-                                    <span>Iniciar Gestión</span>
+                                    <span>Iniciar Compensación</span>
                                 </button>
                             )}
 
-                            {/* Derivación del Supervisor */}
+                            {/* Derivación y Seguimiento del Supervisor */}
                             {isEnCurso && (
                                 <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 6 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem' }}>
                                         <span style={{ color: 'var(--text-muted)' }}>Estado Supervisor:</span>
                                         <StatusBadge status={claim.estado_supervisor} />
+                                    </div>
+                                    <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
+                                        {claim.estado_supervisor === 'Pendiente' && 'Supervisor notificado. El sistema enviará recordatorios de seguimiento automático para que confirme la entrega o reporte algún impedimento.'}
+                                        {claim.estado_supervisor === 'Resuelto' && 'Compensación entregada y confirmada por el supervisor.'}
+                                        {claim.estado_supervisor === 'Imposibilidad' && 'El supervisor reportó un impedimento para concretar la entrega.'}
                                     </div>
                                     {claim.estado_supervisor === 'Resuelto' && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--success)', fontSize: '0.78rem', fontWeight: 600 }}>
