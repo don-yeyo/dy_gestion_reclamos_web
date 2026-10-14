@@ -54,6 +54,19 @@ router.get('/info', async (req, res) => {
 });
 
 /**
+ * GET /api/supervisores/raw
+ * Retorna el archivo GeoJSON crudo activo para descarga o edición en geojson.io
+ */
+router.get('/raw', async (req, res) => {
+    try {
+        const geojson = await supervisorLookupService.getRawGeoJSON();
+        res.json(geojson);
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/**
  * POST /api/supervisores/upload
  * Permite a administradores subir un nuevo archivo GeoJSON de cobertura
  */

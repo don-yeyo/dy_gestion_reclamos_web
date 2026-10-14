@@ -146,20 +146,20 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
 
             {/* Motivos si aplican */}
             {claim.admin_motivo_desaprobado && (
-                <div style={{ background: 'var(--error-bg)', padding: 12, borderRadius: 'var(--radius-sm)', marginBottom: 16, fontSize: '0.88rem' }}>
+                <div style={{ background: 'var(--error-bg)', color: 'var(--error)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: 12, borderRadius: 'var(--radius-sm)', marginBottom: 16, fontSize: '0.88rem' }}>
                     <strong>Motivo de Desaprobación (Admin):</strong> {claim.admin_motivo_desaprobado}
                 </div>
             )}
             {claim.supervisor_motivo_imposibilidad && (
-                <div style={{ background: '#fef3c7', padding: 12, borderRadius: 'var(--radius-sm)', marginBottom: 16, fontSize: '0.88rem', border: '1px solid #fde68a' }}>
+                <div style={{ background: 'var(--warning-bg)', color: 'var(--warning)', border: '1px solid rgba(245, 158, 11, 0.3)', padding: 12, borderRadius: 'var(--radius-sm)', marginBottom: 16, fontSize: '0.88rem' }}>
                     <strong>Motivo de Imposibilidad (Supervisor):</strong> {claim.supervisor_motivo_imposibilidad}
                 </div>
             )}
 
             {/* Panel de Decisiones de Administración */}
             {isAdmin && (
-                <div style={{ background: 'var(--surface)', border: '2px solid var(--dy-blue)', padding: 16, borderRadius: 'var(--radius-md)', marginBottom: 24 }}>
-                    <h4 style={{ margin: '0 0 10px 0', color: 'var(--dy-blue)' }}>Acciones de Administración</h4>
+                <div style={{ background: 'var(--surface)', border: '2px solid var(--primary)', padding: 16, borderRadius: 'var(--radius-md)', marginBottom: 24 }}>
+                    <h4 style={{ margin: '0 0 10px 0', color: 'var(--heading-color)' }}>Acciones de Administración</h4>
 
                     {!showDesaprobarPrompt ? (
                         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -215,7 +215,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
 
             {/* Datos del Consumidor */}
             <div style={{ marginBottom: 24 }}>
-                <h4 style={{ color: 'var(--dy-blue)', borderBottom: '1px solid var(--border)', paddingBottom: 6, marginBottom: 12 }}>
+                <h4 style={{ color: 'var(--heading-color)', borderBottom: '1px solid var(--border)', paddingBottom: 6, marginBottom: 12 }}>
                     Datos del Consumidor
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, fontSize: '0.9rem' }}>
@@ -234,7 +234,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
             <div style={{ marginBottom: 24, padding: 14, background: 'var(--surface-subtle)', borderRadius: 'var(--radius-md)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
                     <div>
-                        <h4 style={{ margin: 0, color: 'var(--dy-blue)' }}>Supervisor Comercial Asignado</h4>
+                        <h4 style={{ margin: 0, color: 'var(--heading-color)' }}>Supervisor Comercial Asignado</h4>
                         <span style={{ fontSize: '0.9rem' }}>{claim.supervisor} ({claim.supervisor_email})</span>
                     </div>
                     {isAdmin && (
@@ -261,7 +261,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                 <div style={{ marginBottom: 24, padding: 14, background: 'rgba(139, 92, 246, 0.08)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
                         <div>
-                            <h4 style={{ margin: 0, color: '#6d28d9' }}>Control de Inocuidad y Calidad</h4>
+                            <h4 style={{ margin: 0, color: 'var(--info)' }}>Control de Inocuidad y Calidad</h4>
                             <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                                 Al pasar a "Pendiente", se notifica a Inocuidad con los materiales del caso.
                             </span>
@@ -284,13 +284,13 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
 
             {/* Productos reclamados */}
             <div style={{ marginBottom: 20 }}>
-                <h4 style={{ color: 'var(--dy-blue)', borderBottom: '1px solid var(--border)', paddingBottom: 6, marginBottom: 12 }}>
+                <h4 style={{ color: 'var(--heading-color)', borderBottom: '1px solid var(--border)', paddingBottom: 6, marginBottom: 12 }}>
                     Productos Reclamados ({claim.items.length})
                 </h4>
                 {claim.items.map((item, idx) => (
                     <div key={idx} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 16, marginBottom: 12 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                            <strong style={{ fontSize: '1rem', color: 'var(--dy-blue)' }}>
+                            <strong style={{ fontSize: '1rem', color: 'var(--heading-color)' }}>
                                 #{idx + 1} [{item.marca}] {item.producto}
                             </strong>
                             <span className="badge badge-sin-acciones">Cantidad: {item.cantidad}</span>

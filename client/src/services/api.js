@@ -57,6 +57,7 @@ export const publicApi = {
 
 export const supervisoresApi = {
     getInfo: () => api.get('/supervisores/info'),
+    getRawGeoJSON: () => api.get('/supervisores/raw'),
     lookup: (lat, lng) => api.get('/supervisores/lookup', { params: { lat, lng } }),
     uploadGeoJSON: (geojsonData) => api.post('/supervisores/upload', geojsonData)
 };

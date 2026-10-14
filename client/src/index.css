@@ -1,4 +1,4 @@
-:root {
+:root, [data-theme="light"] {
   /* Paleta Corporativa Don Yeyo S.A. */
   --dy-blue: #0d2c5c;
   --dy-blue-dark: #071935;
@@ -6,6 +6,7 @@
   --dy-red: #e40521;
   --dy-red-hover: #c4041b;
   --dy-light-gray: #f8fafc;
+  --dy-gold: #d97706;
 
   /* Tokens Genéricos - Light Mode */
   --primary: var(--dy-blue);
@@ -18,10 +19,13 @@
   --surface: #ffffff;
   --surface-hover: #f8fafc;
   --surface-subtle: #f1f5f9;
+  --surface-card: #ffffff;
 
   --text: #0d2c5c;
+  --text-primary: #0d2c5c;
   --text-secondary: #475569;
   --text-muted: #64748b;
+  --heading-color: #0d2c5c;
 
   --border: #e2e8f0;
   --border-focus: var(--dy-blue);
@@ -48,22 +52,42 @@
   --transition: all 200ms ease;
 }
 
-.dark-theme {
-  --background: #0b1329;
-  --surface: #131f3d;
-  --surface-hover: #1c2b52;
-  --surface-subtle: #192648;
+[data-theme="dark"], .dark-theme, html.dark-theme, body.dark-theme {
+  --dy-blue: #60a5fa;
+  --dy-blue-dark: #3b82f6;
+  --dy-blue-light: #93c5fd;
+  --dy-gold: #fbbf24;
+
+  --primary: #3b82f6;
+  --primary-hover: #60a5fa;
+
+  --background: #090e1a;
+  --surface: #10192e;
+  --surface-hover: #172442;
+  --surface-subtle: #142038;
+  --surface-card: #10192e;
 
   --text: #f8fafc;
+  --text-primary: #f8fafc;
   --text-secondary: #cbd5e1;
   --text-muted: #94a3b8;
+  --heading-color: #f8fafc;
 
-  --border: #23345f;
-  --border-focus: #3b82f6;
+  --border: #1e2e50;
+  --border-focus: #60a5fa;
 
-  --glass: rgba(19, 31, 61, 0.88);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --success: #34d399;
+  --success-bg: rgba(16, 185, 129, 0.16);
+  --warning: #fbbf24;
+  --warning-bg: rgba(245, 158, 11, 0.16);
+  --error: #f87171;
+  --error-bg: rgba(239, 68, 68, 0.16);
+  --info: #60a5fa;
+  --info-bg: rgba(59, 130, 246, 0.16);
+
+  --glass: rgba(16, 25, 46, 0.9);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -161,26 +185,26 @@ body {
 
 .badge-pendiente {
   background-color: var(--warning-bg);
-  color: #b45309;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, 0.35);
 }
 
 .badge-en-curso {
-  background-color: rgba(37, 99, 235, 0.12);
-  color: #2563eb;
-  border: 1px solid rgba(37, 99, 235, 0.35);
+  background-color: var(--info-bg);
+  color: var(--info);
+  border: 1px solid rgba(59, 130, 246, 0.35);
 }
 
 .badge-aprobado, .badge-resuelto, .badge-conforme {
   background-color: var(--success-bg);
-  color: #047857;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.35);
 }
 
 .badge-desaprobado, .badge-imposibilidad, .badge-no-resuelto {
   background-color: var(--error-bg);
-  color: #b91c1c;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: var(--error);
+  border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
 .badge-sin-acciones, .badge-sin-respuesta {
@@ -664,5 +688,607 @@ body {
     padding: 14px 20px !important;
     font-size: 1.05rem !important;
     width: 100% !important;
+  }
+}
+
+/* ==============================================================================
+   ESTÁNDAR DON YEYO: LISTADO DE RECLAMOS & TABLAS
+   ============================================================================== */
+.claims-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.claims-page-title-group h1 {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--heading-color);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+
+.claims-page-title-group p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 4px 0 0 0;
+}
+
+/* Chips de Métricas Rápidas */
+.claims-summary-chips {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.summary-chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  transition: var(--transition);
+}
+
+.summary-chip:hover {
+  border-color: var(--border-focus);
+  transform: translateY(-1px);
+}
+
+.summary-chip-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.summary-chip-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.summary-chip-val {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.summary-chip-lbl {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* Panel de Filtros y Búsqueda */
+.filter-panel-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.search-bar-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.search-input-field {
+  flex: 1;
+  position: relative;
+}
+
+.search-input-field input {
+  width: 100%;
+  padding: 12px 16px 12px 42px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.92rem;
+  outline: none;
+  transition: var(--transition);
+}
+
+.search-input-field input:focus {
+  border-color: var(--border-focus);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.search-input-field .search-icon-svg {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}
+
+.filter-selectors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.filter-box label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.filter-box select {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.88rem;
+  outline: none;
+  transition: var(--transition);
+}
+
+.filter-box select:focus {
+  border-color: var(--border-focus);
+  background: var(--surface);
+}
+
+/* Tabla de Reclamos */
+.claims-table-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+
+.claims-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.88rem;
+}
+
+.claims-table th {
+  padding: 14px 18px;
+  background: var(--surface-subtle);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.claims-table td {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  color: var(--text);
+}
+
+.claims-table tbody tr {
+  transition: background-color 150ms ease;
+  cursor: pointer;
+}
+
+.claims-table tbody tr:hover {
+  background-color: var(--surface-hover);
+}
+
+.claim-id-tag {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--dy-blue);
+  letter-spacing: 0.3px;
+}
+
+[data-theme="dark"] .claim-id-tag,
+.dark-theme .claim-id-tag {
+  color: #60a5fa;
+}
+
+.claim-sub-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Paginación de Tabla */
+.claims-pagination-bar {
+  padding: 16px 20px;
+  background: var(--surface-subtle);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.pagination-counter strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.pagination-buttons-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-btn {
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.page-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border-focus);
+}
+
+.page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-indicator-text {
+  padding: 0 8px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ==============================================================================
+   ESTÁNDAR DON YEYO: MODAL DE COBERTURA GEOGRÁFICA
+   ============================================================================== */
+.geo-stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.geo-stat-card {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.geo-stat-icon-wrapper {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--primary);
+}
+
+.geo-stat-num {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1;
+}
+
+.geo-stat-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* Tester de Coordenadas */
+.geo-tester-box {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.geo-tester-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--heading-color);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.geo-tester-inputs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.geo-tester-inputs input {
+  flex: 1;
+  min-width: 140px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.88rem;
+  outline: none;
+}
+
+.geo-tester-inputs input:focus {
+  border-color: var(--border-focus);
+}
+
+.geo-presets-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.geo-preset-chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+
+.geo-preset-chip:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-focus);
+  color: var(--primary);
+}
+
+.geo-test-result {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: var(--text);
+  font-size: 0.88rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.geo-test-result.not-found {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+/* Supervisores List en Modal */
+.geo-supervisors-container {
+  margin-bottom: 20px;
+}
+
+.geo-supervisors-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.geo-supervisor-item {
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+  transition: background-color 150ms ease;
+}
+
+.geo-supervisor-item:last-child {
+  border-bottom: none;
+}
+
+.geo-supervisor-item:hover {
+  background: var(--surface-hover);
+}
+
+.geo-zones-count-badge {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--dy-blue);
+}
+
+[data-theme="dark"] .geo-zones-count-badge,
+.dark-theme .geo-zones-count-badge {
+  color: #60a5fa;
+}
+
+/* Zona de Subida y Descarga GeoJSON */
+.geo-upload-card {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  text-align: center;
+  background: var(--surface-subtle);
+  transition: var(--transition);
+}
+
+.geo-upload-card:hover {
+  border-color: var(--primary);
+  background: var(--surface);
+}
+
+.geo-upload-icon {
+  width: 40px;
+  height: 40px;
+  color: var(--primary);
+  margin: 0 auto 10px auto;
+}
+
+.geo-download-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+/* ==============================================================================
+   ESTÁNDAR DON YEYO: ADAPTABILIDAD MOBILE & RESPONSIVE
+   ============================================================================== */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 16px 12px !important;
+  }
+
+  .app-header {
+    padding: 0 14px !important;
+  }
+
+  .app-version-tag {
+    display: none !important;
+  }
+
+  .user-badge {
+    padding: 4px 8px !important;
+  }
+
+  .user-badge span:first-child {
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .claims-page-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .claims-page-title-group h1 {
+    font-size: 1.4rem !important;
+  }
+
+  .claims-summary-chips {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .summary-chip {
+    padding: 8px 12px !important;
+  }
+
+  .summary-chip-val {
+    font-size: 1rem !important;
+  }
+
+  .filter-panel-card {
+    padding: 14px !important;
+  }
+
+  .filter-selectors-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .claims-pagination-bar {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 10px !important;
+  }
+
+  .modal-overlay {
+    padding: 10px !important;
+  }
+
+  .modal-content-card {
+    max-height: 96vh !important;
+    border-radius: var(--radius-md) !important;
+  }
+
+  .modal-header, .modal-body, .modal-footer {
+    padding: 16px !important;
+  }
+
+  .geo-stats-row {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .geo-tester-inputs {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .geo-download-bar {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
   }
 }

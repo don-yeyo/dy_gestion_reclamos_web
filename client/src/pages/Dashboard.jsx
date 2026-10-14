@@ -44,7 +44,7 @@ export const Dashboard = () => {
         <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
                 <div>
-                    <h1 style={{ margin: 0, color: 'var(--dy-blue)', fontSize: '1.8rem' }}>Dashboard de Reclamos</h1>
+                    <h1 style={{ margin: 0, color: 'var(--heading-color)', fontSize: '1.8rem' }}>Dashboard de Reclamos</h1>
                     <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                         Supervisión y control del flujo de trabajo automatizado de Don Yeyo S.A.
                     </p>
@@ -56,61 +56,61 @@ export const Dashboard = () => {
             </div>
 
             {error && (
-                <div style={{ background: 'var(--error-bg)', color: '#b91c1c', border: '1px solid rgba(239, 68, 68, 0.3)', padding: 14, borderRadius: 'var(--radius-md)', marginBottom: 24 }}>
+                <div style={{ background: 'var(--error-bg)', color: 'var(--error)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: 14, borderRadius: 'var(--radius-md)', marginBottom: 24 }}>
                     {error}
                 </div>
             )}
 
             <div className="dashboard-grid">
-                <div className="kpi-card glass" style={{ borderLeft: '4px solid var(--dy-blue)' }}>
+                <div className="kpi-card glass" style={{ borderLeft: '4px solid var(--primary)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span className="kpi-title">Total en Gestor</span>
-                        <Inbox size={22} color="var(--dy-blue)" />
+                        <Inbox size={22} style={{ color: 'var(--primary)' }} />
                     </div>
                     <div className="kpi-value">{loading ? '...' : kpis.total}</div>
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Filtrados por corte de ID</span>
                 </div>
 
-                <div className="kpi-card glass" style={{ borderLeft: '4px solid #f59e0b' }}>
+                <div className="kpi-card glass" style={{ borderLeft: '4px solid var(--warning)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span className="kpi-title">Pendientes Admin</span>
-                        <Clock size={22} color="#f59e0b" />
+                        <Clock size={22} style={{ color: 'var(--warning)' }} />
                     </div>
-                    <div className="kpi-value" style={{ color: '#b45309' }}>{loading ? '...' : kpis.pendientesAdmin}</div>
+                    <div className="kpi-value" style={{ color: 'var(--warning)' }}>{loading ? '...' : kpis.pendientesAdmin}</div>
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Requieren aprobación</span>
                 </div>
 
-                <div className="kpi-card glass" style={{ borderLeft: '4px solid #10b981' }}>
+                <div className="kpi-card glass" style={{ borderLeft: '4px solid var(--success)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span className="kpi-title">En Supervisión</span>
-                        <CheckCircle size={22} color="#10b981" />
+                        <CheckCircle size={22} style={{ color: 'var(--success)' }} />
                     </div>
-                    <div className="kpi-value" style={{ color: '#047857' }}>{loading ? '...' : kpis.pendientesSupervisor}</div>
+                    <div className="kpi-value" style={{ color: 'var(--success)' }}>{loading ? '...' : kpis.pendientesSupervisor}</div>
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Acción comercial en curso</span>
                 </div>
 
-                <div className="kpi-card glass" style={{ borderLeft: '4px solid var(--dy-red)' }}>
+                <div className="kpi-card glass" style={{ borderLeft: '4px solid var(--error)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span className="kpi-title">Imposibilidades</span>
-                        <AlertTriangle size={22} color="var(--dy-red)" />
+                        <AlertTriangle size={22} style={{ color: 'var(--error)' }} />
                     </div>
-                    <div className="kpi-value" style={{ color: 'var(--dy-red)' }}>{loading ? '...' : kpis.imposibilidad}</div>
+                    <div className="kpi-value" style={{ color: 'var(--error)' }}>{loading ? '...' : kpis.imposibilidad}</div>
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Supervisor reportó traba</span>
                 </div>
 
-                <div className="kpi-card glass" style={{ borderLeft: '4px solid #8b5cf6' }}>
+                <div className="kpi-card glass" style={{ borderLeft: '4px solid var(--info)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span className="kpi-title">Inocuidad / Calidad</span>
-                        <ShieldAlert size={22} color="#8b5cf6" />
+                        <ShieldAlert size={22} style={{ color: 'var(--info)' }} />
                     </div>
-                    <div className="kpi-value" style={{ color: '#7c3aed' }}>{loading ? '...' : kpis.inocuidad}</div>
+                    <div className="kpi-value" style={{ color: 'var(--info)' }}>{loading ? '...' : kpis.inocuidad}</div>
                     <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Derivados a control técnico</span>
                 </div>
             </div>
 
             <div className="table-card">
                 <div className="table-header-controls">
-                    <h3 style={{ margin: 0, color: 'var(--dy-blue)', fontSize: '1.1rem' }}>Últimos Reclamos Ingresados</h3>
+                    <h3 style={{ margin: 0, color: 'var(--heading-color)', fontSize: '1.1rem' }}>Últimos Reclamos Ingresados</h3>
                     <button className="btn btn-secondary" onClick={() => navigate('/reclamos')}>
                         <span>Ver Todos los Reclamos</span>
                         <ArrowRight size={16} />

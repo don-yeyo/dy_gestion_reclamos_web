@@ -15,7 +15,7 @@ export const Drawer = ({ isOpen, onClose, onOpenCobertura }) => {
             <aside className={`drawer-container ${isOpen ? 'open' : ''}`}>
                 <div className="drawer-header">
                     <div>
-                        <h3 style={{ margin: 0, color: 'var(--dy-blue)', fontSize: '1.1rem' }}>Menú de Gestión</h3>
+                        <h3 style={{ margin: 0, color: 'var(--heading-color)', fontSize: '1.1rem' }}>Menú de Gestión</h3>
                         <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                             Rol: <strong>{user?.role?.toUpperCase()}</strong>
                         </p>

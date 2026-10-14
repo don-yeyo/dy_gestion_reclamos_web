@@ -257,6 +257,34 @@ class SupervisorLookupService {
 
         return this.getInfo();
     }
+
+    /**
+     * Obtiene el GeoJSON completo activo para descarga / exportación
+     */
+    async getRawGeoJSON() {
+        await this.loadFeatures();
+        try {
+            const [rows] = await pool.query(
+                'SELECT geojson_content FROM cobertura_supervisores_geo WHERE activo = 1 ORDER BY version DESC LIMIT 1'
+            );
+            if (rows.length > 0 && rows[0].geojson_content) {
+                return typeof rows[0].geojson_content === 'string'
+                    ? JSON.parse(rows[0].geojson_content)
+                    : rows[0].geojson_content;
+            }
+        } catch (e) {
+            // fallback
+        }
+
+        if (fs.existsSync(this.geojsonPath)) {
+            return JSON.parse(fs.readFileSync(this.geojsonPath, 'utf8'));
+        }
+
+        return {
+            type: 'FeatureCollection',
+            features: this.featuresCache || []
+        };
+    }
 }
 
 module.exports = new SupervisorLookupService();

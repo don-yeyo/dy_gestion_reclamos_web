@@ -17,9 +17,13 @@ export const Layout = () => {
     useEffect(() => {
         if (darkMode) {
             document.documentElement.classList.add('dark-theme');
+            document.documentElement.setAttribute('data-theme', 'dark');
+            document.body.classList.add('dark-theme');
             localStorage.setItem('dy_theme', 'dark');
         } else {
             document.documentElement.classList.remove('dark-theme');
+            document.documentElement.setAttribute('data-theme', 'light');
+            document.body.classList.remove('dark-theme');
             localStorage.setItem('dy_theme', 'light');
         }
     }, [darkMode]);
