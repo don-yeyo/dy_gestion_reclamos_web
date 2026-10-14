@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from '../components/Modal';
 import { StatusBadge } from '../components/StatusBadge';
 import { reclamosApi } from '../services/api';
@@ -38,6 +38,7 @@ const SUPERVISORES_LISTA = [
 export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
     const { isAdmin, isInocuidad } = useAuth();
 
+    const [currentClaim, setCurrentClaim] = useState(claim);
     const [updating, setUpdating] = useState(false);
     const [actionMsg, setActionMsg] = useState(null);
     const [motivoDesaprobado, setMotivoDesaprobado] = useState('');
@@ -45,17 +46,27 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
     const [selectedSupervisor, setSelectedSupervisor] = useState(claim?.supervisor || '');
     const [selectedInocuidad, setSelectedInocuidad] = useState(claim?.estado_inocuidad || 'Sin acciones');
 
+    useEffect(() => {
+        if (claim) {
+            setCurrentClaim(claim);
+            setSelectedSupervisor(claim.supervisor || '');
+            setSelectedInocuidad(claim.estado_inocuidad || 'Sin acciones');
+        }
+    }, [claim]);
+
     if (!claim) return null;
 
+    const activeClaim = currentClaim || claim;
+
     const hasSupervisor = Boolean(
-        claim.supervisor &&
-        claim.supervisor.trim() !== '' &&
-        !claim.supervisor.toLowerCase().includes('sin asignar')
+        activeClaim.supervisor &&
+        activeClaim.supervisor.trim() !== '' &&
+        !activeClaim.supervisor.toLowerCase().includes('sin asignar')
     );
 
-    const isEnRecepcion = !claim.estado_admin || claim.estado_admin === 'Pendiente';
-    const isEnCurso = claim.estado_admin === 'En curso';
-    const isDesaprobado = claim.estado_admin === 'Desaprobado';
+    const isEnRecepcion = !activeClaim.estado_admin || activeClaim.estado_admin === 'Pendiente';
+    const isEnCurso = activeClaim.estado_admin === 'En curso';
+    const isDesaprobado = activeClaim.estado_admin === 'Desaprobado';
 
     const handlePonerEnCurso = async () => {
         if (!hasSupervisor) {
@@ -63,14 +74,19 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
             return;
         }
 
-        if (!window.confirm(`¿Iniciar Acción de Compensación para el reclamo #${claim.id}?\n\nEl reclamo pasará a "En curso" y se enviará automáticamente un correo electrónico con instrucciones al supervisor ${claim.supervisor} para entregar la reposición y retribución al consumidor.`)) return;
+        if (!window.confirm(`¿Iniciar Acción de Compensación para el reclamo #${activeClaim.id}?\n\nEl reclamo pasará a "En curso" y se enviará automáticamente un correo electrónico con instrucciones al supervisor ${activeClaim.supervisor} para entregar la reposición y retribución al consumidor.`)) return;
 
         setUpdating(true);
         setActionMsg(null);
         try {
-            await reclamosApi.updateEstadoAdmin(claim.id, 'En curso');
+            await reclamosApi.updateEstadoAdmin(activeClaim.id, 'En curso');
+            setCurrentClaim(prev => ({
+                ...(prev || activeClaim),
+                estado_admin: 'En curso',
+                estado_supervisor: (prev?.estado_supervisor === 'Sin acciones') ? 'Pendiente' : (prev?.estado_supervisor || 'Pendiente')
+            }));
             setActionMsg({ type: 'success', text: 'Acción de Compensación iniciada. Se notificó al supervisor con las instrucciones de reposición/retribución.' });
-            onRefresh();
+            if (onRefresh) onRefresh();
         } catch (e) {
             setActionMsg({ type: 'error', text: 'Error al iniciar Acción de Compensación: ' + (e.response?.data?.error || e.message) });
         } finally {
@@ -87,10 +103,18 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
         setUpdating(true);
         setActionMsg(null);
         try {
-            await reclamosApi.updateEstadoAdmin(claim.id, 'Desaprobado', motivoDesaprobado);
+            await reclamosApi.updateEstadoAdmin(activeClaim.id, 'Desaprobado', motivoDesaprobado);
+            setCurrentClaim(prev => ({
+                ...(prev || activeClaim),
+                estado_admin: 'Desaprobado',
+                admin_motivo_desaprobado: motivoDesaprobado,
+                estado_supervisor: 'Sin acciones',
+                estado_inocuidad: 'Sin acciones',
+                estado_consumidor: 'Sin acciones'
+            }));
             setActionMsg({ type: 'success', text: 'Reclamo desaprobado y estados derivados pasados a "Sin acciones".' });
             setShowDesaprobarPrompt(false);
-            onRefresh();
+            if (onRefresh) onRefresh();
         } catch (e) {
             setActionMsg({ type: 'error', text: 'Error: ' + (e.response?.data?.error || e.message) });
         } finally {
@@ -99,16 +123,23 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
     };
 
     const handleReiniciarFlujo = async () => {
-        if (!window.confirm(`¿Reiniciar todo el flujo del reclamo #${claim.id}?\n\nEl reclamo volverá a la etapa inicial de Recepción ("Pendiente"), permitiendo reasignar el supervisor o reevaluar la procedencia.`)) return;
+        if (!window.confirm(`¿Reiniciar todo el flujo del reclamo #${activeClaim.id}?\n\nEl reclamo volverá a la etapa inicial de Recepción ("Pendiente"), permitiendo reasignar el supervisor o reevaluar la procedencia.`)) return;
 
         setUpdating(true);
         setActionMsg(null);
         try {
-            await reclamosApi.updateEstadoAdmin(claim.id, 'Pendiente');
-            await reclamosApi.updateEstadoSupervisor(claim.id, 'Pendiente');
-            await reclamosApi.updateEstadoInocuidad(claim.id, 'Pendiente');
+            await reclamosApi.updateEstadoAdmin(activeClaim.id, 'Pendiente');
+            await reclamosApi.updateEstadoSupervisor(activeClaim.id, 'Pendiente');
+            await reclamosApi.updateEstadoInocuidad(activeClaim.id, 'Pendiente');
+            setCurrentClaim(prev => ({
+                ...(prev || activeClaim),
+                estado_admin: 'Pendiente',
+                estado_supervisor: 'Pendiente',
+                estado_inocuidad: 'Pendiente',
+                admin_motivo_desaprobado: ''
+            }));
             setActionMsg({ type: 'success', text: 'Flujo reiniciado correctamente. El reclamo se encuentra nuevamente en Recepción.' });
-            onRefresh();
+            if (onRefresh) onRefresh();
         } catch (e) {
             setActionMsg({ type: 'error', text: 'Error al reiniciar flujo: ' + (e.response?.data?.error || e.message) });
         } finally {
@@ -129,9 +160,16 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
         setUpdating(true);
         setActionMsg(null);
         try {
-            await reclamosApi.updateSupervisor(claim.id, supObj.nombre, supObj.email);
+            await reclamosApi.updateSupervisor(activeClaim.id, supObj.nombre, supObj.email);
+            // Actualización inmediata del estado local para reactividad instantánea
+            setCurrentClaim(prev => ({
+                ...(prev || activeClaim),
+                supervisor: supObj.nombre,
+                supervisor_email: supObj.email
+            }));
+            setSelectedSupervisor(supObj.nombre);
             setActionMsg({ type: 'success', text: `Supervisor asignado a ${selectedSupervisor}.` });
-            onRefresh();
+            if (onRefresh) onRefresh();
         } catch (err) {
             setActionMsg({ type: 'error', text: 'Error asignando supervisor: ' + (err.response?.data?.error || err.message) });
         } finally {
@@ -147,9 +185,13 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
         setUpdating(true);
         setActionMsg(null);
         try {
-            await reclamosApi.updateEstadoInocuidad(claim.id, selectedInocuidad);
+            await reclamosApi.updateEstadoInocuidad(activeClaim.id, selectedInocuidad);
+            setCurrentClaim(prev => ({
+                ...(prev || activeClaim),
+                estado_inocuidad: selectedInocuidad
+            }));
             setActionMsg({ type: 'success', text: `Estado de inocuidad actualizado a "${selectedInocuidad}".` });
-            onRefresh();
+            if (onRefresh) onRefresh();
         } catch (err) {
             setActionMsg({ type: 'error', text: 'Error actualizando inocuidad: ' + (err.response?.data?.error || err.message) });
         } finally {
@@ -161,7 +203,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title={`Reclamo #${claim.id}`}
+            title={`Reclamo #${activeClaim.id}`}
             maxWidth="850px"
         >
             {actionMsg && (
@@ -179,14 +221,14 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
             )}
 
             {/* Motivos activos si aplican */}
-            {claim.admin_motivo_desaprobado && (
+            {activeClaim.admin_motivo_desaprobado && (
                 <div style={{ background: 'var(--error-bg)', color: 'var(--error)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: 10, borderRadius: 'var(--radius-sm)', marginBottom: 14, fontSize: '0.82rem' }}>
-                    <strong>Motivo de Desaprobación (Admin):</strong> {claim.admin_motivo_desaprobado}
+                    <strong>Motivo de Desaprobación (Admin):</strong> {activeClaim.admin_motivo_desaprobado}
                 </div>
             )}
-            {claim.supervisor_motivo_imposibilidad && (
+            {activeClaim.supervisor_motivo_imposibilidad && (
                 <div style={{ background: 'var(--warning-bg)', color: 'var(--warning)', border: '1px solid rgba(245, 158, 11, 0.3)', padding: 10, borderRadius: 'var(--radius-sm)', marginBottom: 14, fontSize: '0.82rem' }}>
-                    <strong>Motivo de Imposibilidad (Supervisor):</strong> {claim.supervisor_motivo_imposibilidad}
+                    <strong>Motivo de Imposibilidad (Supervisor):</strong> {activeClaim.supervisor_motivo_imposibilidad}
                 </div>
             )}
 
@@ -197,7 +239,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                     <div className="workflow-top-bar">
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem' }}>
                             <span style={{ color: 'var(--text-muted)' }}>Etapa:</span>
-                            <StatusBadge status={claim.estado_admin || 'Pendiente'} />
+                            <StatusBadge status={activeClaim.estado_admin || 'Pendiente'} />
                         </div>
                         <button
                             className="btn btn-secondary"
@@ -281,14 +323,14 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                             {/* Asignación de Supervisor */}
                             <div style={{ fontSize: '0.76rem' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>Supervisor: </span>
-                                <strong>{claim.supervisor || 'Sin asignar'}</strong>
+                                <strong>{activeClaim.supervisor || 'Sin asignar'}</strong>
                             </div>
 
                             {/* Selector de supervisor disponible si está en recepción */}
                             {isEnRecepcion && (
                                 <div className="wf-select-action-row">
                                     <select
-                                        value={selectedSupervisor || claim.supervisor || ''}
+                                        value={selectedSupervisor || activeClaim.supervisor || ''}
                                         onChange={(e) => setSelectedSupervisor(e.target.value)}
                                         disabled={updating}
                                     >
@@ -300,7 +342,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                     <button
                                         className="btn btn-secondary"
                                         onClick={handleGuardarSupervisor}
-                                        disabled={updating || !selectedSupervisor || selectedSupervisor === claim.supervisor}
+                                        disabled={updating || !selectedSupervisor || selectedSupervisor === activeClaim.supervisor}
                                         title="Guardar asignación del supervisor para la Acción de Compensación"
                                     >
                                         Asignar
@@ -328,14 +370,14 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                 <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 6 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem' }}>
                                         <span style={{ color: 'var(--text-muted)' }}>Estado Supervisor:</span>
-                                        <StatusBadge status={claim.estado_supervisor} />
+                                        <StatusBadge status={activeClaim.estado_supervisor} />
                                     </div>
                                     <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
-                                        {claim.estado_supervisor === 'Pendiente' && 'Supervisor notificado. El sistema enviará recordatorios de seguimiento automático para que confirme la entrega o reporte algún impedimento.'}
-                                        {claim.estado_supervisor === 'Resuelto' && 'Compensación entregada y confirmada por el supervisor.'}
-                                        {claim.estado_supervisor === 'Imposibilidad' && 'El supervisor reportó un impedimento para concretar la entrega.'}
+                                        {activeClaim.estado_supervisor === 'Pendiente' && 'Supervisor notificado. El sistema enviará recordatorios de seguimiento automático para que confirme la entrega o reporte algún impedimento.'}
+                                        {activeClaim.estado_supervisor === 'Resuelto' && 'Compensación entregada y confirmada por el supervisor.'}
+                                        {activeClaim.estado_supervisor === 'Imposibilidad' && 'El supervisor reportó un impedimento para concretar la entrega.'}
                                     </div>
-                                    {claim.estado_supervisor === 'Resuelto' && (
+                                    {activeClaim.estado_supervisor === 'Resuelto' && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--success)', fontSize: '0.78rem', fontWeight: 600 }}>
                                             <CheckCircle2 size={14} />
                                             <span>Reposición / Cortesía Resuelta</span>
@@ -354,7 +396,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
 
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>Estado actual:</span>
-                                <StatusBadge status={claim.estado_inocuidad} />
+                                <StatusBadge status={activeClaim.estado_inocuidad} />
                             </div>
 
                             {(isInocuidad || isAdmin) && (
@@ -372,7 +414,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                     <button
                                         className="btn btn-secondary"
                                         onClick={handleGuardarInocuidad}
-                                        disabled={updating || selectedInocuidad === claim.estado_inocuidad}
+                                        disabled={updating || selectedInocuidad === activeClaim.estado_inocuidad}
                                         title="Actualizar y registrar el dictamen de calidad e inocuidad"
                                     >
                                         Aplicar
@@ -390,9 +432,9 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                     <span style={{ fontSize: '0.76rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.5px' }}>
                         Datos del Reclamo
                     </span>
-                    {claim.evidencia_zip && (
+                    {activeClaim.evidencia_zip && (
                         <a
-                            href={claim.evidencia_zip}
+                            href={activeClaim.evidencia_zip}
                             target="_blank"
                             rel="noreferrer"
                             className="claim-link"
@@ -408,15 +450,15 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                 <div className="claim-info-grid">
                     <div className="claim-info-item">
                         <span className="claim-info-label">Consumidor</span>
-                        <span className="claim-info-val">{claim.nombre} {claim.apellido}</span>
+                        <span className="claim-info-val">{activeClaim.nombre} {activeClaim.apellido}</span>
                     </div>
 
                     <div className="claim-info-item">
                         <span className="claim-info-label">Teléfono</span>
                         <span className="claim-info-val">
-                            {claim.telefono ? (
-                                <a href={`tel:${claim.telefono}`} className="claim-link">
-                                    {claim.telefono}
+                            {activeClaim.telefono ? (
+                                <a href={`tel:${activeClaim.telefono}`} className="claim-link">
+                                    {activeClaim.telefono}
                                 </a>
                             ) : 'S/D'}
                         </span>
@@ -425,9 +467,9 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                     <div className="claim-info-item">
                         <span className="claim-info-label">Email</span>
                         <span className="claim-info-val">
-                            {claim.email ? (
-                                <a href={`mailto:${claim.email}`} className="claim-link">
-                                    {claim.email}
+                            {activeClaim.email ? (
+                                <a href={`mailto:${activeClaim.email}`} className="claim-link">
+                                    {activeClaim.email}
                                 </a>
                             ) : 'S/D'}
                         </span>
@@ -436,25 +478,25 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                     <div className="claim-info-item">
                         <span className="claim-info-label">Ubicación</span>
                         <span className="claim-info-val">
-                            {claim.domicilio ? `${claim.domicilio}, ` : ''}{claim.localidad || 'S/D'} ({claim.provincia || 'S/P'})
+                            {activeClaim.domicilio ? `${activeClaim.domicilio}, ` : ''}{activeClaim.localidad || 'S/D'} ({activeClaim.provincia || 'S/P'})
                         </span>
                     </div>
 
                     <div className="claim-info-item">
                         <span className="claim-info-label">Comercio</span>
-                        <span className="claim-info-val">{claim.comercio_compra || 'S/D'}</span>
+                        <span className="claim-info-val">{activeClaim.comercio_compra || 'S/D'}</span>
                     </div>
 
                     <div className="claim-info-item">
                         <span className="claim-info-label">Fecha de Carga</span>
-                        <span className="claim-info-val">{claim.fecha_carga || claim.fecha_alta || 'S/F'}</span>
+                        <span className="claim-info-val">{activeClaim.fecha_carga || activeClaim.fecha_alta || 'S/F'}</span>
                     </div>
                 </div>
 
                 {/* PRODUCTOS COMO ITEMS COMPACTOS */}
                 <div>
                     <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.4px' }}>
-                        Productos Reclamados ({claim.items?.length || 0})
+                        Productos Reclamados ({activeClaim.items?.length || 0})
                     </span>
                     <table className="claim-products-table">
                         <thead>
@@ -468,7 +510,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                             </tr>
                         </thead>
                         <tbody>
-                            {(claim.items || []).map((item, idx) => (
+                            {(activeClaim.items || []).map((item, idx) => (
                                 <tr key={idx}>
                                     <td><strong>#{idx + 1}</strong></td>
                                     <td>

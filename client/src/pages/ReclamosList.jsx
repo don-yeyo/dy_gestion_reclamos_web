@@ -46,6 +46,11 @@ export const ReclamosList = () => {
             if (res.data.success) {
                 const list = res.data.data || res.data.reclamos || [];
                 setReclamos(list);
+                setSelectedReclamo(prev => {
+                    if (!prev) return null;
+                    const fresh = list.find(r => r.id === prev.id);
+                    return fresh || prev;
+                });
             }
         } catch (err) {
             console.error('Error al obtener reclamos:', err);
