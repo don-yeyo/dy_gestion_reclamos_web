@@ -20,7 +20,8 @@ import {
     GitBranch,
     Clock,
     CheckCircle2,
-    Gift
+    Gift,
+    Loader2
 } from 'lucide-react';
 
 const SUPERVISORES_LISTA = [
@@ -58,6 +59,8 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
 
     const [currentClaim, setCurrentClaim] = useState(claim);
     const [updating, setUpdating] = useState(false);
+    const [loadingTitle, setLoadingTitle] = useState('');
+    const [loadingMessage, setLoadingMessage] = useState('');
     const [actionMsg, setActionMsg] = useState(null);
     const [motivoDesaprobado, setMotivoDesaprobado] = useState('');
     const [showDesaprobarPrompt, setShowDesaprobarPrompt] = useState(false);
@@ -145,6 +148,8 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
             variant: 'primary',
             confirmText: 'Aprobar Reclamo',
             onConfirm: async () => {
+                setLoadingTitle('Aprobando Reclamo...');
+                setLoadingMessage('Despachando notificaciones por correo electrónico al supervisor y Calidad & Inocuidad, y sincronizando con Google Sheets y MySQL...');
                 setUpdating(true);
                 setActionMsg(null);
                 try {
@@ -186,6 +191,8 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
             return;
         }
 
+        setLoadingTitle('Desaprobando Reclamo...');
+        setLoadingMessage('Registrando motivo de desaprobación y cancelando derivaciones en Google Sheets y base de datos...');
         setUpdating(true);
         setActionMsg(null);
         try {
@@ -215,6 +222,8 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
             variant: 'danger',
             confirmText: 'Reiniciar Flujo',
             onConfirm: async () => {
+                setLoadingTitle('Reiniciando Flujo...');
+                setLoadingMessage('Restableciendo estados de recepción en Google Sheets y base de datos MySQL...');
                 setUpdating(true);
                 setActionMsg(null);
                 try {
@@ -257,6 +266,8 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
             variant: 'primary',
             confirmText: 'Asignar',
             onConfirm: async () => {
+                setLoadingTitle('Asignando Supervisor...');
+                setLoadingMessage(`Registrando a ${selectedSupervisor} en Google Sheets y base de datos MySQL...`);
                 setUpdating(true);
                 setActionMsg(null);
                 try {
@@ -282,7 +293,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
     return (
         <Modal
             isOpen={isOpen}
-            onClose={onClose}
+            onClose={updating ? undefined : onClose}
             title={`Reclamo #${activeClaim.id}`}
             maxWidth="1000px"
         >
@@ -709,6 +720,70 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                 cancelText={dialogConfig.cancelText}
                 loading={updating}
             />
+
+            {/* Overlay Bloqueante con Spinner Don Yeyo durante operaciones asíncronas */}
+            {updating && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(10, 15, 29, 0.78)',
+                        backdropFilter: 'blur(5px)',
+                        WebkitBackdropFilter: 'blur(5px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1400,
+                        cursor: 'wait'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div
+                        className="modal-content-card glass"
+                        style={{
+                            padding: '30px 40px',
+                            borderRadius: 'var(--radius-lg, 16px)',
+                            textAlign: 'center',
+                            maxWidth: '440px',
+                            width: '90%',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.65)',
+                            border: '1px solid var(--border)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: 14
+                        }}
+                    >
+                        <div
+                            style={{
+                                width: 60,
+                                height: 60,
+                                borderRadius: '50%',
+                                background: 'rgba(229, 53, 59, 0.12)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
+                        >
+                            <Loader2
+                                size={32}
+                                className="animate-spin"
+                                style={{ color: 'var(--primary, #E5353B)' }}
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <h3 style={{ margin: 0, color: 'var(--text)', fontSize: '1.15rem', fontWeight: 700 }}>
+                                {loadingTitle || 'Procesando solicitud...'}
+                            </h3>
+
+                            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.86rem', lineHeight: 1.5 }}>
+                                {loadingMessage || 'Sincronizando con Google Sheets y base de datos MySQL. Por favor no cierre la ventana...'}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </Modal>
     );
 };
