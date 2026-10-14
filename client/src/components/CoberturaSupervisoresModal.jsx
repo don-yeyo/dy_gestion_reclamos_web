@@ -4,6 +4,7 @@ import {
     Globe, Download, Search, Navigation, Compass, ExternalLink
 } from 'lucide-react';
 import { supervisoresApi } from '../services/api';
+import { ConfirmModal } from './ConfirmModal';
 
 const PRESET_COORDINATES = [
     { label: 'Pergamino (Centro)', lat: -33.8942, lng: -60.5736 },
@@ -20,6 +21,9 @@ export const CoberturaSupervisoresModal = ({ isOpen, onClose }) => {
     const [uploading, setUploading] = useState(false);
     const [uploadSuccess, setUploadSuccess] = useState(null);
     const [searchSupervisor, setSearchSupervisor] = useState('');
+
+    // Modal de alertas
+    const [alertDialog, setAlertDialog] = useState({ isOpen: false, title: '', message: '', variant: 'warning' });
 
     // Tester interactivo de coordenadas
     const [testLat, setTestLat] = useState('-33.8942');
@@ -88,7 +92,12 @@ export const CoberturaSupervisoresModal = ({ isOpen, onClose }) => {
             downloadAnchor.click();
             downloadAnchor.remove();
         } catch (err) {
-            alert('Error al descargar el archivo GeoJSON: ' + err.message);
+            setAlertDialog({
+                isOpen: true,
+                title: 'Error de Descarga',
+                message: 'No fue posible descargar el archivo GeoJSON: ' + err.message,
+                variant: 'danger'
+            });
         }
     };
 
@@ -405,6 +414,16 @@ export const CoberturaSupervisoresModal = ({ isOpen, onClose }) => {
                     </button>
                 </div>
             </div>
+
+            {/* Modal de alerta para descarga o errores */}
+            <ConfirmModal
+                isOpen={alertDialog.isOpen}
+                onClose={() => setAlertDialog(prev => ({ ...prev, isOpen: false }))}
+                title={alertDialog.title}
+                message={alertDialog.message}
+                type="alert"
+                variant={alertDialog.variant}
+            />
         </div>
     );
 };

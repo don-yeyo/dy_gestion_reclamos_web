@@ -12,7 +12,7 @@ El proyecto está organizado en dos componentes desacoplados con sus propios ent
 dy_gestion_reclamos_web/
 ├── client/                     # Frontend SPA en React + Vite
 │   ├── src/
-│   │   ├── components/         # Header, Drawer, Modal, StatusBadge, Layout
+│   │   ├── components/         # Header, Drawer, Modal, ConfirmModal, StatusBadge, Layout
 │   │   ├── config/             # MSAL Azure AD SSO y Contexto de Autenticación
 │   │   ├── pages/              # Dashboard, ReclamosList, ReclamoDetailModal, ImposibilidadPublic
 │   │   ├── services/           # Cliente Axios e interceptores seguros

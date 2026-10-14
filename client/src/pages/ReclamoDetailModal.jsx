@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../components/Modal';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { StatusBadge } from '../components/StatusBadge';
 import { reclamosApi } from '../services/api';
 import { useAuth } from '../config/AuthContext';
@@ -62,6 +63,48 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
     const [showDesaprobarPrompt, setShowDesaprobarPrompt] = useState(false);
     const [selectedSupervisor, setSelectedSupervisor] = useState(claim?.supervisor || '');
 
+    // Modal de diálogo (reemplaza alert y confirm de JS nativo)
+    const [dialogConfig, setDialogConfig] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        type: 'confirm', // 'confirm' | 'alert'
+        variant: 'primary', // 'primary' | 'danger' | 'warning' | 'info' | 'success'
+        confirmText: 'Confirmar',
+        cancelText: 'Cancelar',
+        onConfirm: null
+    });
+
+    const closeDialog = () => setDialogConfig(prev => ({ ...prev, isOpen: false }));
+
+    const showAlertModal = (title, message, variant = 'warning') => {
+        setDialogConfig({
+            isOpen: true,
+            title,
+            message,
+            type: 'alert',
+            variant,
+            confirmText: 'Entendido',
+            onConfirm: () => closeDialog()
+        });
+    };
+
+    const showConfirmModal = ({ title, message, variant = 'primary', confirmText = 'Confirmar', cancelText = 'Cancelar', onConfirm }) => {
+        setDialogConfig({
+            isOpen: true,
+            title,
+            message,
+            type: 'confirm',
+            variant,
+            confirmText,
+            cancelText,
+            onConfirm: async () => {
+                closeDialog();
+                if (onConfirm) await onConfirm();
+            }
+        });
+    };
+
     useEffect(() => {
         if (claim) {
             setCurrentClaim(claim);
@@ -83,51 +126,63 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
     const isEnCurso = activeClaim.estado_admin === 'En curso' || activeClaim.estado_admin === 'Aprobado';
     const isDesaprobado = activeClaim.estado_admin === 'Desaprobado';
 
-    const handleAprobarReclamo = async () => {
+    const handleAprobarReclamo = () => {
         if (!hasSupervisor) {
-            alert('Debe asignar un supervisor comercial antes de poder aprobar el reclamo.');
+            showAlertModal(
+                'Supervisor Comercial Requerido',
+                'Debe asignar un supervisor comercial antes de poder aprobar el reclamo.',
+                'warning'
+            );
             return;
         }
 
-        if (!window.confirm(
-            `¿Aprobar el Reclamo #${activeClaim.id}?\n\n` +
-            `• Se notificará por correo al supervisor ${activeClaim.supervisor} con las instrucciones de entrega de reposición y cortesía.\n` +
-            `• Se enviará copia completa del expediente al departamento de Calidad & Inocuidad para su investigación técnica.\n` +
-            `• Ambos estados pasarán a "Pendiente" y el reclamo quedará En curso.`
-        )) return;
-
-        setUpdating(true);
-        setActionMsg(null);
-        try {
-            await reclamosApi.updateEstadoAdmin(activeClaim.id, 'En curso');
-            const nowIso = new Date().toISOString();
-            setCurrentClaim(prev => ({
-                ...(prev || activeClaim),
-                estado_admin: 'En curso',
-                fecha_estado_admin: nowIso,
-                estado_supervisor: 'Pendiente',
-                fecha_estado_supervisor: nowIso,
-                estado_inocuidad: 'Pendiente',
-                fecha_estado_inocuidad: nowIso,
-                estado_consumidor: 'En curso',
-                fecha_estado_consumidor: nowIso,
-                admin_motivo_desaprobado: ''
-            }));
-            setActionMsg({
-                type: 'success',
-                text: 'Reclamo Aprobado con éxito. Se notificó al supervisor comercial y se derivó copia a Calidad & Inocuidad.'
-            });
-            if (onRefresh) onRefresh();
-        } catch (e) {
-            setActionMsg({ type: 'error', text: 'Error al aprobar reclamo: ' + (e.response?.data?.error || e.message) });
-        } finally {
-            setUpdating(false);
-        }
+        showConfirmModal({
+            title: `Aprobar Reclamo #${activeClaim.id}`,
+            message: `¿Aprobar el Reclamo #${activeClaim.id}?\n\n` +
+                `• Se notificará por correo al supervisor ${activeClaim.supervisor} con las instrucciones de entrega de reposición y cortesía.\n` +
+                `• Se enviará copia completa del expediente al departamento de Calidad & Inocuidad para su investigación técnica.\n` +
+                `• Ambos estados pasarán a "Pendiente" y el reclamo quedará En curso.`,
+            variant: 'primary',
+            confirmText: 'Aprobar Reclamo',
+            onConfirm: async () => {
+                setUpdating(true);
+                setActionMsg(null);
+                try {
+                    await reclamosApi.updateEstadoAdmin(activeClaim.id, 'En curso');
+                    const nowIso = new Date().toISOString();
+                    setCurrentClaim(prev => ({
+                        ...(prev || activeClaim),
+                        estado_admin: 'En curso',
+                        fecha_estado_admin: nowIso,
+                        estado_supervisor: 'Pendiente',
+                        fecha_estado_supervisor: nowIso,
+                        estado_inocuidad: 'Pendiente',
+                        fecha_estado_inocuidad: nowIso,
+                        estado_consumidor: 'En curso',
+                        fecha_estado_consumidor: nowIso,
+                        admin_motivo_desaprobado: ''
+                    }));
+                    setActionMsg({
+                        type: 'success',
+                        text: 'Reclamo Aprobado con éxito. Se notificó al supervisor comercial y se derivó copia a Calidad & Inocuidad.'
+                    });
+                    if (onRefresh) onRefresh();
+                } catch (e) {
+                    setActionMsg({ type: 'error', text: 'Error al aprobar reclamo: ' + (e.response?.data?.error || e.message) });
+                } finally {
+                    setUpdating(false);
+                }
+            }
+        });
     };
 
     const handleDesaprobar = async () => {
         if (!motivoDesaprobado.trim()) {
-            alert('Por favor ingresá un motivo de desaprobación.');
+            showAlertModal(
+                'Motivo Requerido',
+                'Por favor ingresá un motivo de desaprobación antes de continuar.',
+                'warning'
+            );
             return;
         }
 
@@ -153,59 +208,75 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
         }
     };
 
-    const handleReiniciarFlujo = async () => {
-        if (!window.confirm(`¿Reiniciar todo el flujo del reclamo #${activeClaim.id}?\n\nEl reclamo volverá a la etapa inicial de Recepción ("Pendiente"), permitiendo reasignar el supervisor o reevaluar la procedencia.`)) return;
-
-        setUpdating(true);
-        setActionMsg(null);
-        try {
-            await reclamosApi.updateEstadoAdmin(activeClaim.id, 'Pendiente');
-            await reclamosApi.updateEstadoSupervisor(activeClaim.id, 'Pendiente');
-            await reclamosApi.updateEstadoInocuidad(activeClaim.id, 'Pendiente');
-            setCurrentClaim(prev => ({
-                ...(prev || activeClaim),
-                estado_admin: 'Pendiente',
-                estado_supervisor: 'Pendiente',
-                estado_inocuidad: 'Pendiente',
-                admin_motivo_desaprobado: ''
-            }));
-            setActionMsg({ type: 'success', text: 'Flujo reiniciado correctamente. El reclamo se encuentra nuevamente en Recepción.' });
-            if (onRefresh) onRefresh();
-        } catch (e) {
-            setActionMsg({ type: 'error', text: 'Error al reiniciar flujo: ' + (e.response?.data?.error || e.message) });
-        } finally {
-            setUpdating(false);
-        }
+    const handleReiniciarFlujo = () => {
+        showConfirmModal({
+            title: 'Reiniciar Flujo del Reclamo',
+            message: `¿Reiniciar todo el flujo del reclamo #${activeClaim.id}?\n\nEl reclamo volverá a la etapa inicial de Recepción ("Pendiente"), permitiendo reasignar el supervisor o reevaluar la procedencia.`,
+            variant: 'danger',
+            confirmText: 'Reiniciar Flujo',
+            onConfirm: async () => {
+                setUpdating(true);
+                setActionMsg(null);
+                try {
+                    await reclamosApi.updateEstadoAdmin(activeClaim.id, 'Pendiente');
+                    await reclamosApi.updateEstadoSupervisor(activeClaim.id, 'Pendiente');
+                    await reclamosApi.updateEstadoInocuidad(activeClaim.id, 'Pendiente');
+                    setCurrentClaim(prev => ({
+                        ...(prev || activeClaim),
+                        estado_admin: 'Pendiente',
+                        estado_supervisor: 'Pendiente',
+                        estado_inocuidad: 'Pendiente',
+                        admin_motivo_desaprobado: ''
+                    }));
+                    setActionMsg({ type: 'success', text: 'Flujo reiniciado correctamente. El reclamo se encuentra nuevamente en Recepción.' });
+                    if (onRefresh) onRefresh();
+                } catch (e) {
+                    setActionMsg({ type: 'error', text: 'Error al reiniciar flujo: ' + (e.response?.data?.error || e.message) });
+                } finally {
+                    setUpdating(false);
+                }
+            }
+        });
     };
 
-    const handleGuardarSupervisor = async () => {
+    const handleGuardarSupervisor = () => {
         if (!selectedSupervisor) {
-            alert('Por favor seleccione un supervisor de la lista.');
+            showAlertModal(
+                'Selección Requerida',
+                'Por favor seleccione un supervisor de la lista.',
+                'warning'
+            );
             return;
         }
         const supObj = SUPERVISORES_LISTA.find(s => s.nombre === selectedSupervisor);
         if (!supObj) return;
 
-        if (!window.confirm(`¿Asignar este reclamo al supervisor ${selectedSupervisor}?`)) return;
-
-        setUpdating(true);
-        setActionMsg(null);
-        try {
-            await reclamosApi.updateSupervisor(activeClaim.id, supObj.nombre, supObj.email);
-            // Actualización inmediata del estado local para reactividad instantánea
-            setCurrentClaim(prev => ({
-                ...(prev || activeClaim),
-                supervisor: supObj.nombre,
-                supervisor_email: supObj.email
-            }));
-            setSelectedSupervisor(supObj.nombre);
-            setActionMsg({ type: 'success', text: `Supervisor asignado a ${selectedSupervisor}.` });
-            if (onRefresh) onRefresh();
-        } catch (err) {
-            setActionMsg({ type: 'error', text: 'Error asignando supervisor: ' + (err.response?.data?.error || err.message) });
-        } finally {
-            setUpdating(false);
-        }
+        showConfirmModal({
+            title: 'Asignar Supervisor Comercial',
+            message: `¿Desea asignar este reclamo al supervisor ${selectedSupervisor}?`,
+            variant: 'primary',
+            confirmText: 'Asignar',
+            onConfirm: async () => {
+                setUpdating(true);
+                setActionMsg(null);
+                try {
+                    await reclamosApi.updateSupervisor(activeClaim.id, supObj.nombre, supObj.email);
+                    // Actualización inmediata del estado local para reactividad instantánea
+                    setCurrentClaim(prev => ({
+                        ...(prev || activeClaim),
+                        supervisor: supObj.nombre,
+                        supervisor_email: supObj.email
+                    }));
+                    setSelectedSupervisor(supObj.nombre);
+                    setActionMsg({ type: 'success', text: `Supervisor asignado a ${selectedSupervisor}.` });
+                    if (onRefresh) onRefresh();
+                } catch (err) {
+                    setActionMsg({ type: 'error', text: 'Error asignando supervisor: ' + (err.response?.data?.error || err.message) });
+                } finally {
+                    setUpdating(false);
+                }
+            }
+        });
     };
 
     return (
@@ -592,6 +663,20 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                     </table>
                 </div>
             </div>
+
+            {/* Modal de Alerta / Confirmación Estilo Don Yeyo */}
+            <ConfirmModal
+                isOpen={dialogConfig.isOpen}
+                onClose={closeDialog}
+                onConfirm={dialogConfig.onConfirm}
+                title={dialogConfig.title}
+                message={dialogConfig.message}
+                type={dialogConfig.type}
+                variant={dialogConfig.variant}
+                confirmText={dialogConfig.confirmText}
+                cancelText={dialogConfig.cancelText}
+                loading={updating}
+            />
         </Modal>
     );
 };

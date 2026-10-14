@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { publicApi } from '../services/api';
+import { ConfirmModal } from '../components/ConfirmModal';
 import {
     AlertTriangle, CheckCircle2, Clock, MapPin, Package,
     ShieldAlert, ArrowRight, Loader2
@@ -18,6 +19,9 @@ export const ImposibilidadPublic = () => {
     const [observaciones, setObservaciones] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [submittedSuccess, setSubmittedSuccess] = useState(false);
+
+    // Modal de alertas estéticas
+    const [alertDialog, setAlertDialog] = useState({ isOpen: false, title: '', message: '', variant: 'warning' });
 
     useEffect(() => {
         const verify = async () => {
@@ -47,7 +51,12 @@ export const ImposibilidadPublic = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!motivoOpcion) {
-            alert('Por favor seleccioná el motivo de la imposibilidad.');
+            setAlertDialog({
+                isOpen: true,
+                title: 'Motivo Requerido',
+                message: 'Por favor seleccioná el motivo de la imposibilidad antes de confirmar.',
+                variant: 'warning'
+            });
             return;
         }
 
@@ -62,7 +71,12 @@ export const ImposibilidadPublic = () => {
                 setSubmittedSuccess(true);
             }
         } catch (err) {
-            alert(err.response?.data?.error || 'Error al registrar el motivo.');
+            setAlertDialog({
+                isOpen: true,
+                title: 'Error al Registrar',
+                message: err.response?.data?.error || 'Ocurrió un error al registrar el motivo de la imposibilidad.',
+                variant: 'danger'
+            });
         } finally {
             setSubmitting(false);
         }
@@ -192,6 +206,16 @@ export const ImposibilidadPublic = () => {
                     Acción validada criptográficamente para el supervisor asignado.
                 </div>
             </div>
+
+            {/* Modal de alerta para validaciones o errores */}
+            <ConfirmModal
+                isOpen={alertDialog.isOpen}
+                onClose={() => setAlertDialog(prev => ({ ...prev, isOpen: false }))}
+                title={alertDialog.title}
+                message={alertDialog.message}
+                type="alert"
+                variant={alertDialog.variant}
+            />
         </div>
     );
 };
