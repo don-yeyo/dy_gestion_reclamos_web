@@ -156,51 +156,191 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                 </div>
             )}
 
-            {/* Panel de Decisiones de Administración */}
+            {/* Panel de Workflow y Decisiones de Administración */}
             {isAdmin && (
-                <div style={{ background: 'var(--surface)', border: '2px solid var(--primary)', padding: 16, borderRadius: 'var(--radius-md)', marginBottom: 24 }}>
-                    <h4 style={{ margin: '0 0 10px 0', color: 'var(--heading-color)' }}>Acciones de Administración</h4>
+                <div className="workflow-diagram-card">
+                    <div className="workflow-header">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <GitBranch size={17} style={{ color: 'var(--primary)' }} />
+                            <h4 style={{ margin: 0, color: 'var(--heading-color)', fontSize: '0.92rem', fontWeight: 700 }}>
+                                Flujo de Decisión Administrativa
+                            </h4>
+                        </div>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            Etapa actual: <strong style={{ color: 'var(--text)' }}>{claim.estado_admin || 'Pendiente'}</strong>
+                        </span>
+                    </div>
 
-                    {!showDesaprobarPrompt ? (
-                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                            <button
-                                className="btn"
-                                style={{ backgroundColor: '#2563eb', color: '#ffffff' }}
-                                onClick={handlePonerEnCurso}
-                                disabled={updating || claim.estado_admin === 'En curso'}
-                                title="Pasa el reclamo a En curso, sincroniza consumidor y envía email con instrucciones al supervisor"
-                            >
-                                <Play size={16} />
-                                <span>Poner En Curso (Notificar Supervisor)</span>
-                            </button>
-                            <button
-                                className="btn btn-success"
-                                onClick={handleAprobar}
-                                disabled={updating || claim.estado_admin === 'Aprobado'}
-                            >
+                    {/* Stepper Visual de Nodos del Ciclo de Vida */}
+                    <div className="workflow-flow-container">
+                        {/* Nodo 1: Recepción / Pendiente */}
+                        <div className={`workflow-step-node ${(claim.estado_admin === 'Pendiente') ? 'active' : (claim.estado_admin !== 'Desaprobado') ? 'approved' : ''}`}>
+                            <div className="workflow-step-badge">
+                                {(claim.estado_admin !== 'Pendiente' && claim.estado_admin !== 'Desaprobado') ? <Check size={16} /> : '1'}
+                            </div>
+                            <span className="workflow-step-title">1. Recepción</span>
+                        </div>
+
+                        <div className={`workflow-line-connector ${(claim.estado_admin === 'En curso' || claim.estado_admin === 'Aprobado') ? 'active' : ''}`} />
+
+                        {/* Nodo 2: En curso (Triaje y Notificación) */}
+                        <div className={`workflow-step-node ${(claim.estado_admin === 'En curso') ? 'active' : (claim.estado_admin === 'Aprobado') ? 'approved' : ''}`}>
+                            <div className="workflow-step-badge">
+                                {(claim.estado_admin === 'Aprobado') ? <Check size={16} /> : <Play size={13} />}
+                            </div>
+                            <span className="workflow-step-title">2. En Curso</span>
+                        </div>
+
+                        <div className={`workflow-line-connector ${(claim.estado_admin === 'Aprobado') ? 'active' : ''}`} />
+
+                        {/* Rama Aprobado */}
+                        <div className={`workflow-step-node ${(claim.estado_admin === 'Aprobado') ? 'approved' : ''}`}>
+                            <div className="workflow-step-badge">
                                 <Check size={16} />
-                                <span>Aprobar Reclamo</span>
-                            </button>
-                            <button
-                                className="btn btn-danger"
-                                onClick={() => setShowDesaprobarPrompt(true)}
-                                disabled={updating || claim.estado_admin === 'Desaprobado'}
-                            >
+                            </div>
+                            <span className="workflow-step-title">3. Aprobado</span>
+                        </div>
+
+                        <div className="workflow-line-connector" style={{ borderTop: '2px dashed var(--border)', background: 'transparent' }} />
+
+                        {/* Rama Desaprobado */}
+                        <div className={`workflow-step-node ${(claim.estado_admin === 'Desaprobado') ? 'rejected' : ''}`}>
+                            <div className="workflow-step-badge">
                                 <X size={16} />
-                                <span>Desaprobar Reclamo</span>
-                            </button>
+                            </div>
+                            <span className="workflow-step-title">Desaprobado</span>
+                        </div>
+                    </div>
+
+                    {/* Botones de Acción y Transición Contextuales */}
+                    {!showDesaprobarPrompt ? (
+                        <div className="workflow-buttons-bar">
+                            {/* Caso 1: Pendiente */}
+                            {(!claim.estado_admin || claim.estado_admin === 'Pendiente') && (
+                                <>
+                                    <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                                        Reclamo recién ingresado. Inicia la gestión para alertar al supervisor comercial.
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 10 }}>
+                                        <button
+                                            className="btn btn-primary"
+                                            onClick={handlePonerEnCurso}
+                                            disabled={updating}
+                                        >
+                                            <Play size={15} />
+                                            <span>Iniciar Gestión (Poner En Curso)</span>
+                                        </button>
+                                        <button
+                                            className="btn btn-danger"
+                                            onClick={() => setShowDesaprobarPrompt(true)}
+                                            disabled={updating}
+                                        >
+                                            <X size={15} />
+                                            <span>Desaprobar</span>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Caso 2: En curso */}
+                            {claim.estado_admin === 'En curso' && (
+                                <>
+                                    <div>
+                                        <button
+                                            className="btn btn-secondary"
+                                            onClick={handleRevertirAPendiente}
+                                            disabled={updating}
+                                            title="Regresa el reclamo a la etapa inicial de recepción"
+                                        >
+                                            <RotateCcw size={14} />
+                                            <span>Volver a Pendiente</span>
+                                        </button>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 10 }}>
+                                        <button
+                                            className="btn btn-success"
+                                            onClick={handleAprobar}
+                                            disabled={updating}
+                                        >
+                                            <Check size={15} />
+                                            <span>Aprobar Reclamo</span>
+                                        </button>
+                                        <button
+                                            className="btn btn-danger"
+                                            onClick={() => setShowDesaprobarPrompt(true)}
+                                            disabled={updating}
+                                        >
+                                            <X size={15} />
+                                            <span>Desaprobar</span>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Caso 3: Aprobado */}
+                            {claim.estado_admin === 'Aprobado' && (
+                                <>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', color: 'var(--success)' }}>
+                                        <Check size={16} />
+                                        <span>Reclamo Aprobado. Las acciones del supervisor continúan en marcha.</span>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 10 }}>
+                                        <button
+                                            className="btn btn-secondary"
+                                            onClick={() => {
+                                                if (window.confirm('¿Reabrir y volver a colocar el reclamo "En curso"?')) {
+                                                    handlePonerEnCurso();
+                                                }
+                                            }}
+                                            disabled={updating}
+                                            title="Vuelve a colocar el reclamo en estado En curso para reconsiderar detalles"
+                                        >
+                                            <RotateCcw size={14} />
+                                            <span>Volver a En Curso</span>
+                                        </button>
+                                        <button
+                                            className="btn btn-danger"
+                                            onClick={() => setShowDesaprobarPrompt(true)}
+                                            disabled={updating}
+                                        >
+                                            <X size={15} />
+                                            <span>Cambiar a Desaprobado</span>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Caso 4: Desaprobado */}
+                            {claim.estado_admin === 'Desaprobado' && (
+                                <>
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--error)' }}>
+                                        Reclamo desaprobado y cerrado. Puedes reconsiderarlo si ingresó nueva información.
+                                    </div>
+                                    <div>
+                                        <button
+                                            className="btn btn-primary"
+                                            onClick={handlePonerEnCurso}
+                                            disabled={updating}
+                                        >
+                                            <RotateCcw size={14} />
+                                            <span>Reconsiderar (Poner En Curso)</span>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     ) : (
-                        <div style={{ marginTop: 10 }}>
-                            <label className="form-label">Indicar motivo de desaprobación:</label>
+                        <div style={{ marginTop: 12, padding: 14, background: 'var(--surface-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                            <label className="form-label" style={{ fontWeight: 600 }}>Indicar motivo de la desaprobación:</label>
                             <textarea
                                 className="form-textarea"
-                                rows={3}
+                                rows={2}
                                 value={motivoDesaprobado}
                                 onChange={(e) => setMotivoDesaprobado(e.target.value)}
-                                placeholder="Ej: Información del producto ilegible o fuera de política de garantía..."
+                                placeholder="Ej: Falta de evidencia concluyente o fuera del período de vencimiento..."
+                                style={{ marginBottom: 10 }}
                             />
-                            <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                            <div style={{ display: 'flex', gap: 10 }}>
                                 <button className="btn btn-danger" onClick={handleDesaprobar} disabled={updating}>
                                     Confirmar Desaprobación
                                 </button>

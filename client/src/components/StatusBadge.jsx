@@ -19,8 +19,9 @@ export const StatusBadge = ({ status, type = 'default' }) => {
     }
 
     return (
-        <span className={`badge ${badgeClass}`}>
-            ● {status}
+        <span className={`badge ${badgeClass}`} style={{ whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: '0.65em', lineHeight: 1 }}>●</span>
+            <span style={{ whiteSpace: 'nowrap' }}>{status}</span>
         </span>
     );
 };

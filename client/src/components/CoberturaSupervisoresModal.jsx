@@ -96,7 +96,9 @@ export const CoberturaSupervisoresModal = ({ isOpen, onClose }) => {
         setTestingLookup(true);
         setTestResult(null);
         try {
-            const res = await supervisoresApi.lookup(lat, lng);
+            const cleanLat = String(lat).trim().replace(',', '.');
+            const cleanLng = String(lng).trim().replace(',', '.');
+            const res = await supervisoresApi.lookup(cleanLat, cleanLng);
             if (res.data.success) {
                 setTestResult(res.data);
             }
@@ -228,15 +230,13 @@ export const CoberturaSupervisoresModal = ({ isOpen, onClose }) => {
                                 </div>
                                 <div className="geo-tester-inputs">
                                     <input
-                                        type="number"
-                                        step="0.0001"
+                                        type="text"
                                         placeholder="Latitud (ej: -33.8942)"
                                         value={testLat}
                                         onChange={(e) => setTestLat(e.target.value)}
                                     />
                                     <input
-                                        type="number"
-                                        step="0.0001"
+                                        type="text"
                                         placeholder="Longitud (ej: -60.5736)"
                                         value={testLng}
                                         onChange={(e) => setTestLng(e.target.value)}

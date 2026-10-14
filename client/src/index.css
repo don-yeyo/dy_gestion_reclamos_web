@@ -94,6 +94,27 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+/* Custom Scrollbars según Design Guideline Don Yeyo */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--radius-pill);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
 
 body {
@@ -528,7 +549,7 @@ body {
   max-width: 800px;
   width: 100%;
   max-height: 90vh;
-  overflow-y: auto;
+  overflow: hidden;
   border: 1px solid var(--border);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
   display: flex;
@@ -536,25 +557,29 @@ body {
 }
 
 .modal-header {
-  padding: 20px 24px;
+  padding: 16px 24px;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
 }
 
 .modal-body {
-  padding: 24px;
-  flex: 1;
+  padding: 20px 24px;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  max-height: calc(90vh - 120px);
 }
 
 .modal-footer {
-  padding: 16px 24px;
+  padding: 14px 24px;
   border-top: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 /* Form controls */
@@ -862,7 +887,7 @@ body {
   background: var(--surface);
 }
 
-/* Tabla de Reclamos */
+/* Tabla de Reclamos - Versión Compacta Alta Densidad */
 .claims-table-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -871,30 +896,51 @@ body {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
 }
 
+.claims-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
 .claims-table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
-  font-size: 0.88rem;
+  font-size: 0.81rem;
+}
+
+@media (min-width: 1024px) {
+  .claims-table {
+    table-layout: fixed;
+  }
+  .claims-table-wrapper {
+    overflow-x: hidden;
+  }
+}
+
+@media (max-width: 1023px) {
+  .claims-table {
+    min-width: 860px;
+  }
 }
 
 .claims-table th {
-  padding: 14px 18px;
+  padding: 8px 10px;
   background: var(--surface-subtle);
   font-weight: 700;
-  font-size: 0.78rem;
+  font-size: 0.73rem;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
 
 .claims-table td {
-  padding: 14px 18px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
   color: var(--text);
+  line-height: 1.3;
 }
 
 .claims-table tbody tr {
@@ -908,9 +954,10 @@ body {
 
 .claim-id-tag {
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.84rem;
   color: var(--dy-blue);
   letter-spacing: 0.3px;
+  white-space: nowrap;
 }
 
 [data-theme="dark"] .claim-id-tag,
@@ -919,9 +966,133 @@ body {
 }
 
 .claim-sub-text {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
-  margin-top: 2px;
+  margin-top: 1px;
+  white-space: nowrap;
+}
+
+/* ==============================================================================
+   WORKFLOW STEPS DIAGRAM (ACCIONES DE ADMINISTRACIÓN)
+   ============================================================================== */
+.workflow-diagram-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  transition: var(--transition);
+}
+
+.workflow-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.workflow-flow-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  margin: 16px 0 24px 0;
+  gap: 6px;
+}
+
+.workflow-step-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  position: relative;
+  z-index: 2;
+  text-align: center;
+}
+
+.workflow-step-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface-subtle);
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  transition: var(--transition);
+}
+
+.workflow-step-node.active .workflow-step-badge {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+}
+
+.workflow-step-node.approved .workflow-step-badge {
+  border-color: var(--success);
+  background: var(--success);
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+}
+
+.workflow-step-node.rejected .workflow-step-badge {
+  border-color: var(--error);
+  background: var(--error);
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.2);
+}
+
+.workflow-step-title {
+  margin-top: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.workflow-step-node.active .workflow-step-title {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.workflow-step-node.approved .workflow-step-title {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.workflow-step-node.rejected .workflow-step-title {
+  color: var(--error);
+  font-weight: 700;
+}
+
+.workflow-line-connector {
+  flex: 1;
+  height: 2px;
+  background: var(--border);
+  margin-top: -24px;
+  position: relative;
+  z-index: 1;
+}
+
+.workflow-line-connector.active {
+  background: var(--primary);
+}
+
+.workflow-buttons-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 /* Paginación de Tabla */

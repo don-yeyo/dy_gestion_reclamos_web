@@ -114,11 +114,14 @@ class SupervisorLookupService {
      * Encuentra el supervisor correspondiente a una coordenada (lat, lng)
      */
     async findSupervisor(lat, lng) {
-        const numLat = parseFloat(lat);
-        const numLng = parseFloat(lng);
+        const cleanLat = String(lat || '').trim().replace(',', '.');
+        const cleanLng = String(lng || '').trim().replace(',', '.');
+        const numLat = parseFloat(cleanLat);
+        const numLng = parseFloat(cleanLng);
 
         if (isNaN(numLat) || isNaN(numLng)) {
             return {
+                found: false,
                 supervisor: 'Sin asignar',
                 email: '',
                 zona: 'Coordenadas inválidas'
@@ -136,6 +139,7 @@ class SupervisorLookupService {
             if (type === 'Polygon' && coordinates[0]) {
                 if (this.isPointInPolygon(numLng, numLat, coordinates[0])) {
                     return {
+                        found: true,
                         supervisor: props.Supervisor || 'Sin asignar',
                         email: props.email || '',
                         zona: props.name || props.Zona || ''
@@ -145,6 +149,7 @@ class SupervisorLookupService {
                 for (const poly of coordinates) {
                     if (poly[0] && this.isPointInPolygon(numLng, numLat, poly[0])) {
                         return {
+                            found: true,
                             supervisor: props.Supervisor || 'Sin asignar',
                             email: props.email || '',
                             zona: props.name || props.Zona || ''
@@ -155,6 +160,7 @@ class SupervisorLookupService {
         }
 
         return {
+            found: false,
             supervisor: 'Sin asignar',
             email: '',
             zona: 'Fuera de zona delimitada'

@@ -211,8 +211,13 @@ Este sistema implementa un modelo de seguridad estricto para evitar elevación d
      - Se blanquean motivos de desaprobación previos.
      - **Disparo del flujo:** Se envía automáticamente el correo con las instrucciones de la acción comercial requerida (cortesía o reposición) al **Supervisor asignado**.
 
-3. **Decisiones de Administración:**
-   - **Aprobar:** Confirma la procedencia del reclamo.
+3. **Decisiones de Administración (Workflow Interactivo):**
+   - El detalle del reclamo cuenta con un diagrama de flujo interactivo por etapas (`1. Recepción` ➔ `2. En Curso` ➔ `3. Aprobado` / `Desaprobado`).
+   - Permite transiciones bidireccionales según corresponda:
+     - **Pendiente ➔ En curso:** Inicia gestión y alerta al supervisor.
+     - **En curso ➔ Pendiente:** Reversión a estado de recepción en caso de apertura por error.
+     - **En curso ➔ Aprobado / Desaprobado:** Conclusión de la gestión administrativa.
+     - **Aprobado / Desaprobado ➔ Reabrir / Reconsiderar:** Permite volver a poner el reclamo en curso si se recibe nueva evidencia.
    - **Desaprobar:** Requiere ingresar el motivo correspondiente; automáticamente pasa `estado_supervisor`, `estado_consumidor` y `estado_inocuidad` a *"Sin acciones"*.
 
 4. **Acción del Supervisor:**

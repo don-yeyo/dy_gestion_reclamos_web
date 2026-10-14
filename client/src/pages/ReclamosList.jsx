@@ -330,19 +330,19 @@ export const ReclamosList = () => {
 
             {/* Tabla de Reclamos */}
             <div className="claims-table-card">
-                <div style={{ overflowX: 'auto' }}>
+                <div className="claims-table-wrapper">
                     <table className="claims-table">
                         <thead>
                             <tr>
-                                <th style={{ width: '120px' }}>ID / Fecha</th>
-                                <th>Consumidor</th>
-                                <th>Ubicación</th>
-                                <th>Producto / Defecto</th>
-                                <th>Supervisor</th>
-                                <th style={{ textAlign: 'center' }}>Admin</th>
-                                <th style={{ textAlign: 'center' }}>Supervisor</th>
-                                <th style={{ textAlign: 'center' }}>Inocuidad</th>
-                                <th style={{ textAlign: 'right' }}>Acción</th>
+                                <th style={{ width: '95px' }}>ID / Fecha</th>
+                                <th style={{ width: '17%' }}>Consumidor</th>
+                                <th style={{ width: '13%' }}>Ubicación</th>
+                                <th style={{ width: '19%' }}>Producto / Defecto</th>
+                                <th style={{ width: '14%' }}>Supervisor</th>
+                                <th style={{ width: '9%', textAlign: 'center' }}>Admin</th>
+                                <th style={{ width: '9%', textAlign: 'center' }}>Supervisor</th>
+                                <th style={{ width: '9%', textAlign: 'center' }}>Inocuidad</th>
+                                <th style={{ width: '65px', textAlign: 'right' }}>Acción</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -393,37 +393,43 @@ export const ReclamosList = () => {
 
                                             {/* Consumidor */}
                                             <td>
-                                                <div style={{ fontWeight: 600 }}>{r.cliente || `${r.nombre || ''} ${r.apellido || ''}`.trim() || 'Consumidor'}</div>
-                                                <div className="claim-sub-text">
+                                                <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {r.cliente || `${r.nombre || ''} ${r.apellido || ''}`.trim() || 'Consumidor'}
+                                                </div>
+                                                <div className="claim-sub-text" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                     {r.email || r.telefono || 'Sin contacto'}
                                                 </div>
                                             </td>
 
                                             {/* Ubicación */}
                                             <td>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.85rem' }}>
-                                                    <MapPin size={13} style={{ color: 'var(--dy-gold)', flexShrink: 0 }} />
-                                                    <span style={{ fontWeight: 500 }}>{r.localidad || 'S/D'}</span>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.81rem', overflow: 'hidden' }}>
+                                                    <MapPin size={12} style={{ color: 'var(--dy-gold)', flexShrink: 0 }} />
+                                                    <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                        {r.localidad || 'S/D'}
+                                                    </span>
                                                 </div>
-                                                <div className="claim-sub-text">{r.provincia || ''}</div>
+                                                <div className="claim-sub-text" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {r.provincia || ''}
+                                                </div>
                                             </td>
 
                                             {/* Productos & Defectos */}
                                             <td>
-                                                <div style={{ fontWeight: 500, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                     {firstItem.producto || 'Sin especificar'}
                                                 </div>
-                                                <div className="claim-sub-text" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                    <span style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                <div className="claim-sub-text" style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                         {firstItem.defecto || 'Sin defecto'}
                                                     </span>
                                                     {itemCount > 1 && (
                                                         <span style={{
                                                             background: 'var(--surface-subtle)', border: '1px solid var(--border)',
-                                                            padding: '1px 6px', borderRadius: 'var(--radius-pill)',
-                                                            fontSize: '0.7rem', fontWeight: 600, color: 'var(--primary)'
+                                                            padding: '1px 5px', borderRadius: 'var(--radius-pill)',
+                                                            fontSize: '0.68rem', fontWeight: 600, color: 'var(--primary)', flexShrink: 0
                                                         }}>
-                                                            +{itemCount - 1} más
+                                                            +{itemCount - 1}
                                                         </span>
                                                     )}
                                                 </div>
@@ -431,10 +437,10 @@ export const ReclamosList = () => {
 
                                             {/* Supervisor */}
                                             <td>
-                                                <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                                                <div style={{ fontWeight: 600, fontSize: '0.81rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                     {r.supervisor || 'Sin asignar'}
                                                 </div>
-                                                <div className="claim-sub-text">
+                                                <div className="claim-sub-text" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                     {r.supervisor_email || ''}
                                                 </div>
                                             </td>
@@ -460,9 +466,9 @@ export const ReclamosList = () => {
                                                         setSelectedReclamo(r);
                                                     }}
                                                     className="btn btn-secondary"
-                                                    style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                                                    style={{ padding: '4px 10px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
                                                 >
-                                                    <Eye size={13} />
+                                                    <Eye size={12} />
                                                     <span>Ver</span>
                                                 </button>
                                             </td>
