@@ -8,46 +8,93 @@ class GoogleSheetsService {
         this.tabName = process.env.GOOGLE_SHEETS_TAB_NAME || process.env.GOOGLE_SHEET_TAB || 'Reclamos 2023';
 
         // Opciones de autenticación con Google
+        const credentials = this._resolveCredentials();
         const authOptions = {
             scopes: ['https://www.googleapis.com/auth/spreadsheets']
         };
 
-        // Si se pasa el JSON completo por variable de entorno (ideal para Netlify)
-        if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-            try {
-                authOptions.credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
-            } catch (e) {
-                console.error('[SHEETS AUTH] Error parseando GOOGLE_SERVICE_ACCOUNT_JSON:', e.message);
-            }
-        }
-
-        // Si no se cargó por credentials directas, buscar archivo local
-        if (!authOptions.credentials) {
-            const possiblePaths = [
-                process.env.GOOGLE_SERVICE_ACCOUNT_JSON_PATH,
-                process.env.GOOGLE_APPLICATION_CREDENTIALS,
-                'credentials/reclamos-501813-311b1979c9e5.json',
-                'credentials/reclamos-service-account.json'
-            ].filter(Boolean);
-
-            let resolvedKeyPath = null;
-            for (const p of possiblePaths) {
-                const absPath = path.isAbsolute(p) ? p : path.resolve(__dirname, '..', p);
-                if (fs.existsSync(absPath)) {
-                    resolvedKeyPath = absPath;
-                    break;
-                }
-            }
-
-            if (resolvedKeyPath) {
-                authOptions.keyFile = resolvedKeyPath;
-            } else {
-                console.warn('[SHEETS AUTH] No se encontró archivo de credenciales en rutas conocidas.');
-            }
+        if (credentials) {
+            authOptions.credentials = credentials;
+            this.hasCredentials = true;
+        } else {
+            this.hasCredentials = false;
+            console.warn('[SHEETS AUTH WARNING] No se encontraron credenciales válidas de Google Sheets. En Netlify configure GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_SERVICE_ACCOUNT_JSON_BASE64.');
         }
 
         this.auth = new google.auth.GoogleAuth(authOptions);
         this.sheets = google.sheets({ version: 'v4', auth: this.auth });
+    }
+
+    /**
+     * Resuelve las credenciales de la cuenta de servicio Google Sheets tanto para entornos
+     * serverless (Netlify) como para desarrollo local mediante archivos.
+     */
+    _resolveCredentials() {
+        // Prevenir que GoogleAuth intente abrir rutas relativas que no existen en el entorno serverless (/var/task)
+        if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+            const adcPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+            const absAdcPath = path.isAbsolute(adcPath) ? adcPath : path.resolve(__dirname, '..', adcPath);
+            if (!fs.existsSync(absAdcPath)) {
+                delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+            }
+        }
+
+        // 1. Prioridad: Variable de entorno con el JSON o Base64 (ideal para Netlify)
+        const envJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 || process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+        if (envJson) {
+            try {
+                let text = envJson.trim();
+                // Quitar comillas envolventes si fueron agregadas en el dashboard de Netlify
+                if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) {
+                    text = text.slice(1, -1).trim();
+                }
+
+                // Si no comienza con '{', evaluar si viene codificado en Base64
+                if (!text.startsWith('{')) {
+                    try {
+                        const decoded = Buffer.from(text, 'base64').toString('utf8');
+                        if (decoded.trim().startsWith('{')) {
+                            text = decoded.trim();
+                        }
+                    } catch (e) {
+                        // Continuar si no era base64
+                    }
+                }
+
+                const parsed = JSON.parse(text);
+                if (parsed.private_key) {
+                    parsed.private_key = parsed.private_key.replace(/\\n/g, '\n');
+                }
+                return parsed;
+            } catch (err) {
+                console.error('[SHEETS AUTH] Error parseando GOOGLE_SERVICE_ACCOUNT_JSON:', err.message);
+            }
+        }
+
+        // 2. Fallback: Archivo físico local en el filesystem (ideal para desarrollo local)
+        const possiblePaths = [
+            process.env.GOOGLE_SERVICE_ACCOUNT_JSON_PATH,
+            'credentials/reclamos-501813-311b1979c9e5.json',
+            'credentials/reclamos-service-account.json'
+        ].filter(Boolean);
+
+        for (const p of possiblePaths) {
+            const absPath = path.isAbsolute(p) ? p : path.resolve(__dirname, '..', p);
+            if (fs.existsSync(absPath)) {
+                try {
+                    const content = fs.readFileSync(absPath, 'utf8');
+                    const parsed = JSON.parse(content);
+                    if (parsed.private_key) {
+                        parsed.private_key = parsed.private_key.replace(/\\n/g, '\n');
+                    }
+                    return parsed;
+                } catch (e) {
+                    console.error(`[SHEETS AUTH] Error leyendo archivo de credenciales en ${absPath}:`, e.message);
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -69,6 +116,10 @@ class GoogleSheetsService {
      * @returns {Promise<Array>}
      */
     async getReclamos(cutoffId = null) {
+        if (!this.hasCredentials) {
+            throw new Error('No se encontraron credenciales de Google Sheets configuradas. En Netlify, debes definir la variable de entorno GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_SERVICE_ACCOUNT_JSON_BASE64.');
+        }
+
         if (!this.spreadsheetId) {
             throw new Error('GOOGLE_SHEETS_SPREADSHEET_ID no está configurado.');
         }
@@ -177,6 +228,10 @@ class GoogleSheetsService {
      * @param {Object} updates Mapeo columna -> nuevo valor (ej: { 'AO': 'Aprobado', 'L': 'Hugo Basile' })
      */
     async updateReclamo(claimId, updates) {
+        if (!this.hasCredentials) {
+            throw new Error('No se encontraron credenciales de Google Sheets configuradas. En Netlify, debes definir la variable de entorno GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_SERVICE_ACCOUNT_JSON_BASE64.');
+        }
+
         const claim = await this.getReclamoById(claimId);
         if (!claim) {
             throw new Error(`Reclamo con ID ${claimId} no encontrado.`);

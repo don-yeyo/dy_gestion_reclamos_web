@@ -76,7 +76,13 @@ El archivo [netlify.toml](file:///C:/Users/gabrielt/Documents/Proyectos/GestionR
 3. Redirigir llamadas de `/api/*` automáticamente al handler serverless (`/.netlify/functions/netlify-handler/:splat`).
 4. Redirigir rutas de navegación SPA (`/*`) a `/index.html`.
 
-En las variables de entorno de la configuración de Netlify (Site Settings -> Environment variables), ingresar las mismas variables detalladas en `server/.env` y `client/.env`.
+En las variables de entorno de la configuración de Netlify (**Site configuration** -> **Environment variables**), ingresar las variables requeridas.
+> [!IMPORTANT]
+> **Credenciales de Google Sheets en Netlify**:
+> En entornos serverless como Netlify, los archivos en `credentials/*.json` están excluidos del repositorio Git por seguridad (.gitignore).
+> Por lo tanto, en lugar de `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` o `GOOGLE_APPLICATION_CREDENTIALS`, debés configurar en Netlify la variable:
+> - `GOOGLE_SERVICE_ACCOUNT_JSON_BASE64`: El contenido del archivo de la cuenta de servicio codificado en Base64 (método más confiable para evitar problemas de saltos de línea).
+> - o `GOOGLE_SERVICE_ACCOUNT_JSON`: El texto JSON completo de la cuenta de servicio.
 
 ---
 
@@ -145,7 +151,9 @@ Este sistema implementa un modelo de seguridad estricto para evitar elevación d
 | `APP_SECRET` | Clave secreta para firma de JWT y tokens de acción | *(string secreto)* |
 | `GOOGLE_SHEETS_SPREADSHEET_ID` | ID de la hoja de cálculo de Reclamos | *(Google Spreadsheet ID)* |
 | `GOOGLE_SHEETS_TAB_NAME` | Nombre de la pestaña de reclamos | `Reclamos 2023` |
-| `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` | Ruta al JSON de la cuenta de servicio | `credentials/reclamos-501813-311b1979c9e5.json` |
+| `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` | Ruta local al JSON de la cuenta de servicio (desarrollo) | `credentials/reclamos-501813-311b1979c9e5.json` |
+| `GOOGLE_SERVICE_ACCOUNT_JSON_BASE64` | Contenido del JSON en Base64 (Recomendado para Netlify) | *(string base64)* |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Contenido del JSON en texto plano (alternativa Netlify) | *(JSON string)* |
 | `RECLAMOS_NUMERO_CORTE` | ID numérico de corte a partir del cual se gestionan | `20233357` |
 | `EMAILS_ADMINS` | Correos con rol de Administrador | `admin1@empresa.com,admin2@empresa.com` |
 | `EMAILS_INOCUIDAD` | Correos de Calidad e Inocuidad | `calidad@empresa.com` |
