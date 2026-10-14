@@ -284,7 +284,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                         <div className={`wf-branch-card ${isEnRecepcion ? 'active' : ''}`}>
                             <div className="wf-branch-title">
                                 <Clock size={14} style={{ color: 'var(--warning)' }} />
-                                <span>1. Recepción & Descarte</span>
+                                <span>1. Ingreso</span>
                             </div>
 
                             <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>

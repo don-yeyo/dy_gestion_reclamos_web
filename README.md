@@ -204,8 +204,11 @@ Este sistema implementa un modelo de seguridad estricto para evitar elevación d
    - Se envía un correo interno a administración con un **enlace único y seguro (Webhook Anti-tampering con JWT/HMAC)** para iniciar la gestión con un solo clic.
 
 2. **Inicio de Acción de Compensación ("En curso"):**
-   - El administrador inicia la **Acción de Compensación** desde el correo electrónico inicial o desde el diagrama del Gestor Web.
-   - **Efectos automáticos:**
+   - El administrador inicia la **Acción de Compensación** desde el correo electrónico inicial (`/api/public/actions/admin-quick`) o desde el diagrama del Gestor Web.
+   - **Regla Estricta de Negocio:** **Bajo ninguna circunstancia un reclamo puede avanzar a "En curso" si no tiene supervisor asignado.**
+     - Si el reclamo carece de supervisor (o figura como "Sin asignar"), el webhook detiene el flujo, presenta una pantalla con advertencia visual corporativa clara y permite **asignar el supervisor comercial responsable directamente en el formulario web**.
+     - Tras seleccionar el supervisor y confirmar, el reclamo es actualizado con el nuevo responsable y recién allí avanza a "En curso".
+   - **Efectos automáticos al iniciar la compensación:**
      - `estado_admin` pasa a **"En curso"**.
      - `estado_consumidor` se sincroniza a **"En curso"**.
      - Se asigna o ratifica el supervisor comercial y su `estado_supervisor` se coloca en **"Pendiente"**.

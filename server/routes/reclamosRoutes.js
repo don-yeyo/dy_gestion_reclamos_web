@@ -100,6 +100,23 @@ router.patch('/:id/estado-admin', requireRole(['admin', 'sysadmin']), async (req
             return res.status(404).json({ success: false, error: 'Reclamo no encontrado.' });
         }
 
+        if (estado === 'En curso' || estado === 'Aprobado') {
+            const rawSup = (claim.supervisor || '').trim().toLowerCase();
+            const hasSupervisor = rawSup !== '' &&
+                rawSup !== 'sin asignar' &&
+                rawSup !== 'no asignado' &&
+                rawSup !== 'null' &&
+                rawSup !== 'undefined' &&
+                rawSup !== '-';
+
+            if (!hasSupervisor) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'No se puede avanzar el reclamo a En curso sin un supervisor comercial asignado. Por favor asigná un supervisor primero.'
+                });
+            }
+        }
+
         const updates = { 'AO': estado };
 
         if (estado === 'En curso') {
