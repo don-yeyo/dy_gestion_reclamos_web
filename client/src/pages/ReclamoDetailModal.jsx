@@ -3,7 +3,7 @@ import { Modal } from '../components/Modal';
 import { StatusBadge } from '../components/StatusBadge';
 import { reclamosApi } from '../services/api';
 import { useAuth } from '../config/AuthContext';
-import { MapPin, Phone, Mail, Store, Package, Download, Check, X, ShieldAlert, User, AlertCircle, Play } from 'lucide-react';
+import { MapPin, Phone, Mail, Store, Package, Download, Check, X, ShieldAlert, User, AlertCircle, Play, GitBranch, RotateCcw } from 'lucide-react';
 
 const SUPERVISORES_LISTA = [
     { nombre: 'Hugo Basile', email: 'hugob@donyeyo.com.ar' },

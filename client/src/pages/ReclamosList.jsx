@@ -342,7 +342,7 @@ export const ReclamosList = () => {
                                 <th style={{ width: '9%', textAlign: 'center' }}>Admin</th>
                                 <th style={{ width: '9%', textAlign: 'center' }}>Supervisor</th>
                                 <th style={{ width: '9%', textAlign: 'center' }}>Inocuidad</th>
-                                <th style={{ width: '65px', textAlign: 'right' }}>Acción</th>
+                                <th style={{ width: '42px', textAlign: 'center' }}></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -459,17 +459,24 @@ export const ReclamosList = () => {
                                             </td>
 
                                             {/* Acción */}
-                                            <td style={{ textAlign: 'right' }}>
+                                            <td style={{ textAlign: 'center' }}>
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setSelectedReclamo(r);
                                                     }}
                                                     className="btn btn-secondary"
-                                                    style={{ padding: '4px 10px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+                                                    style={{
+                                                        padding: '6px',
+                                                        borderRadius: 'var(--radius-sm)',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        lineHeight: 1
+                                                    }}
+                                                    title="Ver detalles"
                                                 >
-                                                    <Eye size={12} />
-                                                    <span>Ver</span>
+                                                    <Eye size={14} />
                                                 </button>
                                             </td>
                                         </tr>

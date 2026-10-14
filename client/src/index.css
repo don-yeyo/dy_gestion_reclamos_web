@@ -195,13 +195,14 @@ body {
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
+  gap: 4px;
+  padding: 2px 7px;
   border-radius: var(--radius-pill);
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-size: 0.6rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
 }
 
 .badge-pendiente {
