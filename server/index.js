@@ -9,6 +9,7 @@ const authRoutes = require('./routes/authRoutes');
 const reclamosRoutes = require('./routes/reclamosRoutes');
 const publicActionRoutes = require('./routes/publicActionRoutes');
 const cronRoutes = require('./routes/cronRoutes');
+const supervisoresRoutes = require('./routes/supervisoresRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -49,11 +50,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Logging
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-const authRoutes = require('./routes/authRoutes');
-const reclamosRoutes = require('./routes/reclamosRoutes');
-const publicActionRoutes = require('./routes/publicActionRoutes');
-const cronRoutes = require('./routes/cronRoutes');
-const supervisoresRoutes = require('./routes/supervisoresRoutes');
+
 
 // Rutas de API
 app.use('/api/auth', authRoutes);
