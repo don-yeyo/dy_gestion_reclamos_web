@@ -21,6 +21,53 @@ class EmailWorkflowService {
     }
 
     /**
+     * Envía un correo electrónico evaluando si está activo el modo de testeo por entorno.
+     * Si EMAIL_TEST_MODE es true, redirige el correo a EMAIL_TEST_RECIPIENT para proteger a terceros
+     * y añade un banner informativo en la cabecera del correo con los destinatarios originales.
+     */
+    async sendMail(mailOptions) {
+        const testMode = process.env.EMAIL_TEST_MODE === 'true' || process.env.EMAIL_TEST_MODE === '1';
+        const testRecipient = process.env.EMAIL_TEST_RECIPIENT || process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER;
+
+        let finalOptions = { ...mailOptions };
+
+        if (testMode && testRecipient) {
+            const originalTo = Array.isArray(mailOptions.to) ? mailOptions.to.join(', ') : (mailOptions.to || '');
+            const originalCc = mailOptions.cc ? (Array.isArray(mailOptions.cc) ? mailOptions.cc.join(', ') : mailOptions.cc) : null;
+            const originalBcc = mailOptions.bcc ? (Array.isArray(mailOptions.bcc) ? mailOptions.bcc.join(', ') : mailOptions.bcc) : null;
+
+            console.log(`[EMAIL TEST MODE] Interceptando correo.`);
+            console.log(` -> Destinatario original: "${originalTo}"`);
+            console.log(` -> Redirigiendo a casilla de pruebas: "${testRecipient}"`);
+            console.log(` -> Asunto: "${mailOptions.subject}"`);
+
+            const bannerHtml = `
+            <div style="background:#fef3c7; border:2px dashed #f59e0b; color:#92400e; padding:14px; margin-bottom:18px; border-radius:8px; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size:0.86rem; line-height:1.5;">
+                <div style="font-weight:bold; font-size:0.95rem; margin-bottom:6px; color:#b45309;">
+                    ⚠️ MODO DE PRUEBAS / TESTING ACTIVADO (EMAIL_TEST_MODE)
+                </div>
+                <div>Este mensaje fue interceptado en entorno de pruebas y <strong>NO</strong> fue enviado al destinatario real.</div>
+                <div style="margin-top:8px; padding-top:8px; border-top:1px solid #fde68a;">
+                    <strong>Destinatario(s) original(es):</strong> ${originalTo}<br/>
+                    ${originalCc ? `<strong>CC original:</strong> ${originalCc}<br/>` : ''}
+                    ${originalBcc ? `<strong>BCC original:</strong> ${originalBcc}<br/>` : ''}
+                </div>
+            </div>
+            `;
+
+            finalOptions.to = testRecipient;
+            delete finalOptions.cc;
+            delete finalOptions.bcc;
+            finalOptions.subject = `[TESTING - Para: ${originalTo}] ${mailOptions.subject}`;
+            if (finalOptions.html) {
+                finalOptions.html = `${bannerHtml}${finalOptions.html}`;
+            }
+        }
+
+        return this.transporter.sendMail(finalOptions);
+    }
+
+    /**
      * Genera un token HMAC anti-tampering seguro para links en correos
      */
     generateToken(claimId, actor, action, extra = {}) {
@@ -116,7 +163,7 @@ class EmailWorkflowService {
         </div>
         `;
 
-        return this.transporter.sendMail({
+        return this.sendMail({
             from: this.from,
             to: claim.supervisor_email,
             subject: `[Acción Requerida] Reclamo #${claim.id} - ${claim.nombre} ${claim.apellido} (${claim.localidad})`,
@@ -143,7 +190,7 @@ class EmailWorkflowService {
         </div>
         `;
 
-        return this.transporter.sendMail({
+        return this.sendMail({
             from: this.from,
             to: adminEmails,
             subject: `[ALERTA] Supervisor reportó Imposibilidad - Reclamo #${claim.id}`,
@@ -189,7 +236,7 @@ class EmailWorkflowService {
         </div>
         `;
 
-        return this.transporter.sendMail({
+        return this.sendMail({
             from: this.from,
             to: claim.email,
             subject: `Seguimiento de tu Reclamo en Don Yeyo #${claim.id}`,
@@ -218,7 +265,7 @@ class EmailWorkflowService {
         </div>
         `;
 
-        return this.transporter.sendMail({
+        return this.sendMail({
             from: this.from,
             to: adminEmails,
             subject: `${isUrgent ? '[URGENTE] ' : ''}Consumidor respondió "${feedback}" - Reclamo #${claim.id}`,
@@ -277,7 +324,7 @@ class EmailWorkflowService {
         </div>
         `;
 
-        return this.transporter.sendMail({
+        return this.sendMail({
             from: this.from,
             to: inocuidadEmails,
             subject: `[Calidad / Inocuidad] Nuevo Reclamo Aprobado #${claim.id} - ${claim.nombre} ${claim.apellido}`,
@@ -301,7 +348,7 @@ class EmailWorkflowService {
         </div>
         `;
 
-        return this.transporter.sendMail({
+        return this.sendMail({
             from: this.from,
             to: elevationEmails,
             subject: `[ELEVACIÓN] Sin respuesta de acción - Reclamo #${claim.id} (${claim.supervisor})`,
