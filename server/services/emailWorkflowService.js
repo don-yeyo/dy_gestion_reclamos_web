@@ -7,36 +7,70 @@ const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:5173';
 
 class EmailWorkflowService {
     constructor() {
-        this.transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST || 'mail.donyeyo.com.ar',
+        // 1. Transporter para correos dirigidos a Consumidores (SMTP saliente institucional Don Yeyo)
+        this.consumerTransporter = nodemailer.createTransport({
+            host: (process.env.SMTP_HOST || 'mail.donyeyo.com.ar').replace(/"/g, ''),
             port: parseInt(process.env.SMTP_PORT || '465', 10),
             secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
             auth: {
-                user: process.env.SMTP_USER || '',
-                pass: process.env.SMTP_PASS || ''
+                user: (process.env.SMTP_USER || '').replace(/"/g, ''),
+                pass: (process.env.SMTP_PASS || '').replace(/"/g, '')
             }
         });
+        const consumerFromName = (process.env.SMTP_FROM_NAME || 'Don Yeyo - Reclamos').replace(/"/g, '');
+        const consumerFromEmail = (process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || 'noresponder@donyeyo.com.ar').replace(/"/g, '');
+        this.consumerFrom = `"${consumerFromName}" <${consumerFromEmail}>`;
 
-        this.from = `"${process.env.SMTP_FROM_NAME || 'Don Yeyo S.A. - Reclamos'}" <${process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER}>`;
+        // 2. Transporter para Alertas y Correos Internos a las áreas de la empresa y supervisores (Outlook / Gabriel Tonelli)
+        const alertaHost = (process.env.ALERTA_SMTP_HOST || 'smtp-mail.outlook.com').replace(/"/g, '');
+        const alertaPort = parseInt(process.env.ALERTA_SMTP_PORT || '587', 10);
+        const alertaEncrypt = ((process.env.ALERTA_SMTP_ENCRYPT || 'tls').replace(/"/g, '')).toLowerCase();
+        const isAlertaSecure = alertaEncrypt === 'ssl' || alertaPort === 465;
+
+        this.internalTransporter = nodemailer.createTransport({
+            host: alertaHost,
+            port: alertaPort,
+            secure: isAlertaSecure,
+            auth: {
+                user: (process.env.ALERTA_SMTP_USER || '').replace(/"/g, ''),
+                pass: (process.env.ALERTA_SMTP_PASSWORD || '').replace(/"/g, '')
+            },
+            tls: {
+                ciphers: 'SSLv3',
+                rejectUnauthorized: false
+            }
+        });
+        const alertaFromName = (process.env.ALERTA_SMTP_NAME || 'Gabriel Tonelli').replace(/"/g, '');
+        const alertaFromEmail = (process.env.ALERTA_SMTP_USER || consumerFromEmail).replace(/"/g, '');
+        this.internalFrom = `"${alertaFromName}" <${alertaFromEmail}>`;
     }
 
     /**
-     * Envía un correo electrónico evaluando si está activo el modo de testeo por entorno.
+     * Envía un correo electrónico evaluando el canal (interno o consumidor) y el modo de testeo por entorno.
      * Si EMAIL_TEST_MODE es true, redirige el correo a EMAIL_TEST_RECIPIENT para proteger a terceros
      * y añade un banner informativo en la cabecera del correo con los destinatarios originales.
+     * @param {Object} mailOptions Opciones de correo (to, subject, html, etc.)
+     * @param {string} channel 'internal' (default) para áreas de la empresa y supervisores, o 'consumer' para clientes
      */
-    async sendMail(mailOptions) {
-        const testMode = process.env.EMAIL_TEST_MODE === 'true' || process.env.EMAIL_TEST_MODE === '1';
-        const testRecipient = process.env.EMAIL_TEST_RECIPIENT || process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER;
+    async sendMail(mailOptions, channel = 'internal') {
+        const isConsumer = channel === 'consumer';
+        const transporter = isConsumer ? this.consumerTransporter : this.internalTransporter;
+        const defaultFrom = isConsumer ? this.consumerFrom : this.internalFrom;
 
-        let finalOptions = { ...mailOptions };
+        const testMode = process.env.EMAIL_TEST_MODE === 'true' || process.env.EMAIL_TEST_MODE === '1';
+        const testRecipient = (process.env.EMAIL_TEST_RECIPIENT || process.env.ALERTA_SMTP_USER || process.env.SMTP_USER || '').replace(/"/g, '');
+
+        let finalOptions = {
+            from: defaultFrom,
+            ...mailOptions
+        };
 
         if (testMode && testRecipient) {
             const originalTo = Array.isArray(mailOptions.to) ? mailOptions.to.join(', ') : (mailOptions.to || '');
             const originalCc = mailOptions.cc ? (Array.isArray(mailOptions.cc) ? mailOptions.cc.join(', ') : mailOptions.cc) : null;
             const originalBcc = mailOptions.bcc ? (Array.isArray(mailOptions.bcc) ? mailOptions.bcc.join(', ') : mailOptions.bcc) : null;
 
-            console.log(`[EMAIL TEST MODE] Interceptando correo.`);
+            console.log(`[EMAIL TEST MODE] Interceptando correo [Canal: ${channel.toUpperCase()}].`);
             console.log(` -> Destinatario original: "${originalTo}"`);
             console.log(` -> Redirigiendo a casilla de pruebas: "${testRecipient}"`);
             console.log(` -> Asunto: "${mailOptions.subject}"`);
@@ -48,6 +82,7 @@ class EmailWorkflowService {
                 </div>
                 <div>Este mensaje fue interceptado en entorno de pruebas y <strong>NO</strong> fue enviado al destinatario real.</div>
                 <div style="margin-top:8px; padding-top:8px; border-top:1px solid #fde68a;">
+                    <strong>Canal de salida:</strong> ${isConsumer ? 'Consumidores (SMTP Saliente)' : 'Interno / Alertas a la Empresa (Outlook)'}<br/>
                     <strong>Destinatario(s) original(es):</strong> ${originalTo}<br/>
                     ${originalCc ? `<strong>CC original:</strong> ${originalCc}<br/>` : ''}
                     ${originalBcc ? `<strong>BCC original:</strong> ${originalBcc}<br/>` : ''}
@@ -64,7 +99,7 @@ class EmailWorkflowService {
             }
         }
 
-        return this.transporter.sendMail(finalOptions);
+        return transporter.sendMail(finalOptions);
     }
 
     /**
