@@ -79,11 +79,15 @@ async function initDatabase() {
                 evidencia_zip TEXT,
                 fecha_carga DATETIME NULL,
                 estado_admin VARCHAR(50) DEFAULT 'Pendiente',
+                fecha_estado_admin DATETIME NULL,
                 admin_motivo_desaprobado TEXT,
                 estado_supervisor VARCHAR(50) DEFAULT 'Pendiente',
+                fecha_estado_supervisor DATETIME NULL,
                 supervisor_motivo_imposibilidad TEXT,
                 estado_consumidor VARCHAR(50) DEFAULT 'Pendiente',
+                fecha_estado_consumidor DATETIME NULL,
                 estado_inocuidad VARCHAR(50) DEFAULT 'Sin acciones',
+                fecha_estado_inocuidad DATETIME NULL,
                 row_numbers JSON,
                 sync_sheet_status VARCHAR(50) DEFAULT 'synced',
                 last_synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -96,6 +100,21 @@ async function initDatabase() {
                 KEY idx_fecha_carga (fecha_carga)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
+
+        // Migración suave: asegurar columnas de timestamp por estado en tablas preexistentes
+        const colsToAdd = [
+            'fecha_estado_admin DATETIME NULL',
+            'fecha_estado_supervisor DATETIME NULL',
+            'fecha_estado_consumidor DATETIME NULL',
+            'fecha_estado_inocuidad DATETIME NULL'
+        ];
+        for (const colDef of colsToAdd) {
+            try {
+                await connection.query(`ALTER TABLE reclamos ADD COLUMN ${colDef}`);
+            } catch (err) {
+                // Columna ya existente
+            }
+        }
 
         // 3. Tabla de Productos/Items asociados a cada Reclamo
         await connection.query(`

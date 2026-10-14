@@ -35,6 +35,23 @@ const SUPERVISORES_LISTA = [
     { nombre: 'Pablo Gallo', email: 'juanpablog@donyeyo.com.ar' }
 ];
 
+function formatFechaHoraSutil(isoStr) {
+    if (!isoStr) return null;
+    try {
+        const d = new Date(isoStr);
+        if (isNaN(d.getTime())) return null;
+        return d.toLocaleString('es-AR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch (e) {
+        return null;
+    }
+}
+
 export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
     const { isAdmin, isInocuidad } = useAuth();
 
@@ -44,13 +61,11 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
     const [motivoDesaprobado, setMotivoDesaprobado] = useState('');
     const [showDesaprobarPrompt, setShowDesaprobarPrompt] = useState(false);
     const [selectedSupervisor, setSelectedSupervisor] = useState(claim?.supervisor || '');
-    const [selectedInocuidad, setSelectedInocuidad] = useState(claim?.estado_inocuidad || 'Sin acciones');
 
     useEffect(() => {
         if (claim) {
             setCurrentClaim(claim);
             setSelectedSupervisor(claim.supervisor || '');
-            setSelectedInocuidad(claim.estado_inocuidad || 'Sin acciones');
         }
     }, [claim]);
 
@@ -65,30 +80,46 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
     );
 
     const isEnRecepcion = !activeClaim.estado_admin || activeClaim.estado_admin === 'Pendiente';
-    const isEnCurso = activeClaim.estado_admin === 'En curso';
+    const isEnCurso = activeClaim.estado_admin === 'En curso' || activeClaim.estado_admin === 'Aprobado';
     const isDesaprobado = activeClaim.estado_admin === 'Desaprobado';
 
-    const handlePonerEnCurso = async () => {
+    const handleAprobarReclamo = async () => {
         if (!hasSupervisor) {
-            alert('Debe asignar un supervisor comercial antes de iniciar la Acción de Compensación.');
+            alert('Debe asignar un supervisor comercial antes de poder aprobar el reclamo.');
             return;
         }
 
-        if (!window.confirm(`¿Iniciar Acción de Compensación para el reclamo #${activeClaim.id}?\n\nEl reclamo pasará a "En curso" y se enviará automáticamente un correo electrónico con instrucciones al supervisor ${activeClaim.supervisor} para entregar la reposición y retribución al consumidor.`)) return;
+        if (!window.confirm(
+            `¿Aprobar el Reclamo #${activeClaim.id}?\n\n` +
+            `• Se notificará por correo al supervisor ${activeClaim.supervisor} con las instrucciones de entrega de reposición y cortesía.\n` +
+            `• Se enviará copia completa del expediente al departamento de Calidad & Inocuidad para su investigación técnica.\n` +
+            `• Ambos estados pasarán a "Pendiente" y el reclamo quedará En curso.`
+        )) return;
 
         setUpdating(true);
         setActionMsg(null);
         try {
             await reclamosApi.updateEstadoAdmin(activeClaim.id, 'En curso');
+            const nowIso = new Date().toISOString();
             setCurrentClaim(prev => ({
                 ...(prev || activeClaim),
                 estado_admin: 'En curso',
-                estado_supervisor: (prev?.estado_supervisor === 'Sin acciones') ? 'Pendiente' : (prev?.estado_supervisor || 'Pendiente')
+                fecha_estado_admin: nowIso,
+                estado_supervisor: 'Pendiente',
+                fecha_estado_supervisor: nowIso,
+                estado_inocuidad: 'Pendiente',
+                fecha_estado_inocuidad: nowIso,
+                estado_consumidor: 'En curso',
+                fecha_estado_consumidor: nowIso,
+                admin_motivo_desaprobado: ''
             }));
-            setActionMsg({ type: 'success', text: 'Acción de Compensación iniciada. Se notificó al supervisor con las instrucciones de reposición/retribución.' });
+            setActionMsg({
+                type: 'success',
+                text: 'Reclamo Aprobado con éxito. Se notificó al supervisor comercial y se derivó copia a Calidad & Inocuidad.'
+            });
             if (onRefresh) onRefresh();
         } catch (e) {
-            setActionMsg({ type: 'error', text: 'Error al iniciar Acción de Compensación: ' + (e.response?.data?.error || e.message) });
+            setActionMsg({ type: 'error', text: 'Error al aprobar reclamo: ' + (e.response?.data?.error || e.message) });
         } finally {
             setUpdating(false);
         }
@@ -177,28 +208,6 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
         }
     };
 
-    const handleGuardarInocuidad = async () => {
-        if (!selectedInocuidad) return;
-
-        if (!window.confirm(`¿Actualizar el dictamen de inocuidad a "${selectedInocuidad}"?`)) return;
-
-        setUpdating(true);
-        setActionMsg(null);
-        try {
-            await reclamosApi.updateEstadoInocuidad(activeClaim.id, selectedInocuidad);
-            setCurrentClaim(prev => ({
-                ...(prev || activeClaim),
-                estado_inocuidad: selectedInocuidad
-            }));
-            setActionMsg({ type: 'success', text: `Estado de inocuidad actualizado a "${selectedInocuidad}".` });
-            if (onRefresh) onRefresh();
-        } catch (err) {
-            setActionMsg({ type: 'error', text: 'Error actualizando inocuidad: ' + (err.response?.data?.error || err.message) });
-        } finally {
-            setUpdating(false);
-        }
-    };
-
     return (
         <Modal
             isOpen={isOpen}
@@ -235,11 +244,27 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
             {/* DIAGRAMA DE WORKFLOW EN RAMAS */}
             {isAdmin && (
                 <div className="workflow-diagram-card">
-                    {/* Barra superior con reinicio discreto */}
+                    {/* Barra superior con estados y reinicio discreto */}
                     <div className="workflow-top-bar">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem' }}>
-                            <span style={{ color: 'var(--text-muted)' }}>Etapa:</span>
-                            <StatusBadge status={activeClaim.estado_admin || 'Pendiente'} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', fontSize: '0.78rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Admin:</span>
+                                <StatusBadge status={activeClaim.estado_admin || 'Pendiente'} />
+                                {activeClaim.fecha_estado_admin && (
+                                    <span style={{ fontSize: '0.71rem', color: 'var(--text-muted)' }}>
+                                        ({formatFechaHoraSutil(activeClaim.fecha_estado_admin)})
+                                    </span>
+                                )}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Consumidor:</span>
+                                <StatusBadge status={activeClaim.estado_consumidor || 'Pendiente'} />
+                                {activeClaim.fecha_estado_consumidor && (
+                                    <span style={{ fontSize: '0.71rem', color: 'var(--text-muted)' }}>
+                                        ({formatFechaHoraSutil(activeClaim.fecha_estado_consumidor)})
+                                    </span>
+                                )}
+                            </div>
                         </div>
                         <button
                             className="btn btn-secondary"
@@ -280,17 +305,29 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
 
                     {/* Grilla de Ramas */}
                     <div className="workflow-tree-grid">
-                        {/* RAMA 1: RECEPCIÓN Y DESCARTE */}
+                        {/* RAMA 1: RECEPCIÓN Y EVALUACIÓN */}
                         <div className={`wf-branch-card ${isEnRecepcion ? 'active' : ''}`}>
                             <div className="wf-branch-title">
                                 <Clock size={14} style={{ color: 'var(--warning)' }} />
                                 <span>1. Ingreso</span>
                             </div>
 
-                            <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Evaluación:</span>
+                                <StatusBadge status={activeClaim.estado_admin || 'Pendiente'} />
+                            </div>
+
+                            {activeClaim.fecha_estado_admin && (
+                                <div style={{ fontSize: '0.71rem', color: 'var(--text-muted)' }}>
+                                    {isEnRecepcion ? 'Cargado: ' : (isDesaprobado ? 'Desaprobado: ' : 'Aprobado: ')}
+                                    {formatFechaHoraSutil(activeClaim.fecha_estado_admin)}
+                                </div>
+                            )}
+
+                            <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.35, marginTop: 4 }}>
                                 {isEnRecepcion && 'Reclamo pendiente de evaluación administrativa.'}
                                 {isDesaprobado && 'Reclamo desaprobado y cerrado.'}
-                                {isEnCurso && 'Recepción superada. Reclamo en Acción de Compensación.'}
+                                {isEnCurso && 'Reclamo aprobado y derivado a los actores correspondientes.'}
                             </div>
 
                             {isEnRecepcion && (
@@ -298,7 +335,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                     className="wf-node-btn wf-danger"
                                     onClick={() => setShowDesaprobarPrompt(true)}
                                     disabled={updating}
-                                    title="Desaprobar reclamo: Marca el reclamo como no procedente desde recepción y cancela las derivaciones de compensación."
+                                    title="Desaprobar reclamo: Marca el reclamo como no procedente desde recepción y cancela las derivaciones de compensación e inocuidad."
                                 >
                                     <X size={14} />
                                     <span>Desaprobar</span>
@@ -306,7 +343,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                             )}
 
                             {isDesaprobado && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--error)', fontSize: '0.78rem', fontWeight: 600 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--error)', fontSize: '0.78rem', fontWeight: 600, marginTop: 4 }}>
                                     <X size={14} />
                                     <span>Desaprobado en Recepción</span>
                                 </div>
@@ -320,13 +357,18 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                 <span>2. Acción de Compensación</span>
                             </div>
 
-                            {/* Asignación de Supervisor */}
+                            {/* Supervisor asignado */}
                             <div style={{ fontSize: '0.76rem' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>Supervisor: </span>
                                 <strong>{activeClaim.supervisor || 'Sin asignar'}</strong>
+                                {activeClaim.supervisor_email && (
+                                    <div style={{ fontSize: '0.71rem', color: 'var(--text-muted)' }}>
+                                        {activeClaim.supervisor_email}
+                                    </div>
+                                )}
                             </div>
 
-                            {/* Selector de supervisor disponible si está en recepción */}
+                            {/* Selector de supervisor disponible SOLO si está en recepción (antes de ser aprobado) */}
                             {isEnRecepcion && (
                                 <div className="wf-select-action-row">
                                     <select
@@ -343,37 +385,44 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                         className="btn btn-secondary"
                                         onClick={handleGuardarSupervisor}
                                         disabled={updating || !selectedSupervisor || selectedSupervisor === activeClaim.supervisor}
-                                        title="Guardar asignación del supervisor para la Acción de Compensación"
+                                        title="Guardar asignación del supervisor"
                                     >
                                         Asignar
                                     </button>
                                 </div>
                             )}
 
-                            {/* Botón de inicio de compensación */}
+                            {/* Botón de Aprobar Reclamo SOLO si está en recepción */}
                             {isEnRecepcion && (
                                 <button
                                     className="wf-node-btn wf-primary"
-                                    onClick={handlePonerEnCurso}
+                                    onClick={handleAprobarReclamo}
                                     disabled={updating || !hasSupervisor}
                                     title={!hasSupervisor
-                                        ? "Debe asignar un supervisor comercial antes de poder iniciar la Acción de Compensación"
-                                        : "Iniciar Acción de Compensación: Dispara el correo de instrucciones al supervisor asignado para entregar la reposición y retribución al consumidor. El estado del supervisor queda en Pendiente para seguimiento automático."}
+                                        ? "Debe asignar un supervisor comercial antes de poder aprobar el reclamo"
+                                        : "Aprobar Reclamo: Notifica por correo al supervisor comercial con instrucciones de compensación y despacha copia a Calidad & Inocuidad con el expediente técnico."}
                                 >
-                                    <Play size={14} />
-                                    <span>Iniciar Compensación</span>
+                                    <CheckCircle2 size={14} />
+                                    <span>Aprobar Reclamo</span>
                                 </button>
                             )}
 
-                            {/* Derivación y Seguimiento del Supervisor */}
+                            {/* Derivación y Seguimiento del Supervisor UNA VEZ APROBADO (solo visualización) */}
                             {isEnCurso && (
-                                <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem' }}>
                                         <span style={{ color: 'var(--text-muted)' }}>Estado Supervisor:</span>
                                         <StatusBadge status={activeClaim.estado_supervisor} />
                                     </div>
+
+                                    {activeClaim.fecha_estado_supervisor && (
+                                        <div style={{ fontSize: '0.71rem', color: 'var(--text-muted)' }}>
+                                            Actualizado: {formatFechaHoraSutil(activeClaim.fecha_estado_supervisor)}
+                                        </div>
+                                    )}
+
                                     <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
-                                        {activeClaim.estado_supervisor === 'Pendiente' && 'Supervisor notificado. El sistema enviará recordatorios de seguimiento automático para que confirme la entrega o reporte algún impedimento.'}
+                                        {activeClaim.estado_supervisor === 'Pendiente' && 'Supervisor notificado por correo electrónico. Seguimiento automático en curso.'}
                                         {activeClaim.estado_supervisor === 'Resuelto' && 'Compensación entregada y confirmada por el supervisor.'}
                                         {activeClaim.estado_supervisor === 'Imposibilidad' && 'El supervisor reportó un impedimento para concretar la entrega.'}
                                     </div>
@@ -387,40 +436,38 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                             )}
                         </div>
 
-                        {/* RAMA 3: CONTROL DE CALIDAD E INOCUIDAD */}
+                        {/* RAMA 3: CONTROL DE CALIDAD E INOCUIDAD (SOLO VISUALIZACIÓN DE ESTADO) */}
                         <div className="wf-branch-card">
                             <div className="wf-branch-title">
                                 <ShieldAlert size={14} style={{ color: '#8b5cf6' }} />
                                 <span>3. Calidad & Inocuidad</span>
                             </div>
 
+                            {/* Solo muestra el estado (solo el badge). Si aún no está aprobada muestra 'Sin acciones' */}
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>Estado actual:</span>
-                                <StatusBadge status={activeClaim.estado_inocuidad} />
+                                <span style={{ color: 'var(--text-muted)' }}>Estado:</span>
+                                <StatusBadge status={isEnRecepcion || isDesaprobado ? 'Sin acciones' : (activeClaim.estado_inocuidad || 'Sin acciones')} />
                             </div>
 
-                            {(isInocuidad || isAdmin) && (
-                                <div className="wf-select-action-row">
-                                    <select
-                                        value={selectedInocuidad}
-                                        onChange={(e) => setSelectedInocuidad(e.target.value)}
-                                        disabled={updating}
-                                    >
-                                        <option value="Sin acciones">Sin acciones</option>
-                                        <option value="Pendiente">Pendiente (Notificar)</option>
-                                        <option value="Resuelto">Resuelto</option>
-                                        <option value="Imposibilidad">Imposibilidad</option>
-                                    </select>
-                                    <button
-                                        className="btn btn-secondary"
-                                        onClick={handleGuardarInocuidad}
-                                        disabled={updating || selectedInocuidad === activeClaim.estado_inocuidad}
-                                        title="Actualizar y registrar el dictamen de calidad e inocuidad"
-                                    >
-                                        Aplicar
-                                    </button>
+                            {activeClaim.fecha_estado_inocuidad && !isEnRecepcion && (
+                                <div style={{ fontSize: '0.71rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                                    Actualizado: {formatFechaHoraSutil(activeClaim.fecha_estado_inocuidad)}
                                 </div>
                             )}
+
+                            <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.35 }}>
+                                {isEnRecepcion && 'El expediente se remitirá a Inocuidad automáticamente cuando el reclamo sea aprobado.'}
+                                {isDesaprobado && 'Sin intervención técnica requerida.'}
+                                {isEnCurso && (activeClaim.estado_inocuidad === 'Pendiente' || !activeClaim.estado_inocuidad) && (
+                                    'Expediente recibido por Calidad & Inocuidad. Investigación de lote y producto en proceso.'
+                                )}
+                                {isEnCurso && activeClaim.estado_inocuidad === 'Resuelto' && (
+                                    'Análisis técnico completado y conformidad de calidad registrada.'
+                                )}
+                                {isEnCurso && activeClaim.estado_inocuidad === 'Imposibilidad' && (
+                                    'Calidad & Inocuidad informó observaciones o imposibilidad de verificación.'
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

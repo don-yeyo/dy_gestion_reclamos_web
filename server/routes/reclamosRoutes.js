@@ -115,45 +115,55 @@ router.patch('/:id/estado-admin', requireRole(['admin', 'sysadmin']), async (req
                     error: 'No se puede avanzar el reclamo a En curso sin un supervisor comercial asignado. Por favor asigná un supervisor primero.'
                 });
             }
+
+            if (claim.estado_admin === 'En curso' || claim.estado_admin === 'Aprobado') {
+                return res.status(400).json({
+                    success: false,
+                    error: 'El reclamo ya ha sido aprobado previamente.'
+                });
+            }
         }
 
         const updates = { 'AO': estado };
 
-        if (estado === 'En curso') {
+        if (estado === 'En curso' || estado === 'Aprobado') {
+            updates['AO'] = 'En curso';
             updates['AP'] = ''; // Blanquear motivos de desaprobado
             updates['AS'] = 'En curso'; // estado_consumidor pasa a En curso
-            // Si el supervisor estaba en Sin acciones, vuelve a Pendiente
-            if (claim.estado_supervisor === 'Sin acciones') {
-                updates['AQ'] = 'Pendiente';
-            }
+            updates['AQ'] = 'Pendiente'; // supervisor pasa a Pendiente
+            updates['AT'] = 'Pendiente'; // calidad / inocuidad pasa a Pendiente
         } else if (estado === 'Desaprobado') {
             updates['AP'] = motivo_desaprobado || 'Desaprobado por administración';
             // Regla solicitada: al desaprobar, cambiar los demás a "Sin acciones"
             updates['AQ'] = 'Sin acciones'; // estado_supervisor
             updates['AS'] = 'Sin acciones'; // estado_consumidor
             updates['AT'] = 'Sin acciones'; // estado_inocuidad
-        } else if (estado === 'Aprobado') {
-            updates['AP'] = '';
-            if (claim.estado_supervisor === 'Sin acciones') {
-                updates['AQ'] = 'Pendiente';
-            }
         } else if (estado === 'Pendiente') {
             updates['AP'] = '';
+            updates['AQ'] = 'Sin acciones';
+            updates['AT'] = 'Sin acciones';
         }
 
         const auditInfo = {
             actor: req.user ? req.user.role : 'admin',
             actorEmail: req.user ? req.user.email : null,
-            motivo: motivo_desaprobado || null
+            motivo: motivo_desaprobado || (estado === 'En curso' ? 'Reclamo aprobado por administración' : null)
         };
 
         await googleSheetsService.updateReclamo(claimId, updates, auditInfo);
 
-        // Si fue pasado a "En curso" (o Aprobado directamente), disparar acción y email al supervisor
+        // Si fue aprobado / puesto en curso, disparar email a Supervisor y a Calidad/Inocuidad
         if (estado === 'En curso' || estado === 'Aprobado') {
             const updatedClaim = await googleSheetsService.getReclamoById(claimId);
+            
+            // 1. Email al Supervisor con instrucciones de compensación
             emailWorkflowService.sendSupervisorActionEmail(updatedClaim).catch(err => {
-                console.error(`[WORKFLOW] Error enviando email a supervisor (${claim.supervisor_email}):`, err.message);
+                console.error(`[WORKFLOW] Error enviando email a supervisor (${updatedClaim.supervisor_email}):`, err.message);
+            });
+
+            // 2. Email a Calidad / Inocuidad con expediente completo para investigación
+            emailWorkflowService.sendInocuidadActionEmail(updatedClaim).catch(err => {
+                console.error(`[WORKFLOW] Error enviando email a inocuidad:`, err.message);
             });
         }
 
@@ -215,12 +225,28 @@ router.patch('/:id/supervisor', requireRole(['admin', 'sysadmin']), async (req, 
     }
 
     try {
+        const claim = await googleSheetsService.getReclamoById(claimId);
+        if (!claim) {
+            return res.status(404).json({ success: false, error: 'Reclamo no encontrado.' });
+        }
+
+        if (claim.estado_admin === 'En curso' || claim.estado_admin === 'Aprobado') {
+            return res.status(400).json({
+                success: false,
+                error: 'No se puede modificar el supervisor de un reclamo que ya ha sido aprobado.'
+            });
+        }
+
         const updates = {
             'L': supervisor,
             'AG': email || ''
         };
-        await googleSheetsService.updateReclamo(claimId, updates);
-        res.json({ success: true, message: 'Supervisor reasignado correctamente.', updates });
+        await googleSheetsService.updateReclamo(claimId, updates, {
+            actor: req.user ? req.user.role : 'admin',
+            actorEmail: req.user ? req.user.email : null,
+            motivo: `Supervisor asignado: ${supervisor}`
+        });
+        res.json({ success: true, message: 'Supervisor asignado correctamente.', updates });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }

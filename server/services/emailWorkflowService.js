@@ -227,25 +227,60 @@ class EmailWorkflowService {
     }
 
     /**
-     * Envía expediente a Inocuidad cuando el administrador cambia estado_inocuidad a Pendiente
+     * Envía expediente completo a Calidad e Inocuidad cuando el administrador aprueba el reclamo
      */
     async sendInocuidadActionEmail(claim) {
         const inocuidadEmails = process.env.EMAILS_INOCUIDAD || 'inocuidad@donyeyo.com.ar';
+        const items = Array.isArray(claim.items) ? claim.items : [];
+        const itemsHtml = items.map(item => `
+            <div style="background:#f8fafc; border-left:4px solid #8b5cf6; padding:12px; margin-bottom:10px; border-radius:4px; font-size:0.9rem; line-height:1.5;">
+                <strong>${item.marca || 'Don Yeyo'} - ${item.producto || 'Producto'}</strong> (${item.categoria || 'Sin categoría'})<br/>
+                <span><strong>Defecto:</strong> ${item.defecto || 'No especificado'}</span><br/>
+                <span><strong>Cantidad:</strong> ${item.cantidad || 1}</span><br/>
+                <span><strong>Lote:</strong> ${item.lote || 'N/A'} | <strong>Hora:</strong> ${item.hora || 'N/A'} | <strong>Vencimiento:</strong> ${item.vto || item.vto_reclamo || 'N/A'}</span><br/>
+                <span><strong>Conserva envase:</strong> ${item.conserva_envase || 'No especificado'}</span>
+                ${item.descripcion ? `<br/><span style="color:#475569; font-style:italic;">"${item.descripcion}"</span>` : ''}
+            </div>
+        `).join('') || `<p><em>${claim.defecto || 'Sin detalle de productos cargados.'}</em></p>`;
+
         const html = `
-        <div style="font-family:sans-serif; max-width:600px; margin:auto; padding:20px; border:1px solid #e2e8f0; border-radius:8px;">
-            <h3 style="color:#151C5B;">Derivación de Caso a Inocuidad y Calidad - Reclamo #${claim.id}</h3>
-            <p>El área de administración ha asignado el reclamo <strong>#${claim.id}</strong> para intervención y análisis técnico de Inocuidad.</p>
-            <p><strong>Consumidor:</strong> ${claim.nombre} ${claim.apellido} (${claim.localidad}, ${claim.provincia})<br/>
-            <strong>Comercio de compra:</strong> ${claim.comercio_compra || 'No especificado'}</p>
-            ${claim.evidencia_zip ? `<p><a href="${claim.evidencia_zip}" style="display:inline-block; background:#151C5B; color:#fff; padding:8px 16px; border-radius:4px; text-decoration:none;">Descargar Evidencias Multimedia (ZIP)</a></p>` : ''}
-            <p><a href="${APP_BASE_URL}/reclamos/${claim.id}">Ver Reclamo en el Gestor Web</a></p>
+        <div style="font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width:640px; margin:auto; background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden;">
+            <div style="background:#151C5B; color:#ffffff; padding:20px; text-align:center;">
+                <h2 style="margin:0; font-size:1.35rem;">Expediente Técnico - Reclamo Aprobado #${claim.id}</h2>
+                <p style="margin:6px 0 0 0; opacity:0.85; font-size:0.9rem;">Don Yeyo S.A. | Departamento de Calidad & Inocuidad</p>
+            </div>
+            <div style="padding:24px; color:#1e293b; line-height:1.55;">
+                <p>Estimado equipo de <strong>Calidad e Inocuidad</strong>,</p>
+                <p>El reclamo <strong>#${claim.id}</strong> ha sido <strong>Aprobado</strong> por la administración. Se envía copia completa del expediente para iniciar la investigación técnica, análisis de lote y trazabilidad correspondiente.</p>
+
+                <div style="background:#f1f5f9; padding:14px; border-radius:8px; margin:16px 0; font-size:0.92rem;">
+                    <h4 style="margin:0 0 8px 0; color:#151C5B;">Datos del Consumidor</h4>
+                    <strong>Nombre:</strong> ${claim.nombre} ${claim.apellido}<br/>
+                    <strong>Domicilio:</strong> ${claim.domicilio || 'No especificado'} (${claim.localidad}, ${claim.provincia})<br/>
+                    <strong>Teléfono:</strong> <a href="tel:${claim.telefono}">${claim.telefono || 'Sin teléfono'}</a><br/>
+                    <strong>Email:</strong> ${claim.email || 'Sin correo'}<br/>
+                    <strong>Comercio de compra:</strong> ${claim.comercio_compra || 'No especificado'}<br/>
+                    <strong>Supervisor asignado:</strong> ${claim.supervisor || 'Sin asignar'} (${claim.supervisor_email || 'Sin correo'})
+                </div>
+
+                <h4 style="color:#151C5B; margin:16px 0 8px 0;">Detalle de Productos Reclamados:</h4>
+                ${itemsHtml}
+
+                <div style="margin-top:20px; text-align:center; display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+                    ${claim.evidencia_zip ? `<a href="${claim.evidencia_zip}" style="display:inline-block; background:#8b5cf6; color:#ffffff; text-decoration:none; padding:10px 20px; border-radius:6px; font-weight:600; font-size:0.9rem;">Descargar Evidencias ZIP</a>` : ''}
+                    <a href="${APP_BASE_URL}/reclamos/${claim.id}" style="display:inline-block; background:#151C5B; color:#ffffff; text-decoration:none; padding:10px 20px; border-radius:6px; font-weight:600; font-size:0.9rem;">Abrir en el Gestor Web</a>
+                </div>
+            </div>
+            <div style="background:#f8fafc; padding:14px; text-align:center; font-size:0.8rem; color:#94a3b8; border-top:1px solid #e2e8f0;">
+                Don Yeyo S.A. | Sistema de Gestión Automatizado de Reclamos
+            </div>
         </div>
         `;
 
         return this.transporter.sendMail({
             from: this.from,
             to: inocuidadEmails,
-            subject: `[Inocuidad] Caso Asignado - Reclamo #${claim.id}`,
+            subject: `[Calidad / Inocuidad] Nuevo Reclamo Aprobado #${claim.id} - ${claim.nombre} ${claim.apellido}`,
             html
         });
     }

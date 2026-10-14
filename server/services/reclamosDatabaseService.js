@@ -346,11 +346,15 @@ class ReclamosDatabaseService {
             evidencia_zip: r.evidencia_zip,
             fecha_carga: r.fecha_carga ? r.fecha_carga.toISOString() : '',
             estado_admin: r.estado_admin,
+            fecha_estado_admin: r.fecha_estado_admin ? r.fecha_estado_admin.toISOString() : (r.fecha_carga ? r.fecha_carga.toISOString() : (r.created_at ? new Date(r.created_at).toISOString() : null)),
             admin_motivo_desaprobado: r.admin_motivo_desaprobado,
             estado_supervisor: r.estado_supervisor,
+            fecha_estado_supervisor: r.fecha_estado_supervisor ? r.fecha_estado_supervisor.toISOString() : null,
             supervisor_motivo_imposibilidad: r.supervisor_motivo_imposibilidad,
             estado_consumidor: r.estado_consumidor,
+            fecha_estado_consumidor: r.fecha_estado_consumidor ? r.fecha_estado_consumidor.toISOString() : null,
             estado_inocuidad: r.estado_inocuidad,
+            fecha_estado_inocuidad: r.fecha_estado_inocuidad ? r.fecha_estado_inocuidad.toISOString() : null,
             items: itemsByClaim.get(r.id) || []
         }));
     }
@@ -393,11 +397,15 @@ class ReclamosDatabaseService {
             evidencia_zip: r.evidencia_zip,
             fecha_carga: r.fecha_carga ? r.fecha_carga.toISOString() : '',
             estado_admin: r.estado_admin,
+            fecha_estado_admin: r.fecha_estado_admin ? r.fecha_estado_admin.toISOString() : (r.fecha_carga ? r.fecha_carga.toISOString() : (r.created_at ? new Date(r.created_at).toISOString() : null)),
             admin_motivo_desaprobado: r.admin_motivo_desaprobado,
             estado_supervisor: r.estado_supervisor,
+            fecha_estado_supervisor: r.fecha_estado_supervisor ? r.fecha_estado_supervisor.toISOString() : null,
             supervisor_motivo_imposibilidad: r.supervisor_motivo_imposibilidad,
             estado_consumidor: r.estado_consumidor,
+            fecha_estado_consumidor: r.fecha_estado_consumidor ? r.fecha_estado_consumidor.toISOString() : null,
             estado_inocuidad: r.estado_inocuidad,
+            fecha_estado_inocuidad: r.fecha_estado_inocuidad ? r.fecha_estado_inocuidad.toISOString() : null,
             items: items.map(it => ({
                 rowNumber: it.item_row_number,
                 categoria: it.categoria,
@@ -448,6 +456,21 @@ class ReclamosDatabaseService {
         for (const [key, val] of Object.entries(updates)) {
             const mapped = ReclamosDatabaseService.sheetColToDbCol(key) || key;
             dbUpdates[mapped] = val;
+        }
+
+        // Registrar timestamp exacto del cambio de estado si se actualiza alguno
+        const now = new Date();
+        if (dbUpdates.estado_admin !== undefined) {
+            dbUpdates.fecha_estado_admin = now;
+        }
+        if (dbUpdates.estado_supervisor !== undefined) {
+            dbUpdates.fecha_estado_supervisor = now;
+        }
+        if (dbUpdates.estado_consumidor !== undefined) {
+            dbUpdates.fecha_estado_consumidor = now;
+        }
+        if (dbUpdates.estado_inocuidad !== undefined) {
+            dbUpdates.fecha_estado_inocuidad = now;
         }
 
         const fields = Object.keys(dbUpdates);

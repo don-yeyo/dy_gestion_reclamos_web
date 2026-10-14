@@ -192,28 +192,27 @@ router.get('/admin-quick', async (req, res) => {
             `);
         }
 
-        // Si ya tiene supervisor asignado, proceder a poner en curso
-        const yaEstabaEnCurso = claim.estado_admin === 'En curso';
-
         if (!yaEstabaEnCurso) {
             const updates = {
                 'AO': 'En curso',
                 'AS': 'En curso',
-                'AP': ''
+                'AP': '',
+                'AQ': 'Pendiente',
+                'AT': 'Pendiente'
             };
-            if (claim.estado_supervisor === 'Sin acciones' || !claim.estado_supervisor) {
-                updates['AQ'] = 'Pendiente';
-            }
 
             await googleSheetsService.updateReclamo(payload.claimId, updates, {
                 actor: 'admin_link',
                 motivo: 'Aprobación rápida desde email'
             });
 
-            // Disparar email al supervisor
+            // Disparar email al supervisor y a Calidad/Inocuidad
             const updatedClaim = await googleSheetsService.getReclamoById(payload.claimId);
             emailWorkflowService.sendSupervisorActionEmail(updatedClaim).catch(err => {
                 console.error(`[WORKFLOW] Error enviando email a supervisor (${claim.supervisor_email}):`, err.message);
+            });
+            emailWorkflowService.sendInocuidadActionEmail(updatedClaim).catch(err => {
+                console.error('[WORKFLOW] Error enviando email a inocuidad:', err.message);
             });
         }
 
@@ -331,17 +330,16 @@ router.post('/admin-assign-and-start', async (req, res) => {
             `);
         }
 
-        // Actualizar supervisor y poner en curso
+        // Actualizar supervisor y poner en curso con derivaciones a supervisor e inocuidad
         const updates = {
             'L': supNombre,
             'AG': supEmail,
             'AO': 'En curso',
             'AS': 'En curso',
-            'AP': ''
+            'AP': '',
+            'AQ': 'Pendiente',
+            'AT': 'Pendiente'
         };
-        if (claim.estado_supervisor === 'Sin acciones' || !claim.estado_supervisor) {
-            updates['AQ'] = 'Pendiente';
-        }
 
         await googleSheetsService.updateReclamo(payload.claimId, updates, {
             actor: 'admin_link',
@@ -349,10 +347,13 @@ router.post('/admin-assign-and-start', async (req, res) => {
             motivo: `Supervisor ${supNombre} asignado y puesto En curso desde enlace web de correo`
         });
 
-        // Disparar email al supervisor asignado
+        // Disparar emails al supervisor asignado y a Calidad/Inocuidad
         const updatedClaim = await googleSheetsService.getReclamoById(payload.claimId);
         emailWorkflowService.sendSupervisorActionEmail(updatedClaim).catch(err => {
             console.error(`[WORKFLOW] Error enviando email a supervisor (${supEmail}):`, err.message);
+        });
+        emailWorkflowService.sendInocuidadActionEmail(updatedClaim).catch(err => {
+            console.error('[WORKFLOW] Error enviando email a inocuidad:', err.message);
         });
 
         res.send(`
@@ -387,7 +388,8 @@ router.post('/admin-assign-and-start', async (req, res) => {
                         • <strong>Supervisor Asignado:</strong> ${escapeHtml(supNombre)} (${escapeHtml(supEmail || 'Sin email registrado')})<br/>
                         • <strong>Estado Admin:</strong> En curso<br/>
                         • <strong>Estado Consumidor:</strong> En curso<br/>
-                        • <strong>Acción de Compensación:</strong> Notificación enviada al supervisor por correo electrónico.
+                        • <strong>Acción de Compensación:</strong> Notificación enviada al supervisor por correo electrónico.<br/>
+                        • <strong>Calidad & Inocuidad:</strong> Expediente técnico enviado al departamento de calidad para análisis de lote.
                     </div>
 
                     <a href="${APP_BASE_URL}/reclamos/${payload.claimId}" class="btn">Abrir en el Gestor Web</a>
