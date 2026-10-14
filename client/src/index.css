@@ -973,127 +973,231 @@ body {
   white-space: nowrap;
 }
 
+/* Enlaces de Reclamo (Teléfono, Email, Evidencias) */
+.claim-link {
+  color: var(--dy-blue);
+  text-decoration: none;
+  font-weight: 500;
+  transition: var(--transition);
+}
+
+.claim-link:hover {
+  text-decoration: underline;
+  opacity: 0.85;
+}
+
+[data-theme="dark"] .claim-link,
+.dark-theme .claim-link {
+  color: #ffffff !important;
+}
+
 /* ==============================================================================
-   WORKFLOW STEPS DIAGRAM (ACCIONES DE ADMINISTRACIÓN)
+   WORKFLOW EN RAMAS (INTERACTIVO POR NODOS)
    ============================================================================== */
 .workflow-diagram-card {
   background: var(--surface);
-  border: 2px solid var(--border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 16px 20px;
-  margin-bottom: 24px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
   transition: var(--transition);
 }
 
-.workflow-header {
+.workflow-top-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-  gap: 8px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--border);
 }
 
-.workflow-flow-container {
+.workflow-tree-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+@media (min-width: 768px) {
+  .workflow-tree-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.wf-branch-card {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: var(--transition);
+}
+
+.wf-branch-card.active {
+  border-color: var(--primary);
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.wf-branch-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  position: relative;
-  margin: 16px 0 24px 0;
   gap: 6px;
 }
 
-.workflow-step-node {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex: 1;
-  position: relative;
-  z-index: 2;
-  text-align: center;
-}
-
-.workflow-step-badge {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--surface-subtle);
-  border: 2px solid var(--border);
-  display: flex;
+.wf-node-btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
   font-size: 0.8rem;
-  color: var(--text-muted);
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
   transition: var(--transition);
+  text-align: center;
+  width: 100%;
 }
 
-.workflow-step-node.active .workflow-step-badge {
-  border-color: var(--primary);
+.wf-node-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.wf-node-btn.wf-primary {
   background: var(--primary);
   color: #ffffff;
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
 }
 
-.workflow-step-node.approved .workflow-step-badge {
-  border-color: var(--success);
-  background: var(--success);
-  color: #ffffff;
-  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+.wf-node-btn.wf-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
 }
 
-.workflow-step-node.rejected .workflow-step-badge {
-  border-color: var(--error);
+.wf-node-btn.wf-danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--error);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.wf-node-btn.wf-danger:hover:not(:disabled) {
   background: var(--error);
   color: #ffffff;
-  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.2);
 }
 
-.workflow-step-title {
-  margin-top: 6px;
-  font-size: 0.74rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
+.wf-node-btn.wf-secondary {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
 }
 
-.workflow-step-node.active .workflow-step-title {
-  color: var(--primary);
-  font-weight: 700;
+.wf-node-btn.wf-secondary:hover:not(:disabled) {
+  background: var(--surface-hover);
 }
 
-.workflow-step-node.approved .workflow-step-title {
-  color: var(--success);
-  font-weight: 700;
+.wf-select-action-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.workflow-step-node.rejected .workflow-step-title {
-  color: var(--error);
-  font-weight: 700;
-}
-
-.workflow-line-connector {
+.wf-select-action-row select {
   flex: 1;
-  height: 2px;
-  background: var(--border);
-  margin-top: -24px;
-  position: relative;
-  z-index: 1;
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
 }
 
-.workflow-line-connector.active {
-  background: var(--primary);
+.wf-select-action-row button {
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  white-space: nowrap;
 }
 
-.workflow-buttons-bar {
+/* ==============================================================================
+   DATOS DEL RECLAMO & PRODUCTOS COMPACTOS
+   ============================================================================== */
+.claim-summary-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+}
+
+.claim-summary-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-  flex-wrap: wrap;
-  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.claim-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px 16px;
+  font-size: 0.82rem;
+  margin-bottom: 14px;
+}
+
+.claim-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.claim-info-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.claim-info-val {
+  color: var(--text);
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.claim-products-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  margin-top: 8px;
+}
+
+.claim-products-table th {
+  padding: 6px 8px;
+  background: var(--surface-subtle);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 700;
+  text-align: left;
+}
+
+.claim-products-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.claim-products-table tr:last-child td {
+  border-bottom: none;
 }
 
 /* Paginación de Tabla */

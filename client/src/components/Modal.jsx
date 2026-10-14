@@ -12,7 +12,7 @@ export const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = '80
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="modal-header">
-                    <h3 style={{ margin: 0, color: 'var(--dy-blue)', fontSize: '1.2rem' }}>{title}</h3>
+                    <h3 style={{ margin: 0, color: 'var(--text)', fontSize: '1.15rem', fontWeight: 600 }}>{title}</h3>
                     <button
                         onClick={onClose}
                         style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}

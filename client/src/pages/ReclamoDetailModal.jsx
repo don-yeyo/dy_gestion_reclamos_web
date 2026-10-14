@@ -3,7 +3,23 @@ import { Modal } from '../components/Modal';
 import { StatusBadge } from '../components/StatusBadge';
 import { reclamosApi } from '../services/api';
 import { useAuth } from '../config/AuthContext';
-import { MapPin, Phone, Mail, Store, Package, Download, Check, X, ShieldAlert, User, AlertCircle, Play, GitBranch, RotateCcw } from 'lucide-react';
+import {
+    MapPin,
+    Phone,
+    Mail,
+    Store,
+    Download,
+    Check,
+    X,
+    ShieldAlert,
+    User,
+    AlertCircle,
+    Play,
+    RotateCcw,
+    GitBranch,
+    Clock,
+    CheckCircle2
+} from 'lucide-react';
 
 const SUPERVISORES_LISTA = [
     { nombre: 'Hugo Basile', email: 'hugob@donyeyo.com.ar' },
@@ -26,11 +42,27 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
     const [motivoDesaprobado, setMotivoDesaprobado] = useState('');
     const [showDesaprobarPrompt, setShowDesaprobarPrompt] = useState(false);
     const [selectedSupervisor, setSelectedSupervisor] = useState(claim?.supervisor || '');
+    const [selectedInocuidad, setSelectedInocuidad] = useState(claim?.estado_inocuidad || 'Sin acciones');
 
     if (!claim) return null;
 
+    const hasSupervisor = Boolean(
+        claim.supervisor &&
+        claim.supervisor.trim() !== '' &&
+        !claim.supervisor.toLowerCase().includes('sin asignar')
+    );
+
+    const isEnRecepcion = !claim.estado_admin || claim.estado_admin === 'Pendiente';
+    const isEnCurso = claim.estado_admin === 'En curso';
+    const isDesaprobado = claim.estado_admin === 'Desaprobado';
+
     const handlePonerEnCurso = async () => {
-        if (!window.confirm(`¿Poner el reclamo #${claim.id} "En curso"?\n\nEsto sincronizará el estado del consumidor a "En curso" y enviará automáticamente el email con instrucciones de reposición/cortesía al supervisor ${claim.supervisor || 'asignado'}.`)) return;
+        if (!hasSupervisor) {
+            alert('Debe asignar un supervisor comercial antes de poner el reclamo En Curso.');
+            return;
+        }
+
+        if (!window.confirm(`¿Iniciar gestión comercial para el reclamo #${claim.id}?\n\nEl reclamo pasará a "En curso" y se enviará automáticamente el correo con instrucciones al supervisor ${claim.supervisor}.`)) return;
 
         setUpdating(true);
         setActionMsg(null);
@@ -40,38 +72,6 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
             onRefresh();
         } catch (e) {
             setActionMsg({ type: 'error', text: 'Error al poner en curso: ' + (e.response?.data?.error || e.message) });
-        } finally {
-            setUpdating(false);
-        }
-    };
-
-    const handleRevertirAPendiente = async () => {
-        if (!window.confirm(`¿Revertir el reclamo #${claim.id} al estado inicial "Pendiente"?`)) return;
-
-        setUpdating(true);
-        setActionMsg(null);
-        try {
-            await reclamosApi.updateEstadoAdmin(claim.id, 'Pendiente');
-            setActionMsg({ type: 'success', text: 'Reclamo regresado a estado inicial "Pendiente".' });
-            onRefresh();
-        } catch (e) {
-            setActionMsg({ type: 'error', text: 'Error al revertir a pendiente: ' + (e.response?.data?.error || e.message) });
-        } finally {
-            setUpdating(false);
-        }
-    };
-
-    const handleAprobar = async () => {
-        if (!window.confirm(`¿Marcar como Aprobado el reclamo #${claim.id}?`)) return;
-
-        setUpdating(true);
-        setActionMsg(null);
-        try {
-            await reclamosApi.updateEstadoAdmin(claim.id, 'Aprobado');
-            setActionMsg({ type: 'success', text: 'Reclamo aprobado.' });
-            onRefresh();
-        } catch (e) {
-            setActionMsg({ type: 'error', text: 'Error al aprobar: ' + (e.response?.data?.error || e.message) });
         } finally {
             setUpdating(false);
         }
@@ -97,35 +97,60 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
         }
     };
 
-    const handleReasignarSupervisor = async (e) => {
-        const supNombre = e.target.value;
-        setSelectedSupervisor(supNombre);
-        const supObj = SUPERVISORES_LISTA.find(s => s.nombre === supNombre);
-        if (!supObj) return;
-
-        if (!window.confirm(`¿Reasignar este reclamo al supervisor ${supNombre}?`)) return;
+    const handleReiniciarFlujo = async () => {
+        if (!window.confirm(`¿Reiniciar todo el flujo del reclamo #${claim.id}?\n\nEl reclamo volverá a la etapa inicial de Recepción ("Pendiente"), permitiendo reasignar el supervisor o reevaluar la procedencia.`)) return;
 
         setUpdating(true);
+        setActionMsg(null);
         try {
-            await reclamosApi.updateSupervisor(claim.id, supObj.nombre, supObj.email);
-            setActionMsg({ type: 'success', text: `Supervisor cambiado a ${supNombre}.` });
+            await reclamosApi.updateEstadoAdmin(claim.id, 'Pendiente');
+            await reclamosApi.updateEstadoSupervisor(claim.id, 'Pendiente');
+            await reclamosApi.updateEstadoInocuidad(claim.id, 'Pendiente');
+            setActionMsg({ type: 'success', text: 'Flujo reiniciado correctamente. El reclamo se encuentra nuevamente en Recepción.' });
             onRefresh();
-        } catch (err) {
-            setActionMsg({ type: 'error', text: 'Error reasignando: ' + (err.response?.data?.error || err.message) });
+        } catch (e) {
+            setActionMsg({ type: 'error', text: 'Error al reiniciar flujo: ' + (e.response?.data?.error || e.message) });
         } finally {
             setUpdating(false);
         }
     };
 
-    const handleChangeInocuidad = async (e) => {
-        const nuevoEstado = e.target.value;
+    const handleGuardarSupervisor = async () => {
+        if (!selectedSupervisor) {
+            alert('Por favor seleccione un supervisor de la lista.');
+            return;
+        }
+        const supObj = SUPERVISORES_LISTA.find(s => s.nombre === selectedSupervisor);
+        if (!supObj) return;
+
+        if (!window.confirm(`¿Asignar este reclamo al supervisor ${selectedSupervisor}?`)) return;
+
         setUpdating(true);
+        setActionMsg(null);
         try {
-            await reclamosApi.updateEstadoInocuidad(claim.id, nuevoEstado);
-            setActionMsg({ type: 'success', text: `Estado de inocuidad actualizado a ${nuevoEstado}.` });
+            await reclamosApi.updateSupervisor(claim.id, supObj.nombre, supObj.email);
+            setActionMsg({ type: 'success', text: `Supervisor asignado a ${selectedSupervisor}.` });
             onRefresh();
         } catch (err) {
-            setActionMsg({ type: 'error', text: 'Error: ' + (err.response?.data?.error || err.message) });
+            setActionMsg({ type: 'error', text: 'Error asignando supervisor: ' + (err.response?.data?.error || err.message) });
+        } finally {
+            setUpdating(false);
+        }
+    };
+
+    const handleGuardarInocuidad = async () => {
+        if (!selectedInocuidad) return;
+
+        if (!window.confirm(`¿Actualizar el dictamen de inocuidad a "${selectedInocuidad}"?`)) return;
+
+        setUpdating(true);
+        setActionMsg(null);
+        try {
+            await reclamosApi.updateEstadoInocuidad(claim.id, selectedInocuidad);
+            setActionMsg({ type: 'success', text: `Estado de inocuidad actualizado a "${selectedInocuidad}".` });
+            onRefresh();
+        } catch (err) {
+            setActionMsg({ type: 'error', text: 'Error actualizando inocuidad: ' + (err.response?.data?.error || err.message) });
         } finally {
             setUpdating(false);
         }
@@ -135,352 +160,343 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
         <Modal
             isOpen={isOpen}
             onClose={onClose}
-            title={`Detalle de Reclamo #${claim.id}`}
+            title={`Reclamo #${claim.id}`}
             maxWidth="850px"
         >
             {actionMsg && (
                 <div style={{
-                    padding: 12,
+                    padding: '10px 14px',
                     borderRadius: 'var(--radius-sm)',
                     marginBottom: 16,
                     background: actionMsg.type === 'success' ? 'var(--success-bg)' : 'var(--error-bg)',
-                    color: actionMsg.type === 'success' ? '#065f46' : '#b91c1c',
-                    fontWeight: 500,
-                    fontSize: '0.9rem'
+                    color: actionMsg.type === 'success' ? 'var(--success)' : 'var(--error)',
+                    fontWeight: 600,
+                    fontSize: '0.84rem'
                 }}>
                     {actionMsg.text}
                 </div>
             )}
 
-            {/* Estados actuales */}
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20, padding: 14, background: 'var(--surface-subtle)', borderRadius: 'var(--radius-md)' }}>
-                <div><strong>Admin:</strong> <StatusBadge status={claim.estado_admin} /></div>
-                <div><strong>Supervisor:</strong> <StatusBadge status={claim.estado_supervisor} /></div>
-                <div><strong>Consumidor:</strong> <StatusBadge status={claim.estado_consumidor} /></div>
-                <div><strong>Inocuidad:</strong> <StatusBadge status={claim.estado_inocuidad} /></div>
-            </div>
-
-            {/* Motivos si aplican */}
+            {/* Motivos activos si aplican */}
             {claim.admin_motivo_desaprobado && (
-                <div style={{ background: 'var(--error-bg)', color: 'var(--error)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: 12, borderRadius: 'var(--radius-sm)', marginBottom: 16, fontSize: '0.88rem' }}>
+                <div style={{ background: 'var(--error-bg)', color: 'var(--error)', border: '1px solid rgba(239, 68, 68, 0.3)', padding: 10, borderRadius: 'var(--radius-sm)', marginBottom: 14, fontSize: '0.82rem' }}>
                     <strong>Motivo de Desaprobación (Admin):</strong> {claim.admin_motivo_desaprobado}
                 </div>
             )}
             {claim.supervisor_motivo_imposibilidad && (
-                <div style={{ background: 'var(--warning-bg)', color: 'var(--warning)', border: '1px solid rgba(245, 158, 11, 0.3)', padding: 12, borderRadius: 'var(--radius-sm)', marginBottom: 16, fontSize: '0.88rem' }}>
+                <div style={{ background: 'var(--warning-bg)', color: 'var(--warning)', border: '1px solid rgba(245, 158, 11, 0.3)', padding: 10, borderRadius: 'var(--radius-sm)', marginBottom: 14, fontSize: '0.82rem' }}>
                     <strong>Motivo de Imposibilidad (Supervisor):</strong> {claim.supervisor_motivo_imposibilidad}
                 </div>
             )}
 
-            {/* Panel de Workflow y Decisiones de Administración */}
+            {/* DIAGRAMA DE WORKFLOW EN RAMAS */}
             {isAdmin && (
                 <div className="workflow-diagram-card">
-                    <div className="workflow-header">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <GitBranch size={17} style={{ color: 'var(--primary)' }} />
-                            <h4 style={{ margin: 0, color: 'var(--heading-color)', fontSize: '0.92rem', fontWeight: 700 }}>
-                                Flujo de Decisión Administrativa
-                            </h4>
+                    {/* Barra superior con reinicio discreto */}
+                    <div className="workflow-top-bar">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Etapa:</span>
+                            <StatusBadge status={claim.estado_admin || 'Pendiente'} />
                         </div>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                            Etapa actual: <strong style={{ color: 'var(--text)' }}>{claim.estado_admin || 'Pendiente'}</strong>
-                        </span>
+                        <button
+                            className="btn btn-secondary"
+                            onClick={handleReiniciarFlujo}
+                            disabled={updating}
+                            style={{ padding: '4px 10px', fontSize: '0.75rem', gap: 4 }}
+                            title="Reiniciar flujo completo: Devuelve el reclamo al estado inicial de Recepción, permitiendo reasignar supervisor o reevaluar el reclamo."
+                        >
+                            <RotateCcw size={12} />
+                            <span>Reiniciar Flujo</span>
+                        </button>
                     </div>
 
-                    {/* Stepper Visual de Nodos del Ciclo de Vida */}
-                    <div className="workflow-flow-container">
-                        {/* Nodo 1: Recepción / Pendiente */}
-                        <div className={`workflow-step-node ${(claim.estado_admin === 'Pendiente') ? 'active' : (claim.estado_admin !== 'Desaprobado') ? 'approved' : ''}`}>
-                            <div className="workflow-step-badge">
-                                {(claim.estado_admin !== 'Pendiente' && claim.estado_admin !== 'Desaprobado') ? <Check size={16} /> : '1'}
-                            </div>
-                            <span className="workflow-step-title">1. Recepción</span>
-                        </div>
-
-                        <div className={`workflow-line-connector ${(claim.estado_admin === 'En curso' || claim.estado_admin === 'Aprobado') ? 'active' : ''}`} />
-
-                        {/* Nodo 2: En curso (Triaje y Notificación) */}
-                        <div className={`workflow-step-node ${(claim.estado_admin === 'En curso') ? 'active' : (claim.estado_admin === 'Aprobado') ? 'approved' : ''}`}>
-                            <div className="workflow-step-badge">
-                                {(claim.estado_admin === 'Aprobado') ? <Check size={16} /> : <Play size={13} />}
-                            </div>
-                            <span className="workflow-step-title">2. En Curso</span>
-                        </div>
-
-                        <div className={`workflow-line-connector ${(claim.estado_admin === 'Aprobado') ? 'active' : ''}`} />
-
-                        {/* Rama Aprobado */}
-                        <div className={`workflow-step-node ${(claim.estado_admin === 'Aprobado') ? 'approved' : ''}`}>
-                            <div className="workflow-step-badge">
-                                <Check size={16} />
-                            </div>
-                            <span className="workflow-step-title">3. Aprobado</span>
-                        </div>
-
-                        <div className="workflow-line-connector" style={{ borderTop: '2px dashed var(--border)', background: 'transparent' }} />
-
-                        {/* Rama Desaprobado */}
-                        <div className={`workflow-step-node ${(claim.estado_admin === 'Desaprobado') ? 'rejected' : ''}`}>
-                            <div className="workflow-step-badge">
-                                <X size={16} />
-                            </div>
-                            <span className="workflow-step-title">Desaprobado</span>
-                        </div>
-                    </div>
-
-                    {/* Botones de Acción y Transición Contextuales */}
-                    {!showDesaprobarPrompt ? (
-                        <div className="workflow-buttons-bar">
-                            {/* Caso 1: Pendiente */}
-                            {(!claim.estado_admin || claim.estado_admin === 'Pendiente') && (
-                                <>
-                                    <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                                        Reclamo recién ingresado. Inicia la gestión para alertar al supervisor comercial.
-                                    </div>
-                                    <div style={{ display: 'flex', gap: 10 }}>
-                                        <button
-                                            className="btn btn-primary"
-                                            onClick={handlePonerEnCurso}
-                                            disabled={updating}
-                                        >
-                                            <Play size={15} />
-                                            <span>Iniciar Gestión (Poner En Curso)</span>
-                                        </button>
-                                        <button
-                                            className="btn btn-danger"
-                                            onClick={() => setShowDesaprobarPrompt(true)}
-                                            disabled={updating}
-                                        >
-                                            <X size={15} />
-                                            <span>Desaprobar</span>
-                                        </button>
-                                    </div>
-                                </>
-                            )}
-
-                            {/* Caso 2: En curso */}
-                            {claim.estado_admin === 'En curso' && (
-                                <>
-                                    <div>
-                                        <button
-                                            className="btn btn-secondary"
-                                            onClick={handleRevertirAPendiente}
-                                            disabled={updating}
-                                            title="Regresa el reclamo a la etapa inicial de recepción"
-                                        >
-                                            <RotateCcw size={14} />
-                                            <span>Volver a Pendiente</span>
-                                        </button>
-                                    </div>
-                                    <div style={{ display: 'flex', gap: 10 }}>
-                                        <button
-                                            className="btn btn-success"
-                                            onClick={handleAprobar}
-                                            disabled={updating}
-                                        >
-                                            <Check size={15} />
-                                            <span>Aprobar Reclamo</span>
-                                        </button>
-                                        <button
-                                            className="btn btn-danger"
-                                            onClick={() => setShowDesaprobarPrompt(true)}
-                                            disabled={updating}
-                                        >
-                                            <X size={15} />
-                                            <span>Desaprobar</span>
-                                        </button>
-                                    </div>
-                                </>
-                            )}
-
-                            {/* Caso 3: Aprobado */}
-                            {claim.estado_admin === 'Aprobado' && (
-                                <>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', color: 'var(--success)' }}>
-                                        <Check size={16} />
-                                        <span>Reclamo Aprobado. Las acciones del supervisor continúan en marcha.</span>
-                                    </div>
-                                    <div style={{ display: 'flex', gap: 10 }}>
-                                        <button
-                                            className="btn btn-secondary"
-                                            onClick={() => {
-                                                if (window.confirm('¿Reabrir y volver a colocar el reclamo "En curso"?')) {
-                                                    handlePonerEnCurso();
-                                                }
-                                            }}
-                                            disabled={updating}
-                                            title="Vuelve a colocar el reclamo en estado En curso para reconsiderar detalles"
-                                        >
-                                            <RotateCcw size={14} />
-                                            <span>Volver a En Curso</span>
-                                        </button>
-                                        <button
-                                            className="btn btn-danger"
-                                            onClick={() => setShowDesaprobarPrompt(true)}
-                                            disabled={updating}
-                                        >
-                                            <X size={15} />
-                                            <span>Cambiar a Desaprobado</span>
-                                        </button>
-                                    </div>
-                                </>
-                            )}
-
-                            {/* Caso 4: Desaprobado */}
-                            {claim.estado_admin === 'Desaprobado' && (
-                                <>
-                                    <div style={{ fontSize: '0.85rem', color: 'var(--error)' }}>
-                                        Reclamo desaprobado y cerrado. Puedes reconsiderarlo si ingresó nueva información.
-                                    </div>
-                                    <div>
-                                        <button
-                                            className="btn btn-primary"
-                                            onClick={handlePonerEnCurso}
-                                            disabled={updating}
-                                        >
-                                            <RotateCcw size={14} />
-                                            <span>Reconsiderar (Poner En Curso)</span>
-                                        </button>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    ) : (
-                        <div style={{ marginTop: 12, padding: 14, background: 'var(--surface-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
-                            <label className="form-label" style={{ fontWeight: 600 }}>Indicar motivo de la desaprobación:</label>
+                    {/* Formulario desplegable para desaprobar si está activo */}
+                    {showDesaprobarPrompt && (
+                        <div style={{ marginBottom: 14, padding: 12, background: 'var(--surface-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, marginBottom: 6 }}>
+                                Indicar motivo de la desaprobación:
+                            </label>
                             <textarea
                                 className="form-textarea"
                                 rows={2}
                                 value={motivoDesaprobado}
                                 onChange={(e) => setMotivoDesaprobado(e.target.value)}
                                 placeholder="Ej: Falta de evidencia concluyente o fuera del período de vencimiento..."
-                                style={{ marginBottom: 10 }}
+                                style={{ marginBottom: 8, fontSize: '0.82rem' }}
                             />
-                            <div style={{ display: 'flex', gap: 10 }}>
-                                <button className="btn btn-danger" onClick={handleDesaprobar} disabled={updating}>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <button className="btn btn-danger" onClick={handleDesaprobar} disabled={updating} style={{ padding: '5px 12px', fontSize: '0.78rem' }}>
                                     Confirmar Desaprobación
                                 </button>
-                                <button className="btn btn-secondary" onClick={() => setShowDesaprobarPrompt(false)}>
+                                <button className="btn btn-secondary" onClick={() => setShowDesaprobarPrompt(false)} style={{ padding: '5px 12px', fontSize: '0.78rem' }}>
                                     Cancelar
                                 </button>
                             </div>
                         </div>
                     )}
-                </div>
-            )}
 
-            {/* Datos del Consumidor */}
-            <div style={{ marginBottom: 24 }}>
-                <h4 style={{ color: 'var(--heading-color)', borderBottom: '1px solid var(--border)', paddingBottom: 6, marginBottom: 12 }}>
-                    Datos del Consumidor
-                </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, fontSize: '0.9rem' }}>
-                    <div><strong>Nombre:</strong> {claim.nombre} {claim.apellido}</div>
-                    <div><Phone size={14} style={{ display: 'inline', marginRight: 4 }} /> <strong>Teléfono:</strong> <a href={`tel:${claim.telefono}`}>{claim.telefono}</a></div>
-                    <div><Mail size={14} style={{ display: 'inline', marginRight: 4 }} /> <strong>Email:</strong> {claim.email}</div>
-                    <div><MapPin size={14} style={{ display: 'inline', marginRight: 4 }} /> <strong>Domicilio:</strong> {claim.domicilio} ({claim.localidad}, {claim.provincia})</div>
-                    {claim.comercio_compra && (
-                        <div><Store size={14} style={{ display: 'inline', marginRight: 4 }} /> <strong>Comercio de compra:</strong> {claim.comercio_compra}</div>
-                    )}
-                    <div><strong>Fecha de carga:</strong> {claim.fecha_carga || claim.fecha_alta}</div>
-                </div>
-            </div>
+                    {/* Grilla de Ramas */}
+                    <div className="workflow-tree-grid">
+                        {/* RAMA 1: RECEPCIÓN Y DESCARTE */}
+                        <div className={`wf-branch-card ${isEnRecepcion ? 'active' : ''}`}>
+                            <div className="wf-branch-title">
+                                <Clock size={14} style={{ color: 'var(--warning)' }} />
+                                <span>1. Recepción & Descarte</span>
+                            </div>
 
-            {/* Gestión del Supervisor */}
-            <div style={{ marginBottom: 24, padding: 14, background: 'var(--surface-subtle)', borderRadius: 'var(--radius-md)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-                    <div>
-                        <h4 style={{ margin: 0, color: 'var(--heading-color)' }}>Supervisor Comercial Asignado</h4>
-                        <span style={{ fontSize: '0.9rem' }}>{claim.supervisor} ({claim.supervisor_email})</span>
-                    </div>
-                    {isAdmin && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Reasignar:</label>
-                            <select
-                                className="form-select"
-                                value={selectedSupervisor}
-                                onChange={handleReasignarSupervisor}
-                                disabled={updating}
-                                style={{ width: 'auto' }}
-                            >
-                                {SUPERVISORES_LISTA.map(s => (
-                                    <option key={s.nombre} value={s.nombre}>{s.nombre}</option>
-                                ))}
-                            </select>
+                            <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                                {isEnRecepcion && 'Reclamo pendiente de evaluación administrativa.'}
+                                {isDesaprobado && 'Reclamo desaprobado y cerrado.'}
+                                {isEnCurso && 'Recepción superada. Reclamo en gestión comercial.'}
+                            </div>
+
+                            {isEnRecepcion && (
+                                <button
+                                    className="wf-node-btn wf-danger"
+                                    onClick={() => setShowDesaprobarPrompt(true)}
+                                    disabled={updating}
+                                    title="Desaprobar reclamo: Marca el reclamo como no procedente desde recepción y cancela las derivaciones comerciales."
+                                >
+                                    <X size={14} />
+                                    <span>Desaprobar</span>
+                                </button>
+                            )}
+
+                            {isDesaprobado && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--error)', fontSize: '0.78rem', fontWeight: 600 }}>
+                                    <X size={14} />
+                                    <span>Desaprobado en Recepción</span>
+                                </div>
+                            )}
                         </div>
-                    )}
-                </div>
-            </div>
 
-            {/* Gestión de Inocuidad */}
-            {(isInocuidad || isAdmin) && (
-                <div style={{ marginBottom: 24, padding: 14, background: 'rgba(139, 92, 246, 0.08)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-                        <div>
-                            <h4 style={{ margin: 0, color: 'var(--info)' }}>Control de Inocuidad y Calidad</h4>
-                            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                Al pasar a "Pendiente", se notifica a Inocuidad con los materiales del caso.
-                            </span>
-                        </div>
-                        <select
-                            className="form-select"
-                            value={claim.estado_inocuidad}
-                            onChange={handleChangeInocuidad}
-                            disabled={updating}
-                            style={{ width: 'auto' }}
-                        >
-                            <option value="Sin acciones">Sin acciones</option>
-                            <option value="Pendiente">Pendiente (Notificar equipo)</option>
-                            <option value="Resuelto">Resuelto</option>
-                            <option value="Imposibilidad">Imposibilidad</option>
-                        </select>
-                    </div>
-                </div>
-            )}
+                        {/* RAMA 2: GESTIÓN COMERCIAL (SUPERVISOR) */}
+                        <div className={`wf-branch-card ${isEnCurso ? 'active' : ''}`}>
+                            <div className="wf-branch-title">
+                                <GitBranch size={14} style={{ color: 'var(--primary)' }} />
+                                <span>2. Gestión Comercial</span>
+                            </div>
 
-            {/* Productos reclamados */}
-            <div style={{ marginBottom: 20 }}>
-                <h4 style={{ color: 'var(--heading-color)', borderBottom: '1px solid var(--border)', paddingBottom: 6, marginBottom: 12 }}>
-                    Productos Reclamados ({claim.items.length})
-                </h4>
-                {claim.items.map((item, idx) => (
-                    <div key={idx} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: 16, marginBottom: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                            <strong style={{ fontSize: '1rem', color: 'var(--heading-color)' }}>
-                                #{idx + 1} [{item.marca}] {item.producto}
-                            </strong>
-                            <span className="badge badge-sin-acciones">Cantidad: {item.cantidad}</span>
+                            {/* Asignación de Supervisor */}
+                            <div style={{ fontSize: '0.76rem' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Supervisor: </span>
+                                <strong>{claim.supervisor || 'Sin asignar'}</strong>
+                            </div>
+
+                            {/* Selector de supervisor disponible si está en recepción */}
+                            {isEnRecepcion && (
+                                <div className="wf-select-action-row">
+                                    <select
+                                        value={selectedSupervisor || claim.supervisor || ''}
+                                        onChange={(e) => setSelectedSupervisor(e.target.value)}
+                                        disabled={updating}
+                                    >
+                                        <option value="">Seleccionar supervisor...</option>
+                                        {SUPERVISORES_LISTA.map(s => (
+                                            <option key={s.nombre} value={s.nombre}>{s.nombre}</option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        className="btn btn-secondary"
+                                        onClick={handleGuardarSupervisor}
+                                        disabled={updating || !selectedSupervisor || selectedSupervisor === claim.supervisor}
+                                        title="Guardar reasignación del supervisor comercial para este reclamo"
+                                    >
+                                        Asignar
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Botón de inicio de gestión en En Curso */}
+                            {isEnRecepcion && (
+                                <button
+                                    className="wf-node-btn wf-primary"
+                                    onClick={handlePonerEnCurso}
+                                    disabled={updating || !hasSupervisor}
+                                    title={!hasSupervisor
+                                        ? "Debe asignar un supervisor comercial antes de poder iniciar la gestión comercial"
+                                        : "Iniciar Gestión Comercial: Envía las instrucciones al supervisor comercial asignado y pasa el reclamo a En Curso"}
+                                >
+                                    <Play size={14} />
+                                    <span>Iniciar Gestión</span>
+                                </button>
+                            )}
+
+                            {/* Derivación del Supervisor */}
+                            {isEnCurso && (
+                                <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem' }}>
+                                        <span style={{ color: 'var(--text-muted)' }}>Estado Supervisor:</span>
+                                        <StatusBadge status={claim.estado_supervisor} />
+                                    </div>
+                                    {claim.estado_supervisor === 'Resuelto' && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--success)', fontSize: '0.78rem', fontWeight: 600 }}>
+                                            <CheckCircle2 size={14} />
+                                            <span>Reposición / Cortesía Resuelta</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                        <p style={{ margin: '4px 0', fontSize: '0.88rem' }}><strong>Defecto encontrado:</strong> {item.defecto}</p>
-                        <p style={{ margin: '4px 0', fontSize: '0.88rem', color: 'var(--text-secondary)' }}><strong>Descripción:</strong> {item.descripcion}</p>
-                        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 8 }}>
-                            <span>Lote: {item.lote || 'N/A'}</span>
-                            <span>Hora: {item.hora || 'N/A'}</span>
-                            <span>Vencimiento: {item.vto || 'N/A'}</span>
-                            <span>Conserva envase: {item.conserva_envase}</span>
-                            {item.producto_cortesia && (
-                                <span style={{ color: '#047857', fontWeight: 600 }}>Cortesía: {item.producto_cortesia}</span>
+
+                        {/* RAMA 3: CONTROL DE CALIDAD E INOCUIDAD */}
+                        <div className="wf-branch-card">
+                            <div className="wf-branch-title">
+                                <ShieldAlert size={14} style={{ color: '#8b5cf6' }} />
+                                <span>3. Calidad & Inocuidad</span>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Estado actual:</span>
+                                <StatusBadge status={claim.estado_inocuidad} />
+                            </div>
+
+                            {(isInocuidad || isAdmin) && (
+                                <div className="wf-select-action-row">
+                                    <select
+                                        value={selectedInocuidad}
+                                        onChange={(e) => setSelectedInocuidad(e.target.value)}
+                                        disabled={updating}
+                                    >
+                                        <option value="Sin acciones">Sin acciones</option>
+                                        <option value="Pendiente">Pendiente (Notificar)</option>
+                                        <option value="Resuelto">Resuelto</option>
+                                        <option value="Imposibilidad">Imposibilidad</option>
+                                    </select>
+                                    <button
+                                        className="btn btn-secondary"
+                                        onClick={handleGuardarInocuidad}
+                                        disabled={updating || selectedInocuidad === claim.estado_inocuidad}
+                                        title="Actualizar y registrar el dictamen de calidad e inocuidad"
+                                    >
+                                        Aplicar
+                                    </button>
+                                </div>
                             )}
                         </div>
                     </div>
-                ))}
-            </div>
-
-            {/* Evidencias multimedia */}
-            {claim.evidencia_zip && (
-                <div style={{ marginTop: 16, padding: 14, background: 'var(--surface-subtle)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span><strong>Evidencias Multimedia:</strong> Archivos fotográficos y videos adjuntados por el cliente.</span>
-                    <a
-                        href={claim.evidencia_zip}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="btn btn-secondary"
-                    >
-                        <Download size={16} />
-                        <span>Descargar ZIP</span>
-                    </a>
                 </div>
             )}
+
+            {/* DATOS DEL RECLAMO COMPACTO */}
+            <div className="claim-summary-card">
+                <div className="claim-summary-header">
+                    <span style={{ fontSize: '0.76rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.5px' }}>
+                        Datos del Reclamo
+                    </span>
+                    {claim.evidencia_zip && (
+                        <a
+                            href={claim.evidencia_zip}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="claim-link"
+                            style={{ fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                            title="Descargar paquete ZIP con fotos y evidencias enviadas por el consumidor"
+                        >
+                            <Download size={13} />
+                            <span>Evidencias ZIP</span>
+                        </a>
+                    )}
+                </div>
+
+                <div className="claim-info-grid">
+                    <div className="claim-info-item">
+                        <span className="claim-info-label">Consumidor</span>
+                        <span className="claim-info-val">{claim.nombre} {claim.apellido}</span>
+                    </div>
+
+                    <div className="claim-info-item">
+                        <span className="claim-info-label">Teléfono</span>
+                        <span className="claim-info-val">
+                            {claim.telefono ? (
+                                <a href={`tel:${claim.telefono}`} className="claim-link">
+                                    {claim.telefono}
+                                </a>
+                            ) : 'S/D'}
+                        </span>
+                    </div>
+
+                    <div className="claim-info-item">
+                        <span className="claim-info-label">Email</span>
+                        <span className="claim-info-val">
+                            {claim.email ? (
+                                <a href={`mailto:${claim.email}`} className="claim-link">
+                                    {claim.email}
+                                </a>
+                            ) : 'S/D'}
+                        </span>
+                    </div>
+
+                    <div className="claim-info-item">
+                        <span className="claim-info-label">Ubicación</span>
+                        <span className="claim-info-val">
+                            {claim.domicilio ? `${claim.domicilio}, ` : ''}{claim.localidad || 'S/D'} ({claim.provincia || 'S/P'})
+                        </span>
+                    </div>
+
+                    <div className="claim-info-item">
+                        <span className="claim-info-label">Comercio</span>
+                        <span className="claim-info-val">{claim.comercio_compra || 'S/D'}</span>
+                    </div>
+
+                    <div className="claim-info-item">
+                        <span className="claim-info-label">Fecha de Carga</span>
+                        <span className="claim-info-val">{claim.fecha_carga || claim.fecha_alta || 'S/F'}</span>
+                    </div>
+                </div>
+
+                {/* PRODUCTOS COMO ITEMS COMPACTOS */}
+                <div>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.4px' }}>
+                        Productos Reclamados ({claim.items?.length || 0})
+                    </span>
+                    <table className="claim-products-table">
+                        <thead>
+                            <tr>
+                                <th style={{ width: '30px' }}>#</th>
+                                <th>Producto / Marca</th>
+                                <th>Defecto & Detalle</th>
+                                <th>Lote / Vto</th>
+                                <th>Cortesía</th>
+                                <th style={{ textAlign: 'center', width: '50px' }}>Cant.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {(claim.items || []).map((item, idx) => (
+                                <tr key={idx}>
+                                    <td><strong>#{idx + 1}</strong></td>
+                                    <td>
+                                        <div style={{ fontWeight: 600 }}>{item.producto}</div>
+                                        {item.marca && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>[{item.marca}]</div>}
+                                    </td>
+                                    <td>
+                                        <div style={{ fontWeight: 500 }}>{item.defecto || 'Sin defecto'}</div>
+                                        {item.descripcion && (
+                                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                                                {item.descripcion}
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td>
+                                        <div>Lote: {item.lote || 'N/A'}</div>
+                                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Vto: {item.vto || 'N/A'}</div>
+                                    </td>
+                                    <td>
+                                        {item.producto_cortesia ? (
+                                            <span style={{ color: 'var(--success)', fontWeight: 600 }}>{item.producto_cortesia}</span>
+                                        ) : (
+                                            <span style={{ color: 'var(--text-muted)' }}>-</span>
+                                        )}
+                                    </td>
+                                    <td style={{ textAlign: 'center' }}>
+                                        <span className="badge badge-sin-acciones">{item.cantidad || 1}</span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </Modal>
     );
 };
