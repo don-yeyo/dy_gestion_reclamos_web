@@ -27,6 +27,16 @@ async function initDatabase() {
         connection = await pool.getConnection();
         console.log(`[MYSQL] Conectado exitosamente a la base de datos '${DB_CONFIG.database}' en ${DB_CONFIG.host}.`);
 
+        // 0. Tabla de Configuración y Credenciales del Sistema (evita límite 4KB en AWS Lambda)
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS config_sistema (
+                clave VARCHAR(100) PRIMARY KEY,
+                valor LONGTEXT NOT NULL,
+                descripcion VARCHAR(255),
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+
         // 1. Tabla de Cobertura Geográfica de Supervisores (GeoJSON persistente)
         await connection.query(`
             CREATE TABLE IF NOT EXISTS cobertura_supervisores_geo (

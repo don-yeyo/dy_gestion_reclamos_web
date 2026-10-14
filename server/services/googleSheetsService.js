@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { google } = require('googleapis');
+const { pool } = require('../config/database');
 const reclamosDatabaseService = require('./reclamosDatabaseService');
 
 class GoogleSheetsService {
@@ -19,11 +20,61 @@ class GoogleSheetsService {
             this.hasCredentials = true;
         } else {
             this.hasCredentials = false;
-            console.warn('[SHEETS AUTH WARNING] No se encontraron credenciales válidas de Google Sheets. En Netlify configure GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_SERVICE_ACCOUNT_JSON_BASE64.');
         }
 
         this.auth = new google.auth.GoogleAuth(authOptions);
         this.sheets = google.sheets({ version: 'v4', auth: this.auth });
+    }
+
+    /**
+     * Asegura que el cliente de Google Sheets esté autenticado,
+     * cargando credenciales de MySQL (config_sistema) si no vinieron por variable de entorno
+     */
+    async ensureAuth() {
+        if (this.hasCredentials && this.sheets) return true;
+
+        // 1. Intentar desde variables de entorno o archivo local
+        let creds = this._resolveCredentials();
+
+        // 2. Intentar desde la base de datos MySQL (tabla config_sistema)
+        if (!creds) {
+            creds = await this._resolveCredentialsFromDb();
+        }
+
+        if (creds) {
+            this.auth = new google.auth.GoogleAuth({
+                credentials: creds,
+                scopes: ['https://www.googleapis.com/auth/spreadsheets']
+            });
+            this.sheets = google.sheets({ version: 'v4', auth: this.auth });
+            this.hasCredentials = true;
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Lee las credenciales de Google Service Account almacenadas en MySQL
+     */
+    async _resolveCredentialsFromDb() {
+        try {
+            const [rows] = await pool.query(
+                'SELECT valor FROM config_sistema WHERE clave = ? LIMIT 1',
+                ['google_service_account']
+            );
+            if (rows.length > 0 && rows[0].valor) {
+                const parsed = JSON.parse(rows[0].valor);
+                if (parsed.private_key) {
+                    parsed.private_key = parsed.private_key.replace(/\\n/g, '\n');
+                }
+                console.log('[SHEETS AUTH] Credenciales cargadas exitosamente desde MySQL (config_sistema).');
+                return parsed;
+            }
+        } catch (e) {
+            console.warn('[SHEETS AUTH DB] No se pudo leer credenciales desde MySQL:', e.message);
+        }
+        return null;
     }
 
     /**
@@ -142,8 +193,9 @@ class GoogleSheetsService {
      * Consulta directa a Google Sheets (usada para sincronización o fallbacks)
      */
     async fetchFromSheets(cutoffId = null) {
+        await this.ensureAuth();
         if (!this.hasCredentials) {
-            throw new Error('No se encontraron credenciales de Google Sheets configuradas. En Netlify, debes definir la variable de entorno GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_SERVICE_ACCOUNT_JSON_BASE64.');
+            throw new Error('No se encontraron credenciales de Google Sheets configuradas en el entorno ni en la base de datos (config_sistema).');
         }
 
         if (!this.spreadsheetId) {
@@ -294,6 +346,7 @@ class GoogleSheetsService {
         }
 
         // 2. Actualización en paralelo en Google Sheets (para Power BI y usuarios de planilla)
+        await this.ensureAuth();
         if (this.hasCredentials && this.spreadsheetId && claim.rowNumbers && claim.rowNumbers.length > 0) {
             try {
                 const dataUpdates = [];

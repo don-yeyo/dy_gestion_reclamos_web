@@ -24,6 +24,7 @@ dy_gestion_reclamos_web/
 │   └── package.json
 │
 ├── server/                     # Backend API REST en Node.js + Express
+│   ├── functions/              # Netlify Serverless Functions (api.js)
 │   ├── config/                 # Conexión MySQL Pool (RDS), esquemas DDL y roles RBAC
 │   ├── credentials/            # Cuenta de servicio de Google Sheets (service-account JSON)
 │   ├── data/                   # Respaldo GeoJSON de cobertura geográfica de supervisores
@@ -36,7 +37,6 @@ dy_gestion_reclamos_web/
 │   │   ├── emailWorkflowService.js  # Envío de correos y generación de tokens HMAC seguros
 │   │   └── cronFollowupService.js   # Reglas de seguimiento de días N, M, O, P, F con contador persistente
 │   ├── index.js                # Servidor Express con Helmet, CORS, MySQL y Rate Limiting
-│   ├── netlify-handler.js      # Handler Serverless para Netlify Functions
 │   ├── .env                    # Variables locales de entorno del servidor
 │   ├── .env.template           # Plantilla documentada
 │   └── package.json
@@ -93,8 +93,8 @@ npm run dev
 
 El archivo [netlify.toml](file:///C:/Users/gabrielt/Documents/Proyectos/GestionReclamosWeb/dy_gestion_reclamos_web/netlify.toml) ubicado en la raíz se encarga de:
 1. Instalar dependencias en `server` y `client` y construir el bundle de producción del cliente (`publish = "client/dist"`).
-2. Empaquetar el backend de Express como una **Netlify Function** serverless (`functions = "server"` con `netlify-handler.js`).
-3. Redirigir llamadas de `/api/*` automáticamente al handler serverless (`/.netlify/functions/netlify-handler/:splat`).
+2. Empaquetar el backend de Express como una **Netlify Function** serverless (`functions = "server/functions"` con `api.js`).
+3. Redirigir llamadas de `/api/*` automáticamente al handler serverless (`/.netlify/functions/api/:splat`).
 4. Redirigir rutas de navegación SPA (`/*`) a `/index.html`.
 
 En las variables de entorno de la configuración de Netlify (**Site configuration** -> **Environment variables**), ingresar las variables requeridas.

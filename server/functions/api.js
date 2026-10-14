@@ -1,12 +1,12 @@
 const serverless = require('serverless-http');
-const app = require('./index');
+const app = require('../index');
 
 module.exports.handler = serverless(app, {
     request(request, event, context) {
         request.event = event;
         request.context = context;
 
-        // Netlify a veces envía el body serializado como Buffer o JSON dentro de event.body
+        // Netlify envía el body a veces serializado como Buffer o Base64
         if (event && event.body) {
             try {
                 let rawBody = event.body;
@@ -22,7 +22,7 @@ module.exports.handler = serverless(app, {
                     request.body = rawBody;
                 }
             } catch (err) {
-                console.error('[NETLIFY HANDLER BODY PARSE ERROR]:', err);
+                console.error('[NETLIFY API BODY PARSE ERROR]:', err);
             }
         }
     }

@@ -1,17 +1,14 @@
 [build]
   command = "npm --prefix server install && npm --prefix client install && npm --prefix client run build"
   publish = "client/dist"
-  functions = "server"
-
-[build.environment]
-  SECRETS_SCAN_ENABLED = "false"
+  functions = "server/functions"
 
 [functions]
   node_bundler = "esbuild"
 
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/netlify-handler/:splat"
+  to = "/.netlify/functions/api/:splat"
   status = 200
 
 [[redirects]]
