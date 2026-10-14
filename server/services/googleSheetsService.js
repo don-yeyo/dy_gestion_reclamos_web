@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { google } = require('googleapis');
+const reclamosDatabaseService = require('./reclamosDatabaseService');
 
 class GoogleSheetsService {
     constructor() {
@@ -112,10 +113,35 @@ class GoogleSheetsService {
 
     /**
      * Obtiene todos los reclamos desde la hoja de cálculo filtrados por corte numérico
-     * @param {string|number} cutoffId Número mínimo de reclamo a retornar
-     * @returns {Promise<Array>}
+    /**
+     * Obtiene los reclamos consultando en primer término MySQL para máxima velocidad (<10ms).
+     * Si la base de datos está vacía, consulta Google Sheets y sincroniza automáticamente.
      */
     async getReclamos(cutoffId = null) {
+        try {
+            const dbClaims = await reclamosDatabaseService.getReclamos(cutoffId);
+            if (dbClaims && dbClaims.length > 0) {
+                return dbClaims;
+            }
+        } catch (dbErr) {
+            console.warn('[SHEETS/DB] Error consultando MySQL, recurriendo a Google Sheets:', dbErr.message);
+        }
+
+        // Fallback o primer inicio: obtener desde Google Sheets y persistir en MySQL
+        const sheetsClaims = await this.fetchFromSheets(cutoffId);
+        if (sheetsClaims.length > 0) {
+            reclamosDatabaseService.syncAllFromSheets(sheetsClaims).catch(err => {
+                console.error('[SYNC AUTO ERROR] Error sincronizando reclamos a MySQL:', err.message);
+            });
+        }
+
+        return sheetsClaims;
+    }
+
+    /**
+     * Consulta directa a Google Sheets (usada para sincronización o fallbacks)
+     */
+    async fetchFromSheets(cutoffId = null) {
         if (!this.hasCredentials) {
             throw new Error('No se encontraron credenciales de Google Sheets configuradas. En Netlify, debes definir la variable de entorno GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_SERVICE_ACCOUNT_JSON_BASE64.');
         }
@@ -215,46 +241,84 @@ class GoogleSheetsService {
     }
 
     /**
-     * Obtiene un reclamo específico por ID con todos sus productos
+     * Obtiene un reclamo específico por ID
      */
     async getReclamoById(claimId) {
-        const reclamos = await this.getReclamos(0);
-        return reclamos.find(r => String(r.id) === String(claimId)) || null;
+        try {
+            const dbClaim = await reclamosDatabaseService.getReclamoById(claimId);
+            if (dbClaim) return dbClaim;
+        } catch (dbErr) {
+            console.warn(`[SHEETS/DB] Error consultando #${claimId} en MySQL:`, dbErr.message);
+        }
+
+        const reclamos = await this.fetchFromSheets(0);
+        const claim = reclamos.find(r => String(r.id) === String(claimId)) || null;
+        if (claim) {
+            reclamosDatabaseService.upsertReclamo(claim).catch(e => {
+                console.error(`[SYNC ON-DEMAND ERROR] Fallo al guardar #${claimId} en DB:`, e.message);
+            });
+        }
+        return claim;
     }
 
     /**
-     * Actualiza celdas para todas las filas pertenecientes a un Reclamo
-     * @param {string|number} claimId
-     * @param {Object} updates Mapeo columna -> nuevo valor (ej: { 'AO': 'Aprobado', 'L': 'Hugo Basile' })
+     * Sincronización completa manual desde Google Sheets hacia MySQL
      */
-    async updateReclamo(claimId, updates) {
-        if (!this.hasCredentials) {
-            throw new Error('No se encontraron credenciales de Google Sheets configuradas. En Netlify, debes definir la variable de entorno GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_SERVICE_ACCOUNT_JSON_BASE64.');
-        }
+    async syncSheetsToDatabase(cutoffId = null) {
+        console.log('[MANUAL SYNC] Iniciando sincronización Sheets -> MySQL...');
+        const claims = await this.fetchFromSheets(cutoffId);
+        const syncedCount = await reclamosDatabaseService.syncAllFromSheets(claims);
+        return { totalSheets: claims.length, synced: syncedCount };
+    }
 
+    /**
+     * Actualiza celdas en PARALELO tanto en Google Sheets como en MySQL
+     * Mantiene los tableros de Power BI sincronizados y registra auditoría
+     * @param {string|number} claimId ID del reclamo
+     * @param {Object} updates Mapeo columna Sheets -> nuevo valor (ej: { 'AO': 'Aprobado', 'L': 'Hugo Basile' })
+     * @param {Object} auditInfo Metadatos de auditoría { actor, actorEmail, motivo, metadata }
+     */
+    async updateReclamo(claimId, updates, auditInfo = {}) {
         const claim = await this.getReclamoById(claimId);
         if (!claim) {
             throw new Error(`Reclamo con ID ${claimId} no encontrado.`);
         }
 
-        const dataUpdates = [];
-        for (const rowNum of claim.rowNumbers) {
-            for (const [col, val] of Object.entries(updates)) {
-                dataUpdates.push({
-                    range: `${this.tabName}!${col}${rowNum}`,
-                    values: [[val]]
-                });
-            }
+        // 1. Actualización en MySQL con auditoría completa
+        let dbSuccess = false;
+        try {
+            await reclamosDatabaseService.updateReclamo(claimId, updates, auditInfo);
+            dbSuccess = true;
+        } catch (dbErr) {
+            console.error(`[UPDATE DB ERROR] Fallo al actualizar #${claimId} en MySQL:`, dbErr.message);
         }
 
-        if (dataUpdates.length > 0) {
-            await this.sheets.spreadsheets.values.batchUpdate({
-                spreadsheetId: this.spreadsheetId,
-                requestBody: {
-                    valueInputOption: 'USER_ENTERED',
-                    data: dataUpdates
+        // 2. Actualización en paralelo en Google Sheets (para Power BI y usuarios de planilla)
+        if (this.hasCredentials && this.spreadsheetId && claim.rowNumbers && claim.rowNumbers.length > 0) {
+            try {
+                const dataUpdates = [];
+                for (const rowNum of claim.rowNumbers) {
+                    for (const [col, val] of Object.entries(updates)) {
+                        dataUpdates.push({
+                            range: `${this.tabName}!${col}${rowNum}`,
+                            values: [[val]]
+                        });
+                    }
                 }
-            });
+
+                if (dataUpdates.length > 0) {
+                    await this.sheets.spreadsheets.values.batchUpdate({
+                        spreadsheetId: this.spreadsheetId,
+                        requestBody: {
+                            valueInputOption: 'USER_ENTERED',
+                            data: dataUpdates
+                        }
+                    });
+                }
+            } catch (sheetErr) {
+                console.error(`[UPDATE SHEETS ERROR] Error al reflejar cambio en Google Sheets para #${claimId}:`, sheetErr.message);
+                if (!dbSuccess) throw sheetErr;
+            }
         }
 
         return true;

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const googleSheetsService = require('../services/googleSheetsService');
+const reclamosDatabaseService = require('../services/reclamosDatabaseService');
 const emailWorkflowService = require('../services/emailWorkflowService');
 const { authMiddleware, requireRole } = require('../middlewares/authMiddleware');
 
@@ -23,7 +24,26 @@ router.get('/', async (req, res) => {
         });
     } catch (err) {
         console.error('Error al listar reclamos:', err);
-        res.status(500).json({ success: false, error: 'Error al consultar Google Sheets: ' + err.message });
+        res.status(500).json({ success: false, error: 'Error al consultar reclamos: ' + err.message });
+    }
+});
+
+/**
+ * POST /api/reclamos/sync
+ * Sincronización manual forzada desde Google Sheets hacia MySQL (solo administradores)
+ */
+router.post('/sync', requireRole(['admin', 'sysadmin']), async (req, res) => {
+    try {
+        const cutoff = req.query.cutoff || process.env.RECLAMOS_NUMERO_CORTE || '0';
+        const result = await googleSheetsService.syncSheetsToDatabase(cutoff);
+        res.json({
+            success: true,
+            message: `Sincronización completada. Se sincronizaron ${result.synced} de ${result.totalSheets} registros hacia MySQL.`,
+            ...result
+        });
+    } catch (err) {
+        console.error('Error en sincronización manual:', err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 
@@ -38,6 +58,19 @@ router.get('/:id', async (req, res) => {
             return res.status(404).json({ success: false, error: 'Reclamo no encontrado.' });
         }
         res.json({ success: true, data: claim });
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/**
+ * GET /api/reclamos/:id/auditoria
+ * Retorna el historial de cambios de estado y acciones ejecutadas sobre el reclamo
+ */
+router.get('/:id/auditoria', async (req, res) => {
+    try {
+        const history = await reclamosDatabaseService.getAuditLog(req.params.id);
+        res.json({ success: true, reclamoId: req.params.id, total: history.length, data: history });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -91,7 +124,13 @@ router.patch('/:id/estado-admin', requireRole(['admin', 'sysadmin']), async (req
             updates['AP'] = '';
         }
 
-        await googleSheetsService.updateReclamo(claimId, updates);
+        const auditInfo = {
+            actor: req.user ? req.user.role : 'admin',
+            actorEmail: req.user ? req.user.email : null,
+            motivo: motivo_desaprobado || null
+        };
+
+        await googleSheetsService.updateReclamo(claimId, updates, auditInfo);
 
         // Si fue pasado a "En curso" (o Aprobado directamente), disparar acción y email al supervisor
         if (estado === 'En curso' || estado === 'Aprobado') {

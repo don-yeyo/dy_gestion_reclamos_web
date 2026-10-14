@@ -24,16 +24,18 @@ dy_gestion_reclamos_web/
 │   └── package.json
 │
 ├── server/                     # Backend API REST en Node.js + Express
-│   ├── config/                 # RBAC estricto del servidor (Admin, Inocuidad, Sysadmin)
+│   ├── config/                 # Conexión MySQL Pool (RDS), esquemas DDL y roles RBAC
 │   ├── credentials/            # Cuenta de servicio de Google Sheets (service-account JSON)
-│   ├── data/                   # Polígonos GeoJSON de cobertura geográfica de supervisores
+│   ├── data/                   # Respaldo GeoJSON de cobertura geográfica de supervisores
 │   ├── middlewares/            # Autenticación JWT y control de roles RBAC
-│   ├── routes/                 # Rutas auth, reclamos, acciones públicas y cron
+│   ├── routes/                 # Rutas auth, reclamos, auditoría, sincronización y supervisores
 │   ├── services/
-│   │   ├── googleSheetsService.js   # Lectura/escritura en Google Sheets con corte de numeración
+│   │   ├── reclamosDatabaseService.js # Persistencia transaccional MySQL, items, auditoría y notificaciones
+│   │   ├── googleSheetsService.js   # Dual-write y sincronización en paralelo con Google Sheets
+│   │   ├── supervisorLookupService.js # Geolocalización con persistencia de GeoJSON en MySQL
 │   │   ├── emailWorkflowService.js  # Envío de correos y generación de tokens HMAC seguros
-│   │   └── cronFollowupService.js   # Reglas de seguimiento de días N, M, O, P, F
-│   ├── index.js                # Servidor Express con Helmet, CORS y Rate Limiting
+│   │   └── cronFollowupService.js   # Reglas de seguimiento de días N, M, O, P, F con contador persistente
+│   ├── index.js                # Servidor Express con Helmet, CORS, MySQL y Rate Limiting
 │   ├── netlify-handler.js      # Handler Serverless para Netlify Functions
 │   ├── .env                    # Variables locales de entorno del servidor
 │   ├── .env.template           # Plantilla documentada
@@ -43,6 +45,25 @@ dy_gestion_reclamos_web/
 ├── .gitignore                  # Exclusión de credenciales y node_modules
 └── README.md
 ```
+
+---
+
+## 🗄️ Arquitectura Híbrida: MySQL (AWS RDS) + Google Sheets en Paralelo
+
+Para satisfacer la necesidad de alto rendimiento en el gestor web y simultáneamente garantizar que los **tableros de Power BI** y los usuarios corporativos sigan contando con los datos en tiempo real en la planilla de **Google Sheets**:
+
+1. **Lectura Acelerada (<10 ms):**
+   - El Gestor Web consulta los reclamos e ítems directamente desde la base de datos **MySQL en AWS RDS**.
+2. **Escritura Dual en Paralelo (Dual-Write):**
+   - Cada cambio de estado o reasignación se persiste de inmediato en **MySQL** (con registro de auditoría transaccional) y se refleja en paralelo en **Google Sheets** (`batchUpdate`).
+   - Power BI y las áreas que consumen la hoja de cálculo continúan trabajando sin interrupciones.
+3. **Auditoría de Estados y Trazabilidad:**
+   - Cada transición de estado (`Pendiente` -> `En curso` -> `Resuelto`, etc.) queda registrada en la tabla `auditoria_reclamos` con actor, fecha, valor anterior, valor nuevo y motivo.
+   - Endpoint disponible: `GET /api/reclamos/:id/auditoria`.
+4. **Sincronización Manual y Automática:**
+   - La aplicación sincroniza automáticamente al iniciar y dispone del endpoint `POST /api/reclamos/sync` para forzar la sincronización Sheets -> MySQL ante la llegada de nuevos registros externos.
+5. **Persistencia de Geometría de Supervisores (GeoJSON):**
+   - Las versiones del archivo `cobertura_supervisores.geojson` importadas por los administradores se guardan en la tabla `cobertura_supervisores_geo`, sorteando la limitación de sistemas de archivos de solo lectura en Serverless (Netlify).
 
 ---
 
@@ -149,6 +170,11 @@ Este sistema implementa un modelo de seguridad estricto para evitar elevación d
 | :--- | :--- | :--- |
 | `PORT` | Puerto del servidor Express local | `3001` |
 | `APP_SECRET` | Clave secreta para firma de JWT y tokens de acción | *(string secreto)* |
+| `DB_HOST` | Host de la base de datos MySQL en AWS RDS | `dydb2-instance-1.cz8kik28igwg.us-east-1.rds.amazonaws.com` |
+| `DB_NAME` | Nombre de la base de datos | `Reclamos` |
+| `DB_USER` | Usuario de MySQL | `DBAdmin_Reclamos` |
+| `DB_PASS` | Clave de acceso a la base de datos | *(password)* |
+| `DB_PORT` | Puerto de conexión MySQL | `3306` |
 | `GOOGLE_SHEETS_SPREADSHEET_ID` | ID de la hoja de cálculo de Reclamos | *(Google Spreadsheet ID)* |
 | `GOOGLE_SHEETS_TAB_NAME` | Nombre de la pestaña de reclamos | `Reclamos 2023` |
 | `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` | Ruta local al JSON de la cuenta de servicio (desarrollo) | `credentials/reclamos-501813-311b1979c9e5.json` |

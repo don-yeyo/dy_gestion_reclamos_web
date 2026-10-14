@@ -66,7 +66,10 @@ router.get('/admin-quick', async (req, res) => {
                 updates['AQ'] = 'Pendiente';
             }
 
-            await googleSheetsService.updateReclamo(payload.claimId, updates);
+            await googleSheetsService.updateReclamo(payload.claimId, updates, {
+                actor: 'admin_link',
+                motivo: 'Aprobación rápida desde email'
+            });
 
             // Disparar email al supervisor
             const updatedClaim = await googleSheetsService.getReclamoById(payload.claimId);
@@ -200,6 +203,9 @@ router.get('/supervisor-quick', async (req, res) => {
     try {
         await googleSheetsService.updateReclamo(payload.claimId, {
             'AQ': 'Resuelto'
+        }, {
+            actor: 'supervisor_link',
+            motivo: 'Supervisor confirmó resolución/entrega de producto desde email'
         });
 
         res.send(`
@@ -253,10 +259,14 @@ router.post('/supervisor-imposibilidad', async (req, res) => {
             return res.status(404).json({ success: false, error: 'Reclamo no encontrado.' });
         }
 
-        // Persistir estado y motivo en Google Sheets
+        // Persistir estado y motivo en Google Sheets y MySQL
         await googleSheetsService.updateReclamo(payload.claimId, {
             'AQ': 'Imposibilidad',
             'AR': String(motivo).trim()
+        }, {
+            actor: 'supervisor_link',
+            actorEmail: claim.supervisor_email || '',
+            motivo: String(motivo).trim()
         });
 
         // Notificar por email a los administradores
@@ -300,9 +310,13 @@ router.get('/consumidor-response', async (req, res) => {
     try {
         const claim = await googleSheetsService.getReclamoById(payload.claimId);
 
-        // Persistir estado_consumidor en Google Sheets
+        // Persistir estado_consumidor en Google Sheets y MySQL con auditoría
         await googleSheetsService.updateReclamo(payload.claimId, {
             'AS': estadoFinal
+        }, {
+            actor: 'consumidor_link',
+            actorEmail: claim ? claim.email : '',
+            motivo: `Consumidor respondió encuesta: ${payload.action}`
         });
 
         // Notificar a los administradores

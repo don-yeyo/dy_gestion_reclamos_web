@@ -1,4 +1,5 @@
 const googleSheetsService = require('./googleSheetsService');
+const reclamosDatabaseService = require('./reclamosDatabaseService');
 const emailWorkflowService = require('./emailWorkflowService');
 
 class CronFollowupService {
@@ -32,19 +33,33 @@ class CronFollowupService {
                 const diffDias = Math.floor((now - fechaCarga) / (1000 * 60 * 60 * 24));
 
                 if (diffDias >= diasConsultaSup) {
-                    // Si ya se enviaron reintentos y se superó el límite P
-                    const reintentosActuales = claim._reintentos || 0; // o tracking en metadato
+                    // Contar reintentos reales registrados en la base de datos MySQL
+                    const reintentosActuales = await reclamosDatabaseService.getNotificationCount(claim.id, 'supervisor');
 
                     if (reintentosActuales >= maxReintentosSup) {
                         // Pasar a "Sin respuesta" y elevar a EMAILS_ELEVACION
                         try {
                             await googleSheetsService.updateReclamo(claim.id, {
                                 'AQ': 'Sin respuesta'
+                            }, {
+                                actor: 'sistema_cron',
+                                motivo: `Sin respuesta tras ${maxReintentosSup} recordatorios.`
                             });
+
                             await emailWorkflowService.sendElevationAlert(
                                 claim,
                                 `El supervisor ${claim.supervisor} no respondió a las ${maxReintentosSup} consultas periódicas de seguimiento de acción.`
                             );
+
+                            await reclamosDatabaseService.logNotification({
+                                reclamo_id: claim.id,
+                                destinatario_tipo: 'elevacion_gerencia',
+                                destinatario_email: process.env.EMAILS_ELEVACION || '',
+                                tipo_notificacion: 'alerta_elevacion_supervisor',
+                                reintento_nro: reintentosActuales + 1,
+                                estado_envio: 'enviado'
+                            });
+
                             results.supervisoresElevados++;
                         } catch (e) {
                             results.errores.push(`Error elevando reclamo #${claim.id}: ${e.message}`);
@@ -53,6 +68,14 @@ class CronFollowupService {
                         // Reenviar consulta periódica
                         try {
                             await emailWorkflowService.sendSupervisorActionEmail(claim);
+                            await reclamosDatabaseService.logNotification({
+                                reclamo_id: claim.id,
+                                destinatario_tipo: 'supervisor',
+                                destinatario_email: claim.supervisor_email || '',
+                                tipo_notificacion: 'recordatorio_supervisor',
+                                reintento_nro: reintentosActuales + 1,
+                                estado_envio: 'enviado'
+                            });
                             results.supervisoresConsultados++;
                         } catch (e) {
                             results.errores.push(`Error consultando supervisor para #${claim.id}: ${e.message}`);

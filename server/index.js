@@ -10,6 +10,7 @@ const reclamosRoutes = require('./routes/reclamosRoutes');
 const publicActionRoutes = require('./routes/publicActionRoutes');
 const cronRoutes = require('./routes/cronRoutes');
 const supervisoresRoutes = require('./routes/supervisoresRoutes');
+const { initDatabase, pool } = require('./config/database');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -60,9 +61,20 @@ app.use('/api/cron', cronRoutes);
 app.use('/api/supervisores', supervisoresRoutes);
 
 // Health check
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+    let dbStatus = 'disconnected';
+    try {
+        const [rows] = await pool.query('SELECT 1 as connected');
+        if (rows && rows[0] && rows[0].connected === 1) {
+            dbStatus = 'connected';
+        }
+    } catch (e) {
+        dbStatus = 'error: ' + e.message;
+    }
+
     res.json({
         status: 'ok',
+        database: dbStatus,
         service: 'dy-gestion-reclamos-server',
         timestamp: new Date().toISOString()
     });
@@ -84,6 +96,14 @@ app.use((err, req, res, next) => {
 
 // Iniciar servidor local si no está corriendo como Serverless Function de Netlify
 if (!process.env.NETLIFY) {
+    initDatabase()
+        .then(() => {
+            console.log('[STARTUP] Base de datos MySQL sincronizada e inicializada.');
+        })
+        .catch(err => {
+            console.warn('[STARTUP WARNING] Base de datos no disponible:', err.message);
+        });
+
     app.listen(PORT, () => {
         console.log(`====================================================`);
         console.log(`🚀 DY-GESTIÓN-RECLAMOS API Server corriendo en puerto ${PORT}`);

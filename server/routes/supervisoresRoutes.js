@@ -8,7 +8,7 @@ const { authMiddleware, requireRole } = require('../middlewares/authMiddleware')
  * POST /api/supervisores/lookup { lat, lng }
  * Endpoint para resolución de supervisores por coordenadas (consumido por donyeyo.com.ar)
  */
-const handleLookup = (req, res) => {
+const handleLookup = async (req, res) => {
     const lat = req.query.lat || req.body.lat;
     const lng = req.query.lng || req.body.lng;
 
@@ -20,7 +20,7 @@ const handleLookup = (req, res) => {
     }
 
     try {
-        const result = supervisorLookupService.findSupervisor(lat, lng);
+        const result = await supervisorLookupService.findSupervisor(lat, lng);
         res.json({
             success: true,
             ...result
@@ -41,9 +41,9 @@ router.post('/lookup', handleLookup);
  * GET /api/supervisores/info
  * Consulta información y estadísticas de la cobertura activa
  */
-router.get('/info', (req, res) => {
+router.get('/info', async (req, res) => {
     try {
-        const info = supervisorLookupService.getInfo();
+        const info = await supervisorLookupService.getInfo();
         res.json({
             success: true,
             ...info
@@ -57,7 +57,7 @@ router.get('/info', (req, res) => {
  * POST /api/supervisores/upload
  * Permite a administradores subir un nuevo archivo GeoJSON de cobertura
  */
-router.post('/upload', authMiddleware, requireRole(['admin', 'sysadmin']), (req, res) => {
+router.post('/upload', authMiddleware, requireRole(['admin', 'sysadmin']), async (req, res) => {
     try {
         const geojson = req.body;
         if (!geojson) {
@@ -67,7 +67,8 @@ router.post('/upload', authMiddleware, requireRole(['admin', 'sysadmin']), (req,
             });
         }
 
-        const updatedInfo = supervisorLookupService.saveNewGeoJSON(geojson);
+        const uploader = req.user && req.user.email ? req.user.email : 'admin';
+        const updatedInfo = await supervisorLookupService.saveNewGeoJSON(geojson, uploader);
         res.json({
             success: true,
             message: 'Archivo de cobertura geográfica de supervisores actualizado correctamente.',

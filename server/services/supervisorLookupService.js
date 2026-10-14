@@ -1,21 +1,42 @@
 const fs = require('fs');
 const path = require('path');
+const { pool } = require('../config/database');
 
 class SupervisorLookupService {
     constructor() {
         this.geojsonPath = path.resolve(__dirname, '..', 'data', 'cobertura_supervisores.geojson');
         this.featuresCache = null;
         this.lastModified = null;
+        this.version = 1;
     }
 
     /**
-     * Carga las geometrías en caché
+     * Carga las geometrías en caché desde MySQL o archivo de respaldo local
      */
-    loadFeatures() {
-        if (this.featuresCache) {
+    async loadFeatures() {
+        if (this.featuresCache && this.featuresCache.length > 0) {
             return this.featuresCache;
         }
 
+        // 1. Intentar cargar desde MySQL (permanente e inmutable en entornos Serverless)
+        try {
+            const [rows] = await pool.query(
+                'SELECT version, geojson_content, total_zonas, total_supervisores, created_at FROM cobertura_supervisores_geo WHERE activo = 1 ORDER BY version DESC LIMIT 1'
+            );
+
+            if (rows.length > 0 && rows[0].geojson_content) {
+                const data = JSON.parse(rows[0].geojson_content);
+                this.featuresCache = Array.isArray(data.features) ? data.features : [];
+                this.version = rows[0].version;
+                this.lastModified = rows[0].created_at;
+                console.log(`[SUPERVISOR LOOKUP] Cargadas ${this.featuresCache.length} zonas desde MySQL RDS (Versión ${this.version}).`);
+                return this.featuresCache;
+            }
+        } catch (dbErr) {
+            console.warn('[SUPERVISOR LOOKUP] No se pudo leer de MySQL, usando fallback local:', dbErr.message);
+        }
+
+        // 2. Fallback: Archivo local si aún no se había sembrado en DB
         if (!fs.existsSync(this.geojsonPath)) {
             console.warn('[SUPERVISOR LOOKUP] Archivo GeoJSON no encontrado en:', this.geojsonPath);
             this.featuresCache = [];
@@ -28,13 +49,34 @@ class SupervisorLookupService {
             this.featuresCache = Array.isArray(data.features) ? data.features : [];
             const stats = fs.statSync(this.geojsonPath);
             this.lastModified = stats.mtime;
-            console.log(`[SUPERVISOR LOOKUP] Cargadas ${this.featuresCache.length} zonas de cobertura.`);
+            console.log(`[SUPERVISOR LOOKUP] Cargadas ${this.featuresCache.length} zonas de cobertura desde archivo local.`);
+
+            // Sembrar en MySQL para futuras ejecuciones serverless
+            this._seedToDb(raw, this.featuresCache.length).catch(e => {
+                console.warn('[SUPERVISOR LOOKUP] Error al sembrar GeoJSON en DB:', e.message);
+            });
         } catch (err) {
-            console.error('[SUPERVISOR LOOKUP] Error parseando GeoJSON:', err.message);
+            console.error('[SUPERVISOR LOOKUP] Error parseando GeoJSON local:', err.message);
             this.featuresCache = [];
         }
 
         return this.featuresCache;
+    }
+
+    async _seedToDb(rawContent, totalZonas) {
+        try {
+            const [existing] = await pool.query('SELECT id FROM cobertura_supervisores_geo LIMIT 1');
+            if (existing.length === 0) {
+                await pool.execute(
+                    `INSERT INTO cobertura_supervisores_geo (version, nombre_archivo, geojson_content, total_zonas, activo, subido_por)
+                     VALUES (1, 'cobertura_supervisores.geojson', ?, ?, 1, 'seed_inicial')`,
+                    [rawContent, totalZonas]
+                );
+                console.log('[SUPERVISOR LOOKUP] Cobertura inicial sembrada en MySQL.');
+            }
+        } catch (e) {
+            // Ignorar si falla el seed
+        }
     }
 
     /**
@@ -71,7 +113,7 @@ class SupervisorLookupService {
     /**
      * Encuentra el supervisor correspondiente a una coordenada (lat, lng)
      */
-    findSupervisor(lat, lng) {
+    async findSupervisor(lat, lng) {
         const numLat = parseFloat(lat);
         const numLng = parseFloat(lng);
 
@@ -83,7 +125,7 @@ class SupervisorLookupService {
             };
         }
 
-        const features = this.loadFeatures();
+        const features = await this.loadFeatures();
 
         for (const feature of features) {
             const geometry = feature.geometry || {};
@@ -122,8 +164,8 @@ class SupervisorLookupService {
     /**
      * Retorna resumen de las coberturas activas
      */
-    getInfo() {
-        const features = this.loadFeatures();
+    async getInfo() {
+        const features = await this.loadFeatures();
         const supervisoresMap = new Map();
 
         features.forEach(f => {
@@ -138,6 +180,7 @@ class SupervisorLookupService {
         });
 
         return {
+            version: this.version,
             totalZonas: features.length,
             totalSupervisores: supervisoresMap.size,
             supervisores: Array.from(supervisoresMap.values()),
@@ -146,9 +189,9 @@ class SupervisorLookupService {
     }
 
     /**
-     * Valida y guarda un nuevo archivo GeoJSON reemplazando el actual
+     * Valida y guarda un nuevo archivo GeoJSON persistiendo la versión en MySQL
      */
-    saveNewGeoJSON(rawContent) {
+    async saveNewGeoJSON(rawContent, actor = 'admin') {
         let parsed;
         if (typeof rawContent === 'string') {
             parsed = JSON.parse(rawContent);
@@ -160,17 +203,57 @@ class SupervisorLookupService {
             throw new Error('El archivo provisto no tiene formato válido GeoJSON FeatureCollection.');
         }
 
-        // Crear directorio si no existe
-        const dir = path.dirname(this.geojsonPath);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
+        const features = parsed.features;
+        const supervisoresSet = new Set();
+        features.forEach(f => {
+            if (f.properties && f.properties.Supervisor) {
+                supervisoresSet.add(f.properties.Supervisor);
+            }
+        });
+
+        const geojsonString = typeof rawContent === 'string' ? rawContent : JSON.stringify(parsed);
+
+        // 1. Persistir en MySQL (Desactivar versiones anteriores y activar la nueva)
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            const [lastVerRow] = await connection.query('SELECT IFNULL(MAX(version), 0) as maxVer FROM cobertura_supervisores_geo');
+            const newVersion = (lastVerRow[0] ? lastVerRow[0].maxVer : 0) + 1;
+
+            await connection.execute('UPDATE cobertura_supervisores_geo SET activo = 0');
+            await connection.execute(
+                `INSERT INTO cobertura_supervisores_geo 
+                (version, nombre_archivo, geojson_content, total_zonas, total_supervisores, activo, subido_por) 
+                VALUES (?, 'cobertura_supervisores.geojson', ?, ?, ?, 1, ?)`,
+                [newVersion, geojsonString, features.length, supervisoresSet.size, actor || 'admin']
+            );
+
+            await connection.commit();
+            this.version = newVersion;
+            this.lastModified = new Date();
+            console.log(`[SUPERVISOR LOOKUP] Nueva cobertura v${newVersion} persistida en MySQL.`);
+        } catch (dbErr) {
+            await connection.rollback();
+            console.error('[SUPERVISOR LOOKUP DB ERROR]', dbErr.message);
+            throw new Error('Error al guardar cobertura en base de datos: ' + dbErr.message);
+        } finally {
+            connection.release();
         }
 
-        fs.writeFileSync(this.geojsonPath, JSON.stringify(parsed, null, 2), 'utf8');
+        // 2. Intentar actualizar archivo local como respaldo si el sistema de archivos no es de solo lectura
+        try {
+            const dir = path.dirname(this.geojsonPath);
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+            fs.writeFileSync(this.geojsonPath, JSON.stringify(parsed, null, 2), 'utf8');
+        } catch (fsErr) {
+            console.log('[SUPERVISOR LOOKUP] Nota: Filesystem de solo lectura, persistencia completada en MySQL.');
+        }
 
-        // Invalidar caché
-        this.featuresCache = null;
-        this.loadFeatures();
+        // 3. Actualizar caché en memoria
+        this.featuresCache = features;
 
         return this.getInfo();
     }
