@@ -45,6 +45,22 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
         }
     };
 
+    const handleRevertirAPendiente = async () => {
+        if (!window.confirm(`¿Revertir el reclamo #${claim.id} al estado inicial "Pendiente"?`)) return;
+
+        setUpdating(true);
+        setActionMsg(null);
+        try {
+            await reclamosApi.updateEstadoAdmin(claim.id, 'Pendiente');
+            setActionMsg({ type: 'success', text: 'Reclamo regresado a estado inicial "Pendiente".' });
+            onRefresh();
+        } catch (e) {
+            setActionMsg({ type: 'error', text: 'Error al revertir a pendiente: ' + (e.response?.data?.error || e.message) });
+        } finally {
+            setUpdating(false);
+        }
+    };
+
     const handleAprobar = async () => {
         if (!window.confirm(`¿Marcar como Aprobado el reclamo #${claim.id}?`)) return;
 
