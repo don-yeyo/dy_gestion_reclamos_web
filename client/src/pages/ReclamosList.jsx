@@ -67,6 +67,7 @@ export const ReclamosList = () => {
         if (filterAdmin !== 'ALL') {
             const estado = (r.workflow?.estado_admin || 'Pendiente').toLowerCase();
             if (filterAdmin === 'Pendiente' && estado !== 'pendiente') return false;
+            if (filterAdmin === 'En curso' && estado !== 'en curso') return false;
             if (filterAdmin === 'Aprobado' && estado !== 'aprobado') return false;
             if (filterAdmin === 'Desaprobado' && estado !== 'desaprobado') return false;
         }
@@ -157,6 +158,7 @@ export const ReclamosList = () => {
                         >
                             <option value="ALL">Todos los estados</option>
                             <option value="Pendiente">Pendiente</option>
+                            <option value="En curso">En curso</option>
                             <option value="Aprobado">Aprobado</option>
                             <option value="Desaprobado">Desaprobado</option>
                         </select>

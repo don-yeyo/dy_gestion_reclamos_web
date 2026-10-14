@@ -45,18 +45,19 @@ router.get('/:id', async (req, res) => {
 
 /**
  * PATCH /api/reclamos/:id/estado-admin
- * Permite a los Administradores cambiar estado_admin (Aprobado | Desaprobado | Pendiente)
- * Si es Desaprobado: pasa supervisor, consumidor e inocuidad a "Sin acciones" y guarda motivo.
- * Si es Aprobado: dispara email de acción al supervisor.
+ * Permite a los Administradores cambiar estado_admin (Pendiente | En curso | Aprobado | Desaprobado)
+ * - Si es "En curso": sincroniza estado_consumidor a "En curso", blanquea motivos y dispara email con instrucciones al Supervisor.
+ * - Si es "Desaprobado": pasa supervisor, consumidor e inocuidad a "Sin acciones" y guarda motivo.
+ * - Si es "Aprobado": marca aprobado y limpia motivos.
  */
 router.patch('/:id/estado-admin', requireRole(['admin', 'sysadmin']), async (req, res) => {
     const { estado, motivo_desaprobado } = req.body;
     const claimId = req.params.id;
 
-    if (!['Pendiente', 'Aprobado', 'Desaprobado'].includes(estado)) {
+    if (!['Pendiente', 'En curso', 'Aprobado', 'Desaprobado'].includes(estado)) {
         return res.status(400).json({
             success: false,
-            error: 'Estado inválido. Debe ser Pendiente, Aprobado o Desaprobado.'
+            error: 'Estado inválido. Debe ser Pendiente, En curso, Aprobado o Desaprobado.'
         });
     }
 
@@ -68,7 +69,14 @@ router.patch('/:id/estado-admin', requireRole(['admin', 'sysadmin']), async (req
 
         const updates = { 'AO': estado };
 
-        if (estado === 'Desaprobado') {
+        if (estado === 'En curso') {
+            updates['AP'] = ''; // Blanquear motivos de desaprobado
+            updates['AS'] = 'En curso'; // estado_consumidor pasa a En curso
+            // Si el supervisor estaba en Sin acciones, vuelve a Pendiente
+            if (claim.estado_supervisor === 'Sin acciones') {
+                updates['AQ'] = 'Pendiente';
+            }
+        } else if (estado === 'Desaprobado') {
             updates['AP'] = motivo_desaprobado || 'Desaprobado por administración';
             // Regla solicitada: al desaprobar, cambiar los demás a "Sin acciones"
             updates['AQ'] = 'Sin acciones'; // estado_supervisor
@@ -76,16 +84,17 @@ router.patch('/:id/estado-admin', requireRole(['admin', 'sysadmin']), async (req
             updates['AT'] = 'Sin acciones'; // estado_inocuidad
         } else if (estado === 'Aprobado') {
             updates['AP'] = '';
-            // Si el supervisor estaba en Sin acciones, vuelve a Pendiente
             if (claim.estado_supervisor === 'Sin acciones') {
                 updates['AQ'] = 'Pendiente';
             }
+        } else if (estado === 'Pendiente') {
+            updates['AP'] = '';
         }
 
         await googleSheetsService.updateReclamo(claimId, updates);
 
-        // Si fue Aprobado, disparar acción y email al supervisor
-        if (estado === 'Aprobado') {
+        // Si fue pasado a "En curso" (o Aprobado directamente), disparar acción y email al supervisor
+        if (estado === 'En curso' || estado === 'Aprobado') {
             const updatedClaim = await googleSheetsService.getReclamoById(claimId);
             emailWorkflowService.sendSupervisorActionEmail(updatedClaim).catch(err => {
                 console.error(`[WORKFLOW] Error enviando email a supervisor (${claim.supervisor_email}):`, err.message);

@@ -3,7 +3,7 @@ import { Modal } from '../components/Modal';
 import { StatusBadge } from '../components/StatusBadge';
 import { reclamosApi } from '../services/api';
 import { useAuth } from '../config/AuthContext';
-import { MapPin, Phone, Mail, Store, Package, Download, Check, X, ShieldAlert, User, AlertCircle } from 'lucide-react';
+import { MapPin, Phone, Mail, Store, Package, Download, Check, X, ShieldAlert, User, AlertCircle, Play } from 'lucide-react';
 
 const SUPERVISORES_LISTA = [
     { nombre: 'Hugo Basile', email: 'hugob@donyeyo.com.ar' },
@@ -29,14 +29,30 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
 
     if (!claim) return null;
 
+    const handlePonerEnCurso = async () => {
+        if (!window.confirm(`¿Poner el reclamo #${claim.id} "En curso"?\n\nEsto sincronizará el estado del consumidor a "En curso" y enviará automáticamente el email con instrucciones de reposición/cortesía al supervisor ${claim.supervisor || 'asignado'}.`)) return;
+
+        setUpdating(true);
+        setActionMsg(null);
+        try {
+            await reclamosApi.updateEstadoAdmin(claim.id, 'En curso');
+            setActionMsg({ type: 'success', text: 'Reclamo puesto "En curso". Se notificó al supervisor con las instrucciones correspondientes.' });
+            onRefresh();
+        } catch (e) {
+            setActionMsg({ type: 'error', text: 'Error al poner en curso: ' + (e.response?.data?.error || e.message) });
+        } finally {
+            setUpdating(false);
+        }
+    };
+
     const handleAprobar = async () => {
-        if (!window.confirm(`¿Aprobar el reclamo #${claim.id}? Esto enviará automáticamente el email de acción al supervisor ${claim.supervisor}.`)) return;
+        if (!window.confirm(`¿Marcar como Aprobado el reclamo #${claim.id}?`)) return;
 
         setUpdating(true);
         setActionMsg(null);
         try {
             await reclamosApi.updateEstadoAdmin(claim.id, 'Aprobado');
-            setActionMsg({ type: 'success', text: 'Reclamo aprobado y acción enviada al supervisor.' });
+            setActionMsg({ type: 'success', text: 'Reclamo aprobado.' });
             onRefresh();
         } catch (e) {
             setActionMsg({ type: 'error', text: 'Error al aprobar: ' + (e.response?.data?.error || e.message) });
@@ -148,12 +164,22 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                     {!showDesaprobarPrompt ? (
                         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                             <button
+                                className="btn"
+                                style={{ backgroundColor: '#2563eb', color: '#ffffff' }}
+                                onClick={handlePonerEnCurso}
+                                disabled={updating || claim.estado_admin === 'En curso'}
+                                title="Pasa el reclamo a En curso, sincroniza consumidor y envía email con instrucciones al supervisor"
+                            >
+                                <Play size={16} />
+                                <span>Poner En Curso (Notificar Supervisor)</span>
+                            </button>
+                            <button
                                 className="btn btn-success"
                                 onClick={handleAprobar}
                                 disabled={updating || claim.estado_admin === 'Aprobado'}
                             >
                                 <Check size={16} />
-                                <span>Aprobar Reclamo e Indicar Acción a Supervisor</span>
+                                <span>Aprobar Reclamo</span>
                             </button>
                             <button
                                 className="btn btn-danger"

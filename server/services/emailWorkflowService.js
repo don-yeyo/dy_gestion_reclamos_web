@@ -32,6 +32,18 @@ class EmailWorkflowService {
     }
 
     /**
+     * Genera token y enlace directo único para poner reclamo en 'En curso' desde el email
+     */
+    generateAdminActionToken(claimId) {
+        return this.generateToken(claimId, 'admin', 'en_curso');
+    }
+
+    generateAdminActionUrl(claimId) {
+        const token = this.generateAdminActionToken(claimId);
+        return `${API_BASE_URL}/api/public/actions/admin-quick?token=${encodeURIComponent(token)}`;
+    }
+
+    /**
      * Verifica la autenticidad de un token de acción
      */
     verifyToken(token) {
@@ -43,7 +55,7 @@ class EmailWorkflowService {
     }
 
     /**
-     * Envía email de acción al Supervisor asignado tras aprobación del Administrador
+     * Envía email de acción al Supervisor asignado cuando el Administrador pone el reclamo "En curso"
      */
     async sendSupervisorActionEmail(claim) {
         if (!claim.supervisor_email) {
@@ -75,7 +87,7 @@ class EmailWorkflowService {
             </div>
             <div style="padding:24px; color:#1e293b; line-height:1.5;">
                 <p>Estimado/a <strong>${claim.supervisor}</strong>,</p>
-                <p>Se ha aprobado un reclamo en tu zona de cobertura que requiere de tu intervención para reposición o entrega de cortesía.</p>
+                <p>Se ha puesto <strong>en curso</strong> un reclamo en tu zona de cobertura que requiere de tu intervención para reposición o entrega de cortesía.</p>
 
                 <div style="background:#f1f5f9; padding:14px; border-radius:8px; margin:16px 0;">
                     <h4 style="margin:0 0 8px 0; color:#151C5B;">Datos del Consumidor</h4>

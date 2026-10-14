@@ -165,6 +165,12 @@ body {
   border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
+.badge-en-curso {
+  background-color: rgba(37, 99, 235, 0.12);
+  color: #2563eb;
+  border: 1px solid rgba(37, 99, 235, 0.35);
+}
+
 .badge-aprobado, .badge-resuelto, .badge-conforme {
   background-color: var(--success-bg);
   color: #047857;

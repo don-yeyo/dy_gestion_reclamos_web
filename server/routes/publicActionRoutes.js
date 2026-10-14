@@ -3,9 +3,147 @@ const router = express.Router();
 const googleSheetsService = require('../services/googleSheetsService');
 const emailWorkflowService = require('../services/emailWorkflowService');
 
+const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:5173';
+
+/**
+ * GET /api/public/actions/admin-quick
+ * Endpoint webhook seguro para administradores desde el email de nuevo reclamo.
+ * Pone el reclamo en "En curso", sincroniza consumidor a "En curso", blanquea motivos
+ * y dispara el email de acción con instrucciones al Supervisor asignado.
+ */
+router.get('/admin-quick', async (req, res) => {
+    const { token } = req.query;
+    const payload = emailWorkflowService.verifyToken(token);
+
+    if (!payload || payload.actor !== 'admin' || payload.action !== 'en_curso' || !payload.claimId) {
+        return res.status(401).send(`
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Enlace Inválido - Don Yeyo</title>
+                <style>
+                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f1535; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; color: #f8fafc; }
+                    .card { background: #1a2254; padding: 40px; border-radius: 16px; border: 1px solid rgba(229, 53, 59, 0.4); text-align: center; max-width: 480px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+                    .icon { font-size: 48px; color: #E5353B; margin-bottom: 16px; }
+                    h2 { margin-top: 0; color: #ffffff; }
+                    p { color: #94a3b8; line-height: 1.6; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <div class="icon">⚠️</div>
+                    <h2>Enlace Inválido o Expirado</h2>
+                    <p>El enlace único de acción utilizado no es válido, ha caducado o su firma digital no coincide.</p>
+                    <p style="font-size:0.85rem; color:#64748b; margin-top:20px;">Por seguridad, podés gestionar este reclamo ingresando al Gestor Web autenticado.</p>
+                </div>
+            </body>
+            </html>
+        `);
+    }
+
+    try {
+        const claim = await googleSheetsService.getReclamoById(payload.claimId);
+        if (!claim) {
+            return res.status(404).send(`
+                <div style="font-family:sans-serif; text-align:center; padding:50px; background:#0f1535; color:#fff; min-height:100vh;">
+                    <h2>Reclamo #${payload.claimId} no encontrado</h2>
+                    <p>No se encontró el registro en la base de reclamos.</p>
+                </div>
+            `);
+        }
+
+        const yaEstabaEnCurso = claim.estado_admin === 'En curso';
+
+        if (!yaEstabaEnCurso) {
+            const updates = {
+                'AO': 'En curso',
+                'AS': 'En curso',
+                'AP': ''
+            };
+            if (claim.estado_supervisor === 'Sin acciones') {
+                updates['AQ'] = 'Pendiente';
+            }
+
+            await googleSheetsService.updateReclamo(payload.claimId, updates);
+
+            // Disparar email al supervisor
+            const updatedClaim = await googleSheetsService.getReclamoById(payload.claimId);
+            emailWorkflowService.sendSupervisorActionEmail(updatedClaim).catch(err => {
+                console.error(`[WORKFLOW] Error enviando email a supervisor (${claim.supervisor_email}):`, err.message);
+            });
+        }
+
+        const supervisorInfo = claim.supervisor ? `${claim.supervisor} (${claim.supervisor_email || 'Sin email registrado'})` : 'No asignado';
+
+        res.send(`
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Reclamo En Curso - Don Yeyo</title>
+                <style>
+                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0b0f24; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; color: #f8fafc; }
+                    .card { background: #151C5B; padding: 40px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); text-align: center; max-width: 520px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+                    .icon { width: 64px; height: 64px; line-height: 64px; background: rgba(16, 185, 129, 0.15); border: 2px solid #10b981; border-radius: 50%; font-size: 32px; color: #10b981; margin: 0 auto 20px; }
+                    h2 { margin: 0 0 12px 0; color: #ffffff; font-size: 1.5rem; }
+                    .badge { display: inline-block; background: #2563eb; color: #ffffff; padding: 4px 12px; border-radius: 20px; font-size: 0.82rem; font-weight: bold; margin-bottom: 16px; }
+                    p { color: #cbd5e1; line-height: 1.6; margin: 8px 0; font-size: 0.95rem; }
+                    .info-box { background: rgba(255,255,255,0.06); border-radius: 10px; padding: 16px; margin: 20px 0; text-align: left; font-size: 0.9rem; border-left: 4px solid #10b981; }
+                    .btn { display: inline-block; background: #E5353B; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; margin-top: 16px; transition: background 0.2s; }
+                    .btn:hover { background: #b91c1c; }
+                    .footer { margin-top: 24px; font-size: 0.78rem; color: #64748b; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <div class="icon">✓</div>
+                    <div class="badge">ESTADO: EN CURSO</div>
+                    <h2>${yaEstabaEnCurso ? 'El Reclamo Ya Se Encuentra En Curso' : '¡Reclamo Puesto En Curso con Éxito!'}</h2>
+                    <p>Reclamo <strong>#${payload.claimId}</strong> correspondiente a <strong>${claim.nombre} ${claim.apellido}</strong> (${claim.localidad}, ${claim.provincia}).</p>
+                    
+                    <div class="info-box">
+                        <strong>Acción Ejecutada:</strong><br/>
+                        • <strong>Estado Admin:</strong> En curso<br/>
+                        • <strong>Estado Consumidor:</strong> En curso<br/>
+                        • <strong>Supervisor Notificado:</strong> ${supervisorInfo}<br/>
+                        • <strong>Instrucciones:</strong> Enviadas por correo electrónico para reposición o cortesía.
+                    </div>
+
+                    <a href="${APP_BASE_URL}/reclamos/${payload.claimId}" class="btn">Abrir en el Gestor Web</a>
+
+                    <div class="footer">
+                        Don Yeyo S.A. | Sistema de Gestión Automatizado de Reclamos
+                    </div>
+                </div>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        console.error('Error en admin-quick webhook:', err);
+        res.status(500).send(`Error al procesar la acción: ${err.message}`);
+    }
+});
+
+/**
+ * GET /api/public/actions/generate-admin-link
+ * Endpoint para generar el enlace firmado seguro para un reclamo dado
+ */
+router.get('/generate-admin-link', (req, res) => {
+    const { claimId } = req.query;
+    if (!claimId) {
+        return res.status(400).json({ success: false, error: 'claimId es requerido.' });
+    }
+    const token = emailWorkflowService.generateAdminActionToken(claimId);
+    const url = emailWorkflowService.generateAdminActionUrl(claimId);
+    res.json({ success: true, claimId, token, url });
+});
+
 /**
  * GET /api/public/actions/verify
- * Verifica si un token de acción es válido y devuelve datos del caso
+ * Verifica si un token de acción es válido y devuelve datos del caso para el frontend
  */
 router.get('/verify', async (req, res) => {
     const { token } = req.query;

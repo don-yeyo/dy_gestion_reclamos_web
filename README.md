@@ -165,23 +165,31 @@ Este sistema implementa un modelo de seguridad estricto para evitar elevación d
 
 1. **Ingreso desde Web (`donyeyo.com.ar`):**
    - El consumidor completa el formulario indicando domicilio y producto.
-   - El backend del sitio web calcula el Supervisor por geolocalización (Ray-Casting GeoJSON) y persiste los datos en Google Sheets.
-   - El reclamo nace con `estado_admin: Pendiente`, `estado_supervisor: Pendiente`, `estado_inocuidad: Pendiente`.
+   - El backend web consulta a la API centralizada del gestor (`/api/supervisores/lookup`) para geolocalizar al supervisor y persiste la fila en Google Sheets.
+   - El reclamo nace con `estado_admin: Pendiente`, `estado_supervisor: Pendiente`, `estado_inocuidad: Pendiente`, `estado_consumidor: Pendiente`.
+   - Se envía un correo interno a administración con un **enlace único y seguro (Webhook Anti-tampering con JWT/HMAC)** para iniciar la gestión con un solo clic.
 
-2. **Aprobación de Administración:**
-   - El administrador ingresa a la plataforma web corporativa con SSO Microsoft.
-   - Revisa las fotos/evidencias y decide: **Aprobar** o **Desaprobar** (indicando motivo).
-   - Al aprobar, se dispara un correo con el producto de cortesía calculado al supervisor asignado.
+2. **Inicio de Gestión Administrativa ("En curso"):**
+   - El administrador puede pulsar el botón **"Poner En Curso"** directamente desde su correo electrónico o seleccionarlo desde el panel del Gestor Web.
+   - **Efectos automáticos:**
+     - `estado_admin` pasa a **"En curso"**.
+     - `estado_consumidor` se sincroniza automáticamente a **"En curso"**.
+     - Se blanquean motivos de desaprobación previos.
+     - **Disparo del flujo:** Se envía automáticamente el correo con las instrucciones de la acción comercial requerida (cortesía o reposición) al **Supervisor asignado**.
 
-3. **Acción del Supervisor:**
-   - El supervisor recibe el correo con botones de acción directa: **Confirmar Entrega** o **Informar Imposibilidad** (enlace tokenizado).
+3. **Decisiones de Administración:**
+   - **Aprobar:** Confirma la procedencia del reclamo.
+   - **Desaprobar:** Requiere ingresar el motivo correspondiente; automáticamente pasa `estado_supervisor`, `estado_consumidor` y `estado_inocuidad` a *"Sin acciones"*.
+
+4. **Acción del Supervisor:**
+   - El supervisor recibe el correo con botones de acción directa: **Pude Resolver la Acción** (webhook instantáneo) o **Existe una Imposibilidad** (enlace seguro tokenizado al formulario web corporativo).
    - Si no responde transcurridos $N$ días, el cron de seguimiento envía recordatorios y escala a administración si se superan los plazos máximos.
 
-4. **Validación del Consumidor:**
-   - Al marcarse como resuelto, se consulta al consumidor sobre la recepción del producto.
+5. **Validación del Consumidor:**
+   - Tras la resolución por parte del supervisor, se consulta automáticamente al consumidor sobre la recepción del producto (Conforme, Disconforme, No resuelto).
 
-5. **Dictamen de Calidad / Inocuidad:**
-   - El departamento de Calidad evalúa lote, vencimiento y defecto, registrando dictamen de **Conforme** o **No Conforme**.
+6. **Dictamen de Calidad / Inocuidad:**
+   - El departamento de Inocuidad evalúa lote, vencimiento, defecto y evidencias ZIP, registrando dictamen de **Resuelto** o **Imposibilidad**.
 
 ---
 

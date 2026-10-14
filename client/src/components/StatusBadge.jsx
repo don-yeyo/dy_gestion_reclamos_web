@@ -8,6 +8,8 @@ export const StatusBadge = ({ status, type = 'default' }) => {
 
     if (normalized.includes('pendiente')) {
         badgeClass = 'badge-pendiente';
+    } else if (normalized.includes('en curso')) {
+        badgeClass = 'badge-en-curso';
     } else if (normalized.includes('aprobado') || normalized.includes('resuelto') || normalized.includes('conforme')) {
         badgeClass = 'badge-aprobado';
     } else if (normalized.includes('desaprobado') || normalized.includes('imposibilidad') || normalized.includes('no resuelto')) {
