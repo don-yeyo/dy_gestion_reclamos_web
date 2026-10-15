@@ -182,8 +182,9 @@ Este sistema implementa un modelo de seguridad estricto para evitar elevación d
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Contenido del JSON en texto plano (alternativa Netlify) | *(JSON string)* |
 | `RECLAMOS_NUMERO_CORTE` | ID numérico de corte a partir del cual se gestionan | `20233357` |
 | `EMAILS_ADMINS` | Correos con rol de Administrador | `admin1@empresa.com,admin2@empresa.com` |
-| `SMTP_*` | Credenciales del servidor de correo saliente | Host, Puerto, Usuario y Clave SMTP |
-| `EMAIL_TEST_MODE` | Activar modo de pruebas para interceptar todos los correos | `false` o `true` |
+| `SMTP_*` | Servidor SMTP saliente para correos a **Consumidores** (`SMTP_HOST`, `PORT`, `USER`, `PASSWORD`, `NAME`, `ENCRYPT`) | Servidor saliente institucional Don Yeyo |
+| `ALERTA_SMTP_*` | Servidor SMTP saliente para **Alertas y Notificaciones Internas** (supervisores, calidad, administración, elevación) | `smtp-mail.outlook.com`, puerto `587`, TLS |
+| `EMAIL_TEST_MODE` | Activar modo de pruebas para interceptar todos los correos del sistema | `false` o `true` |
 | `EMAIL_TEST_RECIPIENT` | Casilla única de destino para correos en modo de prueba | `testing-reclamos@donyeyo.com.ar` |
 
 ### Frontend (`client/.env`)

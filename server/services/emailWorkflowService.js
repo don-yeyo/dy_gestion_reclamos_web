@@ -199,11 +199,10 @@ class EmailWorkflowService {
         `;
 
         return this.sendMail({
-            from: this.from,
             to: claim.supervisor_email,
             subject: `[Acción Requerida] Reclamo #${claim.id} - ${claim.nombre} ${claim.apellido} (${claim.localidad})`,
             html
-        });
+        }, 'internal');
     }
 
     /**
@@ -226,11 +225,10 @@ class EmailWorkflowService {
         `;
 
         return this.sendMail({
-            from: this.from,
             to: adminEmails,
             subject: `[ALERTA] Supervisor reportó Imposibilidad - Reclamo #${claim.id}`,
             html
-        });
+        }, 'internal');
     }
 
     /**
@@ -272,11 +270,10 @@ class EmailWorkflowService {
         `;
 
         return this.sendMail({
-            from: this.from,
             to: claim.email,
             subject: `Seguimiento de tu Reclamo en Don Yeyo #${claim.id}`,
             html
-        });
+        }, 'consumer');
     }
 
     /**
@@ -301,11 +298,10 @@ class EmailWorkflowService {
         `;
 
         return this.sendMail({
-            from: this.from,
             to: adminEmails,
             subject: `${isUrgent ? '[URGENTE] ' : ''}Consumidor respondió "${feedback}" - Reclamo #${claim.id}`,
             html
-        });
+        }, 'internal');
     }
 
     /**
@@ -360,11 +356,10 @@ class EmailWorkflowService {
         `;
 
         return this.sendMail({
-            from: this.from,
             to: inocuidadEmails,
             subject: `[Calidad / Inocuidad] Nuevo Reclamo Aprobado #${claim.id} - ${claim.nombre} ${claim.apellido}`,
             html
-        });
+        }, 'internal');
     }
 
     /**
@@ -384,11 +379,10 @@ class EmailWorkflowService {
         `;
 
         return this.sendMail({
-            from: this.from,
             to: elevationEmails,
             subject: `[ELEVACIÓN] Sin respuesta de acción - Reclamo #${claim.id} (${claim.supervisor})`,
             html
-        });
+        }, 'internal');
     }
 }
 
