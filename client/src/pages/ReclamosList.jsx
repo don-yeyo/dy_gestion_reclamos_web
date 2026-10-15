@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
     Search, Filter, RefreshCw, AlertCircle,
     CheckCircle2, Clock, MapPin, Package, UserCheck, ShieldAlert,
-    RotateCcw, Inbox, ChevronLeft, ChevronRight, X
+    RotateCcw, Inbox, ChevronLeft, ChevronRight, X, User
 } from 'lucide-react';
 import { reclamosApi } from '../services/api';
 import { StatusBadge } from '../components/StatusBadge';
@@ -21,6 +21,7 @@ export const ReclamosList = () => {
     const [filterAdmin, setFilterAdmin] = useState('ALL');
     const [filterSupervisor, setFilterSupervisor] = useState('ALL');
     const [filterInocuidad, setFilterInocuidad] = useState('ALL');
+    const [filterConsumidor, setFilterConsumidor] = useState('ALL');
 
     // Paginación
     const [currentPage, setCurrentPage] = useState(1);
@@ -127,22 +128,35 @@ export const ReclamosList = () => {
                 if (filterInocuidad === 'Sin acciones' && estado !== 'sin acciones') return false;
             }
 
+            // Filtro Consumidor
+            if (filterConsumidor !== 'ALL') {
+                const estado = (r.estado_consumidor || 'Pendiente').toLowerCase();
+                if (filterConsumidor === 'Pendiente' && estado !== 'pendiente') return false;
+                if (filterConsumidor === 'En curso' && estado !== 'en curso') return false;
+                if (filterConsumidor === 'Resuelto conforme' && !estado.includes('conforme')) return false;
+                if (filterConsumidor === 'Resuelto disconforme' && !estado.includes('disconforme')) return false;
+                if (filterConsumidor === 'No resuelto' && !estado.includes('no resuelto')) return false;
+                if (filterConsumidor === 'FSR' && (!estado.includes('fsr') && !estado.includes('sin respuesta'))) return false;
+                if (filterConsumidor === 'Sin acciones' && estado !== 'sin acciones') return false;
+            }
+
             return true;
         });
-    }, [reclamos, searchQuery, filterAdmin, filterSupervisor, filterInocuidad]);
+    }, [reclamos, searchQuery, filterAdmin, filterSupervisor, filterInocuidad, filterConsumidor]);
 
     // Paginación
     const totalPages = Math.ceil(filteredReclamos.length / itemsPerPage) || 1;
     const startIndex = (currentPage - 1) * itemsPerPage;
     const paginatedReclamos = filteredReclamos.slice(startIndex, startIndex + itemsPerPage);
 
-    const isFiltered = searchQuery.trim() !== '' || filterAdmin !== 'ALL' || filterSupervisor !== 'ALL' || filterInocuidad !== 'ALL';
+    const isFiltered = searchQuery.trim() !== '' || filterAdmin !== 'ALL' || filterSupervisor !== 'ALL' || filterInocuidad !== 'ALL' || filterConsumidor !== 'ALL';
 
     const handleClearFilters = () => {
         setSearchQuery('');
         setFilterAdmin('ALL');
         setFilterSupervisor('ALL');
         setFilterInocuidad('ALL');
+        setFilterConsumidor('ALL');
         setCurrentPage(1);
         if (searchParams.get('filtro')) {
             setSearchParams({});
@@ -315,6 +329,26 @@ export const ReclamosList = () => {
                             <option value="Pendiente">Pendiente</option>
                             <option value="Conforme">Conforme</option>
                             <option value="No Conforme">No Conforme</option>
+                            <option value="Sin acciones">Sin acciones</option>
+                        </select>
+                    </div>
+
+                    <div className="filter-box">
+                        <label>
+                            <User size={14} style={{ color: '#3b82f6' }} />
+                            Estado Consumidor
+                        </label>
+                        <select
+                            value={filterConsumidor}
+                            onChange={(e) => { setFilterConsumidor(e.target.value); setCurrentPage(1); }}
+                        >
+                            <option value="ALL">Todos los estados</option>
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="En curso">En curso</option>
+                            <option value="Resuelto conforme">Resuelto conforme</option>
+                            <option value="Resuelto disconforme">Resuelto disconforme</option>
+                            <option value="No resuelto">No resuelto</option>
+                            <option value="FSR">Finalizado Sin Respuesta (FSR)</option>
                             <option value="Sin acciones">Sin acciones</option>
                         </select>
                     </div>
