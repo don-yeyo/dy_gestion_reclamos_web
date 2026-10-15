@@ -638,6 +638,8 @@ class ReclamosDatabaseService {
             console.error(`[AUTO-FINALIZADO ERROR] Error en checkAndFinalizeAdminState para #${claimId}:`, err.message);
             return false;
         }
+    }
+
     /**
      * Actualiza el producto_cortesia de los items en MySQL
      * @param {string|number} reclamoId ID del reclamo
