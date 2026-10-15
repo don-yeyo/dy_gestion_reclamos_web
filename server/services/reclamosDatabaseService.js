@@ -579,6 +579,17 @@ class ReclamosDatabaseService {
     }
 
     /**
+     * Obtiene la fecha del último envío de notificación a un destinatario
+     */
+    async getLastNotificationDate(claimId, destinatarioTipo) {
+        const [rows] = await pool.execute(
+            'SELECT created_at FROM seguimiento_notificaciones WHERE reclamo_id = ? AND destinatario_tipo = ? AND estado_envio = "enviado" ORDER BY created_at DESC LIMIT 1',
+            [String(claimId), destinatarioTipo]
+        );
+        return rows[0] && rows[0].created_at ? new Date(rows[0].created_at) : null;
+    }
+
+    /**
      * Verifica si se cumplen las condiciones para pasar automáticamente estado_admin a "Finalizado":
      * 1. Reclamo aprobado previamente por admin (no 'Pendiente', no 'Desaprobado', no 'Finalizado').
      * 2. Inocuidad: cambió su estado de 'Pendiente' a otro de sus estados.

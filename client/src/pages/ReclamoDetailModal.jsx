@@ -661,6 +661,12 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                 {isEnCurso && activeClaim.estado_consumidor === 'Imposibilidad' && (
                                     'No fue posible concretar la entrega al consumidor.'
                                 )}
+                                {(activeClaim.estado_consumidor === 'FSR' || activeClaim.estado_consumidor?.toLowerCase().includes('sin respuesta')) && (
+                                    'El consumidor no respondió las solicitudes de seguimiento tras el plazo estipulado (FSR).'
+                                )}
+                                {activeClaim.estado_consumidor?.toLowerCase().includes('conforme') && (
+                                    'El consumidor respondió la encuesta de conformidad.'
+                                )}
                             </div>
                         </div>
                     </div>

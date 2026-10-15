@@ -184,6 +184,7 @@ Este sistema implementa un modelo de seguridad estricto para evitar elevación d
 | `EMAILS_ADMINS` | Correos con rol de Administrador | `admin1@empresa.com,admin2@empresa.com` |
 | `SMTP_*` | Servidor SMTP saliente para correos a **Consumidores** (`SMTP_HOST`, `PORT`, `USER`, `PASSWORD`, `NAME`, `ENCRYPT`) | Servidor saliente institucional Don Yeyo |
 | `ALERTA_SMTP_*` | Servidor SMTP saliente para **Alertas y Notificaciones Internas** (supervisores, calidad, administración, elevación) | `smtp-mail.outlook.com`, puerto `587`, TLS |
+| `CRON_CONSUMIDOR_DIAS_FIN_SIN_RESPUESTA` | Días (J) sin respuesta del consumidor tras el último requerimiento para pasar a **FSR** | `7` |
 | `EMAIL_TEST_MODE` | Activar modo de pruebas para interceptar todos los correos del sistema | `false` o `true` |
 | `EMAIL_TEST_RECIPIENT` | Casilla única de destino para correos en modo de prueba | `testing-reclamos@donyeyo.com.ar` |
 
@@ -217,9 +218,7 @@ Este sistema implementa un modelo de seguridad estricto para evitar elevación d
      - **Doble despacho de notificaciones por email:**
        1. **Supervisor Comercial:** Correo detallado con los datos de entrega y las instrucciones de reposición/cortesía.
        2. **Calidad & Inocuidad:** Expediente técnico integral (lotes, vencimientos, defectos, envase, descripciones y ZIP) para iniciar la investigación y registro de caso.
-   - **Inmutabilidad y Monitoreo para el Administrador:**
-     - Una vez aprobado el reclamo, el administrador no vuelve a aprobar ni manipula directamente los estados de compensación ni de inocuidad, ni modifica el supervisor.
-     - La pantalla muestra los badges de estado actualizados en tiempo real junto con la fecha y hora sutil de cada transición (`fecha_estado_admin`, `fecha_estado_supervisor`, `fecha_estado_inocuidad`, `fecha_estado_consumidor`).
+   - **Reenvío Manual de Correos:** En el modal de detalle, las cards de Inocuidad y Supervisor disponen de un botón interactivo sutil en la esquina inferior derecha para reenviar los correos ante cualquier contingencia.
 
 3. **Ciclo de Vida y Ramas de Decisión:**
    - **Recepción (Pendiente Admin):** Etapa de ingreso y evaluación de procedencia.
@@ -229,8 +228,15 @@ Este sistema implementa un modelo de seguridad estricto para evitar elevación d
      - El supervisor recibe el correo inicial y los recordatorios automáticos del cron (`CRON_SUPERVISOR_DIAS_CONSULTA`) para informar si pudo resolver la entrega o si existe una imposibilidad.
    - **Control de Calidad e Inocuidad:**
      - Calidad & Inocuidad recibe el expediente técnico para investigación técnica, dictaminando de forma independiente en el sistema.
-   - **Validación del Consumidor:**
+   - **Validación del Consumidor y Regla FSR:**
      - Tras la entrega de la compensación, el cron consulta automáticamente al consumidor sobre su conformidad (`CRON_CONSUMIDOR_DIAS_CONSULTA`).
+     - Si transcurren `J` días (`CRON_CONSUMIDOR_DIAS_FIN_SIN_RESPUESTA`) sin que el consumidor responda a la encuesta, su estado pasa automáticamente a **Finalizado Sin Respuesta (FSR)**.
+   - **Transición Automática a "Finalizado":**
+     - Cuando concurren simultáneamente:
+       1. Calidad & Inocuidad dictaminó un estado distinto de *Pendiente*.
+       2. El supervisor completó la acción (*Resuelto* o *Imposibilidad*).
+       3. El consumidor cerró su circuito (distinto de *Pendiente*, *En curso* y *Sin acciones*, incluyendo *FSR*).
+     - El `estado_admin` asume automáticamente el valor **"Finalizado"**, sellando el cierre integral del caso con auditoría y sincronización completa.
 
 ---
 
