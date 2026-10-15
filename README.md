@@ -240,5 +240,35 @@ Este sistema implementa un modelo de seguridad estricto para evitar elevación d
 
 ---
 
+## 🧪 Pruebas Funcionales y Automatización E2E (Playwright)
+
+El proyecto cuenta con una especificación formal de casos de uso funcionales en [`CASOS_DE_USO_TESTS_FUNCIONALES.md`](file:///c:/Users/gabrielt/Documents/Proyectos/GestionReclamosWeb/dy_gestion_reclamos_web/CASOS_DE_USO_TESTS_FUNCIONALES.md) y una suite completa de pruebas End-to-End automatizadas implementada sobre **Playwright**:
+
+- **Aislamiento y Determinismo:** Mocks integrales de endpoints de backend (`mockApi.js`), permitiendo ejecutar los tests sin depender de conexiones activas a Google Sheets, SMTP ni base de datos MySQL.
+- **Bypass de Autenticación:** Utiliza `VITE_MOCK_AUTH=true` con `.env.test` para validar flujos administrativos sin desplegar popups de Microsoft Entra ID.
+
+### Comandos de Ejecución de Tests:
+
+```bash
+# Ejecutar todas las pruebas E2E en consola (modo headless)
+npm --prefix client run test:e2e
+
+# Ejecutar pruebas interactivas con interfaz gráfica de Playwright (UI Mode)
+npm --prefix client run test:e2e:ui
+```
+
+### Casos de Uso Cubiertos por la Suite Automatizada:
+1. **Dashboard & KPIs:** Carga de métricas, contadores por estado, renderizado de reclamos recientes con badges (incluyendo `FSR`) y navegación al modal de detalle.
+2. **Listado General & Filtros:** Búsqueda reactiva por texto libre, filtrado por Estado Administración y por Estado Consumidor.
+3. **Gestión de Expediente (Modal 4 Cards):**
+   - Requerimiento estricto de supervisor antes de aprobar (`btnAprobar` bloqueado y advertencia visible).
+   - Asignación de supervisor y habilitación inmediata de aprobación.
+   - Aprobación del reclamo con confirmación y sincronización de cards.
+   - Reenvío interactivo de expedientes a Calidad & Inocuidad y al Supervisor.
+4. **Portal Público de Imposibilidad (`/imposibilidad`):** Validación de token criptográfico HMAC, selección obligatoria de motivo e informe de imposibilidad de entrega.
+
+---
+
 ## 📄 Licencia y Confidencialidad
 Propiedad exclusiva de **Don Yeyo S.A.** Prohibida su reproducción, divulgación o distribución sin autorización previa.
+

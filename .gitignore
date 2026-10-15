@@ -8,6 +8,8 @@ dist/
 dist-ssr/
 build/
 coverage/
+client/test-results/
+client/playwright-report/
 
 # Environment and sensitive keys
 .env

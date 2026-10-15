@@ -27,7 +27,7 @@ export const ReclamosList = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 15;
 
-    // Sincronizar filtro desde query params (ej: Drawer: ?filtro=admin_pendiente)
+    // Sincronizar filtro e ID desde query params (ej: Drawer: ?filtro=admin_pendiente, Dashboard: ?id=REC-001)
     useEffect(() => {
         const filtro = searchParams.get('filtro');
         if (filtro === 'admin_pendiente') {
@@ -37,7 +37,15 @@ export const ReclamosList = () => {
         } else if (filtro === 'inocuidad_pendiente') {
             setFilterInocuidad('Pendiente');
         }
-    }, [searchParams]);
+
+        const idParam = searchParams.get('id');
+        if (idParam && reclamos.length > 0) {
+            const found = reclamos.find(r => String(r.id) === String(idParam) || String(r.nro_reclamo) === String(idParam));
+            if (found) {
+                setSelectedReclamo(found);
+            }
+        }
+    }, [searchParams, reclamos]);
 
     const fetchReclamos = async () => {
         setLoading(true);
