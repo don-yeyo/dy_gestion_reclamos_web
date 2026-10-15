@@ -235,6 +235,25 @@ body {
   border: 1px solid var(--border);
 }
 
+.badge-finalizado {
+  background-color: rgba(99, 102, 241, 0.15);
+  color: #6366f1;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+}
+
+[data-theme="dark"] .badge-finalizado,
+.dark-theme .badge-finalizado {
+  background-color: rgba(129, 140, 248, 0.2);
+  color: #a5b4fc;
+  border-color: rgba(129, 140, 248, 0.4);
+}
+
+.badge-fsr {
+  background-color: var(--surface-subtle);
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+}
+
 /* Header & Navbar */
 .app-header {
   position: sticky;

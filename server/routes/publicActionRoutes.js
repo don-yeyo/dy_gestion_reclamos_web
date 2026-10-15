@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const googleSheetsService = require('../services/googleSheetsService');
+const reclamosDatabaseService = require('../services/reclamosDatabaseService');
 const emailWorkflowService = require('../services/emailWorkflowService');
 const supervisorLookupService = require('../services/supervisorLookupService');
 
@@ -485,6 +486,9 @@ router.get('/supervisor-quick', async (req, res) => {
             motivo: 'Supervisor confirmó resolución/entrega de producto desde email'
         });
 
+        // Evaluar cierre automatico del reclamo si se cumplieron todas las condiciones
+        reclamosDatabaseService.checkAndFinalizeAdminState(payload.claimId).catch(console.error);
+
         res.send(`
             <!DOCTYPE html>
             <html lang="es">
@@ -551,6 +555,9 @@ router.post('/supervisor-imposibilidad', async (req, res) => {
             console.error('Error enviando alerta a administradores:', err.message);
         });
 
+        // Evaluar cierre automatico del reclamo si se cumplieron todas las condiciones
+        reclamosDatabaseService.checkAndFinalizeAdminState(payload.claimId).catch(console.error);
+
         res.json({
             success: true,
             message: 'Motivo de imposibilidad registrado y notificado a la administración.'
@@ -602,6 +609,9 @@ router.get('/consumidor-response', async (req, res) => {
                 console.error('Error notificando respuesta a admins:', err.message);
             });
         }
+
+        // Evaluar cierre automatico del reclamo si se cumplieron todas las condiciones
+        reclamosDatabaseService.checkAndFinalizeAdminState(payload.claimId).catch(console.error);
 
         res.send(`
             <!DOCTYPE html>

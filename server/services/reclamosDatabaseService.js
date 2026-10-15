@@ -577,6 +577,58 @@ class ReclamosDatabaseService {
         );
         return rows[0] ? rows[0].count : 0;
     }
+
+    /**
+     * Verifica si se cumplen las condiciones para pasar automáticamente estado_admin a "Finalizado":
+     * 1. Reclamo aprobado previamente por admin (no 'Pendiente', no 'Desaprobado', no 'Finalizado').
+     * 2. Inocuidad: cambió su estado de 'Pendiente' a otro de sus estados.
+     * 3. Supervisor: cambió su estado a 'Resuelto' o 'Imposibilidad'.
+     * 4. Consumidor: cambió su estado a uno distinto de 'Pendiente', 'En curso' y 'Sin acciones'.
+     */
+    async checkAndFinalizeAdminState(claimId) {
+        try {
+            const idStr = String(claimId);
+            const claim = await this.getReclamoById(idStr);
+            if (!claim) return false;
+
+            const adminState = (claim.estado_admin || '').trim();
+            // Debe haber sido aprobado (no en recepción 'Pendiente', ni 'Desaprobado', ni ya 'Finalizado')
+            if (adminState === 'Pendiente' || adminState === 'Desaprobado' || adminState === 'Finalizado') {
+                return false;
+            }
+
+            const inocuidad = (claim.estado_inocuidad || '').trim().toLowerCase();
+            const supervisor = (claim.estado_supervisor || '').trim().toLowerCase();
+            const consumidor = (claim.estado_consumidor || '').trim().toLowerCase();
+
+            // 1. Inocuidad cambió estado pendiente a otro de sus estados
+            const inocuidadOk = inocuidad !== '' && inocuidad !== 'pendiente';
+
+            // 2. Supervisor cambió su estado a resuelto o imposibilidad
+            const supervisorOk = supervisor === 'resuelto' || supervisor === 'imposibilidad';
+
+            // 3. Consumidor cambió su estado a uno distinto de "pendiente", "en curso" y "sin acciones"
+            const consumidorOk = consumidor !== '' &&
+                consumidor !== 'pendiente' &&
+                consumidor !== 'en curso' &&
+                consumidor !== 'sin acciones';
+
+            if (inocuidadOk && supervisorOk && consumidorOk) {
+                console.log(`[AUTO-FINALIZADO] Reclamo #${idStr} cumple las 3 condiciones de cierre. Asumiendo estado_admin como "Finalizado"...`);
+                const googleSheetsService = require('./googleSheetsService');
+                await googleSheetsService.updateReclamo(idStr, { 'AO': 'Finalizado' }, {
+                    actor: 'sistema_auto',
+                    motivo: 'Cierre automático: Inocuidad dictaminó, Supervisor finalizó gestión y Consumidor registró respuesta/cierre.'
+                });
+                return true;
+            }
+            return false;
+        } catch (err) {
+            console.error(`[AUTO-FINALIZADO ERROR] Error en checkAndFinalizeAdminState para #${claimId}:`, err.message);
+            return false;
+        }
+    }
 }
 
 module.exports = new ReclamosDatabaseService();
+

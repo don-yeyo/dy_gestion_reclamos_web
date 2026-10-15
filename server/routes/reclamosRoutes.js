@@ -206,6 +206,9 @@ router.patch('/:id/estado-inocuidad', requireRole(['admin', 'inocuidad', 'sysadm
             });
         }
 
+        // Evaluar transicion automatica a Finalizado
+        await reclamosDatabaseService.checkAndFinalizeAdminState(claimId);
+
         res.json({ success: true, message: `Estado de inocuidad actualizado a "${estado}".` });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
@@ -271,6 +274,10 @@ router.patch('/:id/estado-supervisor', requireRole(['admin', 'sysadmin']), async
         }
 
         await googleSheetsService.updateReclamo(claimId, updates);
+
+        // Evaluar transicion automatica a Finalizado
+        await reclamosDatabaseService.checkAndFinalizeAdminState(claimId);
+
         res.json({ success: true, message: `Estado del supervisor actualizado a "${estado}".` });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
@@ -291,6 +298,10 @@ router.patch('/:id/estado-consumidor', requireRole(['admin', 'sysadmin']), async
 
     try {
         await googleSheetsService.updateReclamo(claimId, { 'AS': estado });
+
+        // Evaluar transicion automatica a Finalizado
+        await reclamosDatabaseService.checkAndFinalizeAdminState(claimId);
+
         res.json({ success: true, message: `Estado del consumidor actualizado a "${estado}".` });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });

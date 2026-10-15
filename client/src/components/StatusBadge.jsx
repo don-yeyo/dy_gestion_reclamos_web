@@ -4,10 +4,15 @@ export const StatusBadge = ({ status, type = 'default' }) => {
     if (!status) return null;
 
     const normalized = String(status).trim().toLowerCase();
-    let badgeClass = 'badge-sin-acciones';
+    let tooltipText = undefined;
 
     if (normalized.includes('pendiente')) {
         badgeClass = 'badge-pendiente';
+    } else if (normalized.includes('finalizado') || normalized === 'fsr') {
+        badgeClass = normalized === 'fsr' || normalized.includes('sin respuesta') ? 'badge-fsr' : 'badge-finalizado';
+        if (normalized === 'fsr' || normalized.includes('sin respuesta')) {
+            tooltipText = 'Finalizado Sin Respuesta: El consumidor no respondió a las solicitudes de seguimiento tras el plazo estipulado';
+        }
     } else if (normalized.includes('en curso')) {
         badgeClass = 'badge-en-curso';
     } else if (normalized.includes('aprobado') || normalized.includes('resuelto') || normalized.includes('conforme')) {
@@ -19,7 +24,11 @@ export const StatusBadge = ({ status, type = 'default' }) => {
     }
 
     return (
-        <span className={`badge ${badgeClass}`} style={{ fontSize: '0.6rem', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+        <span
+            className={`badge ${badgeClass}`}
+            title={tooltipText}
+            style={{ fontSize: '0.6rem', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 3 }}
+        >
             <span style={{ fontSize: '0.55rem', lineHeight: 1 }}>●</span>
             <span style={{ whiteSpace: 'nowrap' }}>{status}</span>
         </span>

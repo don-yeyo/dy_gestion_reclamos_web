@@ -72,6 +72,7 @@ export const ReclamosList = () => {
             pendientesAdmin: reclamos.filter(r => (r.estado_admin || 'Pendiente') === 'Pendiente').length,
             enCurso: reclamos.filter(r => (r.estado_admin || '').toLowerCase() === 'en curso').length,
             aprobados: reclamos.filter(r => (r.estado_admin || '').toLowerCase() === 'aprobado').length,
+            finalizados: reclamos.filter(r => (r.estado_admin || '').toLowerCase() === 'finalizado').length,
             imposibilidad: reclamos.filter(r => (r.estado_supervisor || '').toLowerCase() === 'imposibilidad').length,
         };
     }, [reclamos]);
@@ -107,6 +108,7 @@ export const ReclamosList = () => {
                 if (filterAdmin === 'Pendiente' && estado !== 'pendiente') return false;
                 if (filterAdmin === 'En curso' && estado !== 'en curso') return false;
                 if (filterAdmin === 'Aprobado' && estado !== 'aprobado') return false;
+                if (filterAdmin === 'Finalizado' && estado !== 'finalizado') return false;
                 if (filterAdmin === 'Desaprobado' && estado !== 'desaprobado') return false;
             }
 
@@ -295,6 +297,7 @@ export const ReclamosList = () => {
                             <option value="Pendiente">Pendiente ({summary.pendientesAdmin})</option>
                             <option value="En curso">En curso ({summary.enCurso})</option>
                             <option value="Aprobado">Aprobado ({summary.aprobados})</option>
+                            <option value="Finalizado">Finalizado ({summary.finalizados})</option>
                             <option value="Desaprobado">Desaprobado</option>
                         </select>
                     </div>

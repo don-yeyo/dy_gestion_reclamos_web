@@ -420,7 +420,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
 
                             {activeClaim.fecha_estado_admin && (
                                 <div style={{ fontSize: '0.71rem', color: 'var(--text-muted)' }}>
-                                    {isEnRecepcion ? 'Cargado: ' : (isDesaprobado ? 'Desaprobado: ' : 'Aprobado: ')}
+                                    {isEnRecepcion ? 'Cargado: ' : (isDesaprobado ? 'Desaprobado: ' : (activeClaim.estado_admin === 'Finalizado' ? 'Finalizado: ' : 'Aprobado: '))}
                                     {formatFechaHoraSutil(activeClaim.fecha_estado_admin)}
                                 </div>
                             )}
@@ -443,6 +443,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                             <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
                                 {isDesaprobado && 'Reclamo desaprobado y cerrado.'}
                                 {isEnCurso && 'Reclamo aprobado y derivado a los sectores correspondientes.'}
+                                {activeClaim.estado_admin === 'Finalizado' && 'Reclamo completado y cerrado exitosamente en todos sus circuitos.'}
                             </div>
 
                             {/* Botones de acción en recepción: Desaprobar primero, Aprobar por debajo */}
