@@ -5,6 +5,7 @@ export const StatusBadge = ({ status, type = 'default' }) => {
 
     const normalized = String(status).trim().toLowerCase();
     let tooltipText = undefined;
+    let badgeClass = 'badge-sin-acciones';
 
     if (normalized.includes('pendiente')) {
         badgeClass = 'badge-pendiente';
