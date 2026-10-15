@@ -128,6 +128,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
     const isEnRecepcion = !activeClaim.estado_admin || activeClaim.estado_admin === 'Pendiente';
     const isEnCurso = activeClaim.estado_admin === 'En curso' || activeClaim.estado_admin === 'Aprobado';
     const isDesaprobado = activeClaim.estado_admin === 'Desaprobado';
+    const isReclamoAprobado = isEnCurso || activeClaim.estado_admin === 'Finalizado';
 
     const handleAprobarReclamo = () => {
         if (!hasSupervisor) {
@@ -241,6 +242,56 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                     if (onRefresh) onRefresh();
                 } catch (e) {
                     setActionMsg({ type: 'error', text: 'Error al reiniciar flujo: ' + (e.response?.data?.error || e.message) });
+                } finally {
+                    setUpdating(false);
+                }
+            }
+        });
+    };
+
+    const handleReenviarInocuidad = () => {
+        showConfirmModal({
+            title: `Reenviar a Calidad & Inocuidad`,
+            message: `¿Reenviar el expediente técnico del reclamo #${activeClaim.id} al departamento de Calidad & Inocuidad por correo electrónico?\n\nSe despachará la información técnica completa del producto, lote, defectos y enlaces a evidencias.`,
+            variant: 'primary',
+            confirmText: 'Reenviar Correo',
+            onConfirm: async () => {
+                setLoadingTitle('Reenviando a Inocuidad...');
+                setLoadingMessage('Despachando expediente completo a Calidad & Inocuidad...');
+                setUpdating(true);
+                setActionMsg(null);
+                try {
+                    const res = await reclamosApi.reenviarEmailInocuidad(activeClaim.id);
+                    setActionMsg({ type: 'success', text: res.data?.message || 'Expediente reenviado a Calidad & Inocuidad con éxito.' });
+                } catch (e) {
+                    setActionMsg({ type: 'error', text: 'Error al reenviar correo: ' + (e.response?.data?.error || e.message) });
+                } finally {
+                    setUpdating(false);
+                }
+            }
+        });
+    };
+
+    const handleReenviarSupervisor = () => {
+        if (!hasSupervisor) {
+            showAlertModal('Supervisor Requerido', 'El reclamo no tiene un supervisor comercial asignado.', 'warning');
+            return;
+        }
+        showConfirmModal({
+            title: `Reenviar al Supervisor`,
+            message: `¿Reenviar las instrucciones de compensación al supervisor comercial ${activeClaim.supervisor} (${activeClaim.supervisor_email || 'sin email'})?\n\nSe incluirá el domicilio, productos a entregar y enlaces para reportar la gestión.`,
+            variant: 'primary',
+            confirmText: 'Reenviar Correo',
+            onConfirm: async () => {
+                setLoadingTitle('Reenviando al Supervisor...');
+                setLoadingMessage(`Despachando correo con instrucciones de compensación a ${activeClaim.supervisor}...`);
+                setUpdating(true);
+                setActionMsg(null);
+                try {
+                    const res = await reclamosApi.reenviarEmailSupervisor(activeClaim.id);
+                    setActionMsg({ type: 'success', text: res.data?.message || `Instrucciones reenviadas con éxito al supervisor ${activeClaim.supervisor}.` });
+                } catch (e) {
+                    setActionMsg({ type: 'error', text: 'Error al reenviar correo: ' + (e.response?.data?.error || e.message) });
                 } finally {
                     setUpdating(false);
                 }
@@ -435,7 +486,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                         </div>
 
                         {/* RAMA 2: CONTROL DE CALIDAD E INOCUIDAD */}
-                        <div className={`wf-branch-card ${isEnCurso && activeClaim.estado_inocuidad === 'Pendiente' ? 'active' : ''}`}>
+                        <div className={`wf-branch-card ${isEnCurso && activeClaim.estado_inocuidad === 'Pendiente' ? 'active' : ''} ${isReclamoAprobado ? 'wf-has-resend' : ''}`}>
                             <div className="wf-branch-title">
                                 <ShieldAlert size={14} style={{ color: '#8b5cf6' }} />
                                 <span>2. Calidad & Inocuidad</span>
@@ -465,10 +516,24 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                     'Calidad & Inocuidad informó observaciones o imposibilidad de verificación.'
                                 )}
                             </div>
+
+                            {/* Botón sutil en la esquina inferior derecha para reenviar email a Inocuidad */}
+                            {isReclamoAprobado && (
+                                <button
+                                    type="button"
+                                    className="wf-card-resend-btn"
+                                    onClick={handleReenviarInocuidad}
+                                    disabled={updating}
+                                    title="Reenviar expediente completo por correo a Calidad & Inocuidad"
+                                >
+                                    <Mail size={12} />
+                                    <span>Reenviar</span>
+                                </button>
+                            )}
                         </div>
 
                         {/* RAMA 3: ACCIÓN DE COMPENSACIÓN (SUPERVISOR) */}
-                        <div className={`wf-branch-card ${isEnCurso && activeClaim.estado_supervisor === 'Pendiente' ? 'active' : ''}`}>
+                        <div className={`wf-branch-card ${isEnCurso && activeClaim.estado_supervisor === 'Pendiente' ? 'active' : ''} ${isReclamoAprobado ? 'wf-has-resend' : ''}`}>
                             <div className="wf-branch-title">
                                 <Gift size={14} style={{ color: 'var(--primary)' }} />
                                 <span>3. Acción de Compensación</span>
@@ -506,7 +571,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                     >
                                         <option value="">Seleccionar supervisor...</option>
                                         {SUPERVISORES_LISTA.map(s => (
-                                            <option key={s.nombre} value={s.nombre}>{s.nombre}</option>
+                                             <option key={s.nombre} value={s.nombre}>{s.nombre}</option>
                                         ))}
                                     </select>
                                     <button
@@ -548,6 +613,20 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                     <CheckCircle2 size={14} />
                                     <span>Reposición Entregada</span>
                                 </div>
+                            )}
+
+                            {/* Botón sutil en la esquina inferior derecha para reenviar email al Supervisor */}
+                            {isReclamoAprobado && (
+                                <button
+                                    type="button"
+                                    className="wf-card-resend-btn"
+                                    onClick={handleReenviarSupervisor}
+                                    disabled={updating || !hasSupervisor}
+                                    title={!hasSupervisor ? 'Sin supervisor asignado' : `Reenviar correo de instrucciones a ${activeClaim.supervisor}`}
+                                >
+                                    <Mail size={12} />
+                                    <span>Reenviar</span>
+                                </button>
                             )}
                         </div>
 

@@ -297,4 +297,83 @@ router.patch('/:id/estado-consumidor', requireRole(['admin', 'sysadmin']), async
     }
 });
 
+/**
+ * POST /api/reclamos/:id/reenviar-inocuidad
+ * Permite a los administradores reenviar manualmente el expediente técnico por email a Calidad & Inocuidad
+ */
+router.post('/:id/reenviar-inocuidad', requireRole(['admin', 'sysadmin']), async (req, res) => {
+    const claimId = req.params.id;
+
+    try {
+        const claim = await googleSheetsService.getReclamoById(claimId);
+        if (!claim) {
+            return res.status(404).json({ success: false, error: 'Reclamo no encontrado.' });
+        }
+
+        await emailWorkflowService.sendInocuidadActionEmail(claim);
+
+        await reclamosDatabaseService.logAudit({
+            reclamo_id: claimId,
+            actor: req.user ? req.user.role : 'admin',
+            actor_email: req.user ? req.user.email : null,
+            campo_modificado: 'email_inocuidad',
+            valor_anterior: '',
+            valor_nuevo: 'reenviado',
+            motivo: 'Reenvío manual de expediente a Calidad & Inocuidad'
+        });
+
+        res.json({
+            success: true,
+            message: 'Expediente reenviado a Calidad & Inocuidad con éxito.'
+        });
+    } catch (err) {
+        console.error(`Error reenviando email a inocuidad para #${claimId}:`, err);
+        res.status(500).json({ success: false, error: 'Error al reenviar email a inocuidad: ' + err.message });
+    }
+});
+
+/**
+ * POST /api/reclamos/:id/reenviar-supervisor
+ * Permite a los administradores reenviar manualmente las instrucciones de compensación por email al supervisor comercial
+ */
+router.post('/:id/reenviar-supervisor', requireRole(['admin', 'sysadmin']), async (req, res) => {
+    const claimId = req.params.id;
+
+    try {
+        const claim = await googleSheetsService.getReclamoById(claimId);
+        if (!claim) {
+            return res.status(404).json({ success: false, error: 'Reclamo no encontrado.' });
+        }
+
+        const rawSup = (claim.supervisor || '').trim().toLowerCase();
+        if (!rawSup || rawSup === 'sin asignar' || rawSup === 'no asignado' || !claim.supervisor_email) {
+            return res.status(400).json({
+                success: false,
+                error: 'El reclamo no tiene un supervisor o email de supervisor asignado.'
+            });
+        }
+
+        await emailWorkflowService.sendSupervisorActionEmail(claim);
+
+        await reclamosDatabaseService.logAudit({
+            reclamo_id: claimId,
+            actor: req.user ? req.user.role : 'admin',
+            actor_email: req.user ? req.user.email : null,
+            campo_modificado: 'email_supervisor',
+            valor_anterior: '',
+            valor_nuevo: 'reenviado',
+            motivo: `Reenvío manual de instrucciones a supervisor comercial (${claim.supervisor})`
+        });
+
+        res.json({
+            success: true,
+            message: `Instrucciones reenviadas con éxito al supervisor ${claim.supervisor}.`
+        });
+    } catch (err) {
+        console.error(`Error reenviando email al supervisor para #${claimId}:`, err);
+        res.status(500).json({ success: false, error: 'Error al reenviar email al supervisor: ' + err.message });
+    }
+});
+
 module.exports = router;
+

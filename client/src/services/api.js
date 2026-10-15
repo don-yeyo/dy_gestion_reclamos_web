@@ -46,7 +46,11 @@ export const reclamosApi = {
     updateEstadoSupervisor: (id, estado, motivo_imposibilidad = '') =>
         api.patch(`/reclamos/${id}/estado-supervisor`, { estado, motivo_imposibilidad }),
     updateEstadoConsumidor: (id, estado) =>
-        api.patch(`/reclamos/${id}/estado-consumidor`, { estado })
+        api.patch(`/reclamos/${id}/estado-consumidor`, { estado }),
+    reenviarEmailInocuidad: (id) =>
+        api.post(`/reclamos/${id}/reenviar-inocuidad`),
+    reenviarEmailSupervisor: (id) =>
+        api.post(`/reclamos/${id}/reenviar-supervisor`)
 };
 
 export const publicApi = {
