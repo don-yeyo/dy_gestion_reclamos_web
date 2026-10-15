@@ -638,6 +638,34 @@ class ReclamosDatabaseService {
             console.error(`[AUTO-FINALIZADO ERROR] Error en checkAndFinalizeAdminState para #${claimId}:`, err.message);
             return false;
         }
+    /**
+     * Actualiza el producto_cortesia de los items en MySQL
+     * @param {string|number} reclamoId ID del reclamo
+     * @param {Array} items Lista de items con producto_cortesia
+     */
+    async updateItemsProductoCortesia(reclamoId, items) {
+        const idStr = String(reclamoId);
+        if (!Array.isArray(items) || items.length === 0) return;
+
+        for (const it of items) {
+            const cortesia = it.producto_cortesia || '';
+            if (it.rowNumber) {
+                await pool.execute(
+                    'UPDATE reclamo_items SET producto_cortesia = ? WHERE reclamo_id = ? AND item_row_number = ?',
+                    [cortesia, idStr, it.rowNumber]
+                );
+            } else if (it.id) {
+                await pool.execute(
+                    'UPDATE reclamo_items SET producto_cortesia = ? WHERE id = ?',
+                    [cortesia, it.id]
+                );
+            } else {
+                await pool.execute(
+                    'UPDATE reclamo_items SET producto_cortesia = ? WHERE reclamo_id = ?',
+                    [cortesia, idStr]
+                );
+            }
+        }
     }
 }
 

@@ -192,7 +192,33 @@ Este documento establece la especificación formal de casos de uso funcionales p
 
 ---
 
-## 8. Matriz de Cobertura E2E con Playwright
+## 8. Reglas de Compensación & Cortesía (Fórmula Google Sheet)
+
+### CU-13: Cálculo y Configuración Dinámica de Producto de Cortesía
+- **Actor:** Administrador / Sistema Automatizado.
+- **Precondiciones:**
+  - Fórmula original de Google Sheets: `=+SI(P3361="";"";SI(SI.ERROR(BUSCARV(P3361;'Reclamos 2023'!$AJ$15:$AJ$19;1;0);'Reclamos 2023'!$AG$19)=P3361;'Reclamos 2023'!$AG$18;'Reclamos 2023'!$AG$19))`
+- **Flujo:**
+  1. El Administrador puede abrir el modal **"Reglas de Cortesía"** desde el menú lateral (Drawer -> Configuración).
+  2. Puede visualizar la explicación matemática de la fórmula y ajustar:
+     - Compensación Estándar (`$AG$18` - defecto leve/catalogado).
+     - Compensación Especial / Crítica (`$AG$19` - defecto grave/no listado).
+     - Lista de Defectos Estándar (`$AJ$15:$AJ$19`).
+  3. Puede utilizar el **Simulador en Vivo** para tipear cualquier defecto y verificar qué cortesía arrojaría.
+  4. Al hacer clic en **"Guardar Cambios"**, la regla se persiste en la base de datos MySQL (`config_sistema.clave = 'regla_producto_cortesia'`).
+  5. Al **Aprobar el reclamo** (desde el modal de detalle o mediante el enlace rápido de aprobación por email):
+     - El backend evalúa cada ítem del reclamo contra la regla activa.
+     - Actualiza la celda **"Producto cortesía"** en la **columna S** de Google Sheets.
+     - Persiste el valor en la tabla MySQL `reclamo_items.producto_cortesia`.
+     - Inserta una tarjeta destacada con el **Producto de Cortesía** asignado en el email de acción enviado al supervisor comercial.
+- **Criterio de Aceptación:**
+  - Si el reclamo tiene un defecto en la lista estándar, asigna la compensación estándar.
+  - Si el reclamo tiene un defecto grave (ej: cuerpo extraño) o no catalogado, asigna la compensación especial.
+  - La columna S en Google Sheets, la DB y el email al supervisor quedan perfectamente sincronizados con el mismo valor.
+
+---
+
+## 9. Matriz de Cobertura E2E con Playwright
 
 | ID Test E2E | Escenario Automatizado | Archivo de Prueba |
 | :--- | :--- | :--- |
@@ -201,3 +227,4 @@ Este documento establece la especificación formal de casos de uso funcionales p
 | `TC-E2E-03` | Modal de detalle: visualización de 4 cards y bloqueo de aprobación sin supervisor | `client/e2e/claim-detail-modal.spec.js` |
 | `TC-E2E-04` | Acceso a Portal Público de Imposibilidad con token y envío de motivo | `client/e2e/imposibilidad-public.spec.js` |
 | `TC-E2E-05` | Feedback visual: Spinners y bloqueo durante operaciones asíncronas | `client/e2e/async-loading.spec.js` |
+| `TC-E2E-06` | Apertura de modal de Reglas de Cortesía desde Drawer, verificación de fórmula y simulador interactivo | `client/e2e/reglas-cortesia.spec.js` |

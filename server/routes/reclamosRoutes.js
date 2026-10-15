@@ -152,8 +152,14 @@ router.patch('/:id/estado-admin', requireRole(['admin', 'sysadmin']), async (req
 
         await googleSheetsService.updateReclamo(claimId, updates, auditInfo);
 
-        // Si fue aprobado / puesto en curso, disparar email a Supervisor y a Calidad/Inocuidad
+        // Si fue aprobado / puesto en curso, calcular y aplicar cortesía, luego disparar emails
         if (estado === 'En curso' || estado === 'Aprobado') {
+            try {
+                await googleSheetsService.aplicarProductoCortesia(claimId);
+            } catch (errCortesia) {
+                console.error(`[CORTESIA] Error aplicando producto cortesía al reclamo #${claimId}:`, errCortesia.message);
+            }
+
             const updatedClaim = await googleSheetsService.getReclamoById(claimId);
             
             // 1. Email al Supervisor con instrucciones de compensación

@@ -5,11 +5,13 @@ import { Drawer } from './Drawer';
 import { useAuth } from '../config/AuthContext';
 import LoginScreen from './LoginScreen';
 import { CoberturaSupervisoresModal } from './CoberturaSupervisoresModal';
+import { ReglasCortesiaModal } from './ReglasCortesiaModal';
 
 export const Layout = () => {
     const { isAuthenticated, loading } = useAuth();
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [isCoberturaOpen, setIsCoberturaOpen] = useState(false);
+    const [isReglasCortesiaOpen, setIsReglasCortesiaOpen] = useState(false);
     const [darkMode, setDarkMode] = useState(() => {
         return localStorage.getItem('dy_theme') === 'dark';
     });
@@ -57,6 +59,7 @@ export const Layout = () => {
                 isOpen={isDrawerOpen}
                 onClose={closeDrawer}
                 onOpenCobertura={() => setIsCoberturaOpen(true)}
+                onOpenReglasCortesia={() => setIsReglasCortesiaOpen(true)}
             />
             <main className="main-content">
                 <Outlet />
@@ -64,6 +67,10 @@ export const Layout = () => {
             <CoberturaSupervisoresModal
                 isOpen={isCoberturaOpen}
                 onClose={() => setIsCoberturaOpen(false)}
+            />
+            <ReglasCortesiaModal
+                isOpen={isReglasCortesiaOpen}
+                onClose={() => setIsReglasCortesiaOpen(false)}
             />
         </div>
     );

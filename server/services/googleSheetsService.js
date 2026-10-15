@@ -376,6 +376,63 @@ class GoogleSheetsService {
 
         return true;
     }
+
+    /**
+     * Calcula y actualiza el Producto Cortesía (columna S en Sheets y reclamo_items en DB)
+     * al aprobar el reclamo según la severidad del defecto
+     * @param {string|number} claimId ID del reclamo
+     */
+    async aplicarProductoCortesia(claimId) {
+        const claim = await this.getReclamoById(claimId);
+        if (!claim || !claim.items || claim.items.length === 0) return [];
+
+        const cortesiaService = require('./cortesiaService');
+        const cortesiaConfig = await cortesiaService.getConfig();
+        const itemsActualizados = [];
+        const dataUpdates = [];
+
+        for (let idx = 0; idx < claim.items.length; idx++) {
+            const item = claim.items[idx];
+            const cortesiaCalculada = await cortesiaService.calcularProductoCortesia(item.defecto, cortesiaConfig);
+            item.producto_cortesia = cortesiaCalculada;
+            itemsActualizados.push(item);
+
+            const rowNum = item.rowNumber || (claim.rowNumbers && claim.rowNumbers[idx]) || (claim.rowNumbers && claim.rowNumbers[0]);
+            if (rowNum) {
+                dataUpdates.push({
+                    range: `${this.tabName}!S${rowNum}`,
+                    values: [[cortesiaCalculada]]
+                });
+            }
+        }
+
+        // 1. Actualizar celda(s) de la columna S en Google Sheets
+        await this.ensureAuth();
+        if (this.hasCredentials && this.spreadsheetId && dataUpdates.length > 0) {
+            try {
+                await this.sheets.spreadsheets.values.batchUpdate({
+                    spreadsheetId: this.spreadsheetId,
+                    requestBody: {
+                        valueInputOption: 'USER_ENTERED',
+                        data: dataUpdates
+                    }
+                });
+                console.log(`[CORTESIA] Columna S actualizada en Google Sheets para #${claimId}:`, itemsActualizados.map(i => i.producto_cortesia).join(', '));
+            } catch (sheetErr) {
+                console.error(`[CORTESIA SHEETS ERROR] Error al actualizar columna S para #${claimId}:`, sheetErr.message);
+            }
+        }
+
+        // 2. Persistir en MySQL en la tabla reclamo_items
+        try {
+            await reclamosDatabaseService.updateItemsProductoCortesia(claimId, itemsActualizados);
+            console.log(`[CORTESIA] reclamo_items actualizados en MySQL para Reclamo #${claimId}.`);
+        } catch (dbErr) {
+            console.error(`[CORTESIA DB ERROR] Error al actualizar reclamo_items en MySQL para #${claimId}:`, dbErr.message);
+        }
+
+        return itemsActualizados;
+    }
 }
 
 module.exports = new GoogleSheetsService();

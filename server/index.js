@@ -10,6 +10,7 @@ const reclamosRoutes = require('./routes/reclamosRoutes');
 const publicActionRoutes = require('./routes/publicActionRoutes');
 const cronRoutes = require('./routes/cronRoutes');
 const supervisoresRoutes = require('./routes/supervisoresRoutes');
+const cortesiaRoutes = require('./routes/cortesiaRoutes');
 const { initDatabase, pool } = require('./config/database');
 
 const app = express();
@@ -59,6 +60,7 @@ app.use('/api/reclamos', reclamosRoutes);
 app.use('/api/public/actions', publicActionRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/supervisores', supervisoresRoutes);
+app.use('/api/cortesia', cortesiaRoutes);
 
 // Health check
 app.get('/api/health', async (req, res) => {

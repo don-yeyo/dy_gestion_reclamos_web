@@ -266,6 +266,29 @@ npm --prefix client run test:e2e:ui
    - Aprobación del reclamo con confirmación y sincronización de cards.
    - Reenvío interactivo de expedientes a Calidad & Inocuidad y al Supervisor.
 4. **Portal Público de Imposibilidad (`/imposibilidad`):** Validación de token criptográfico HMAC, selección obligatoria de motivo e informe de imposibilidad de entrega.
+5. **Reglas de Compensación & Cortesía:** Apertura del modal interactivo desde el Drawer, visualización matemática de la fórmula de Google Sheets, gestión de defectos estándar/especiales y simulador en tiempo real.
+
+---
+
+## 🎁 Reglas de Compensación y Producto de Cortesía
+
+El sistema reproduce y supera la lógica de la fórmula original de Google Sheets:
+```excel
+=+SI(P3361="";"";SI(SI.ERROR(BUSCARV(P3361;'Reclamos 2023'!$AJ$15:$AJ$19;1;0);'Reclamos 2023'!$AG$19)=P3361;'Reclamos 2023'!$AG$18;'Reclamos 2023'!$AG$19))
+```
+
+### Funcionamiento:
+1. **Interpretación:**
+   - **Columna P:** Defecto reportado en el reclamo.
+   - **Rango `$AJ$15:$AJ$19`:** Lista de defectos estándar catalogados (*Defectos del producto, Vida util, Menor cantidad de unidades, Defecto en el envase*).
+   - **Celda `$AG$18`:** Compensación Estándar (`1 reemplazo + 1 de kg`).
+   - **Celda `$AG$19`:** Compensación Especial / Crítica (`1 reemplazo + 2 productos a elección + 2 de kg.`).
+2. **Edición Dinámica por el Administrador:**
+   - Accesible desde el menú lateral (`Drawer` → `Configuración` → `Reglas de Cortesía`).
+   - Permite modificar los textos de compensación, agregar o quitar defectos estándar mediante tags/chips interactivos y simular cualquier defecto en tiempo real.
+   - Persistido de forma centralizada en la base de datos MySQL (`config_sistema.clave = 'regla_producto_cortesia'`).
+3. **Automatización al Aprobar:**
+   - Al aprobar un reclamo (vía panel web o enlace seguro de un solo clic), el sistema calcula el producto de cortesía para cada ítem, actualiza la **Columna S** en Google Sheets, actualiza la tabla `reclamo_items` en MySQL y resalta la compensación a entregar en el correo enviado al supervisor comercial.
 
 ---
 

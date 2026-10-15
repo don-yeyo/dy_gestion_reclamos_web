@@ -207,6 +207,13 @@ router.get('/admin-quick', async (req, res) => {
                 motivo: 'Aprobación rápida desde email'
             });
 
+            // Calcular y persistir producto de cortesía en Sheets y DB
+            try {
+                await googleSheetsService.aplicarProductoCortesia(payload.claimId);
+            } catch (errCortesia) {
+                console.error(`[CORTESIA] Error aplicando producto cortesía al reclamo #${payload.claimId}:`, errCortesia.message);
+            }
+
             // Disparar email al supervisor y a Calidad/Inocuidad
             const updatedClaim = await googleSheetsService.getReclamoById(payload.claimId);
             emailWorkflowService.sendSupervisorActionEmail(updatedClaim).catch(err => {

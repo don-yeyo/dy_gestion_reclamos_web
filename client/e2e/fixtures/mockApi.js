@@ -184,4 +184,60 @@ export async function setupMockApi(page, customReclamos = null) {
             })
         });
     });
+
+    // Mock Reglas de Cortesía
+    let mockCortesiaConfig = {
+        cortesia_estandar: '1 reemplazo + 1 de kg',
+        cortesia_especial: '1 reemplazo + 2 productos a elección + 2 de kg.',
+        defectos_estandar: [
+            'Defectos del producto',
+            'Vida util',
+            'Menor cantidad de unidades',
+            'Defecto en el envase'
+        ],
+        sensible_mayusculas: false
+    };
+
+    await page.route('**/api/cortesia/config', async route => {
+        if (route.request().method() === 'GET') {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    success: true,
+                    data: mockCortesiaConfig
+                })
+            });
+        } else if (route.request().method() === 'PUT') {
+            const body = route.request().postDataJSON();
+            mockCortesiaConfig = { ...mockCortesiaConfig, ...body };
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    success: true,
+                    message: 'Configuración de producto cortesía actualizada correctamente.',
+                    data: mockCortesiaConfig
+                })
+            });
+        } else {
+            await route.continue();
+        }
+    });
+
+    await page.route('**/api/cortesia/simular', async route => {
+        const body = route.request().postDataJSON();
+        const defecto = (body?.defecto || '').trim().toLowerCase();
+        const match = mockCortesiaConfig.defectos_estandar.some(d => d.toLowerCase() === defecto);
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                success: true,
+                defecto: body?.defecto,
+                producto_cortesia: match ? mockCortesiaConfig.cortesia_estandar : mockCortesiaConfig.cortesia_especial,
+                tipo_regla: match ? 'estandar' : 'especial'
+            })
+        });
+    });
 }

@@ -66,4 +66,10 @@ export const supervisoresApi = {
     uploadGeoJSON: (geojsonData) => api.post('/supervisores/upload', geojsonData)
 };
 
+export const cortesiaApi = {
+    getConfig: () => api.get('/cortesia/config'),
+    updateConfig: (data) => api.put('/cortesia/config', data),
+    simular: (defecto) => api.post('/cortesia/simular', { defecto })
+};
+
 export default api;

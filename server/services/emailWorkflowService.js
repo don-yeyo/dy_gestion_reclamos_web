@@ -152,12 +152,28 @@ class EmailWorkflowService {
         const urlImposibilidad = `${APP_BASE_URL}/imposibilidad?token=${encodeURIComponent(tokenImposibilidad)}`;
 
         const productosHtml = claim.items.map(item => `
-            <div style="background:#f8fafc; border-left:4px solid #151C5B; padding:12px; margin-bottom:10px; border-radius:4px;">
-                <strong>${item.marca} - ${item.producto}</strong> (${item.categoria})<br/>
-                <span>Cantidad reclamada: ${item.cantidad}</span><br/>
-                <span>Defecto: <em>${item.defecto}</em></span><br/>
-                ${item.producto_cortesia ? `<span style="color:#10b981; font-weight:600;">Cortesía calculada: ${item.producto_cortesia}</span><br/>` : ''}
-                <span style="font-size:0.85em; color:#64748b;">Lote: ${item.lote || 'N/A'} | Venc: ${item.vto || 'N/A'}</span>
+            <div style="background:#f8fafc; border-left:4px solid #151C5B; padding:14px; margin-bottom:12px; border-radius:6px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                <div style="font-size:1.05rem; font-weight:bold; color:#151C5B; margin-bottom:4px;">
+                    ${item.marca} - ${item.producto}
+                </div>
+                <div style="color:#475569; font-size:0.9rem; margin-bottom:6px;">
+                    <span>Categoría: <strong>${item.categoria || 'General'}</strong></span> &bull; 
+                    <span>Cantidad reclamada: <strong>${item.cantidad}</strong></span>
+                </div>
+                <div style="color:#334155; font-size:0.9rem; margin-bottom:8px;">
+                    Defecto reportado: <strong style="color:#b91c1c;">${item.defecto || 'No especificado'}</strong>
+                </div>
+                <div style="margin-top:8px; padding:10px 14px; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:6px; color:#065f46;">
+                    <div style="font-size:0.8rem; text-transform:uppercase; letter-spacing:0.5px; font-weight:bold; color:#047857; margin-bottom:2px;">
+                        🎁 Compensación / Producto de Cortesía a Entregar:
+                    </div>
+                    <div style="font-size:1.05rem; font-weight:800; color:#065f46;">
+                        ${item.producto_cortesia || '1 reemplazo + 1 de kg (Estándar)'}
+                    </div>
+                </div>
+                <div style="font-size:0.8rem; color:#94a3b8; margin-top:6px;">
+                    Lote: ${item.lote || 'N/A'} | Vencimiento: ${item.vto || 'N/A'}
+                </div>
             </div>
         `).join('');
 

@@ -1,9 +1,9 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Inbox, UserCheck, ShieldAlert, X, ChevronRight, HelpCircle, Map } from 'lucide-react';
+import { LayoutDashboard, Inbox, UserCheck, ShieldAlert, X, ChevronRight, HelpCircle, Map, Gift } from 'lucide-react';
 import { useAuth } from '../config/AuthContext';
 
-export const Drawer = ({ isOpen, onClose, onOpenCobertura }) => {
+export const Drawer = ({ isOpen, onClose, onOpenCobertura, onOpenReglasCortesia }) => {
     const { user, isAdmin, isInocuidad } = useAuth();
 
     return (
@@ -83,6 +83,17 @@ export const Drawer = ({ isOpen, onClose, onOpenCobertura }) => {
                     {isAdmin && (
                         <>
                             <div className="drawer-section-title">Configuración</div>
+                            <button
+                                onClick={() => {
+                                    onClose();
+                                    if (onOpenReglasCortesia) onOpenReglasCortesia();
+                                }}
+                                className="drawer-nav-item"
+                                style={{ width: '100%', background: 'transparent', border: 'none', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}
+                            >
+                                <Gift size={18} color="#10b981" />
+                                <span>Reglas de Cortesía</span>
+                            </button>
                             <button
                                 onClick={() => {
                                     onClose();
