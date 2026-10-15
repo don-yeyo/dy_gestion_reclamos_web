@@ -120,20 +120,21 @@ export const Dashboard = () => {
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th>ID Reclamo</th>
+                                <th style={{ width: '80px' }}>ID</th>
                                 <th>Fecha</th>
                                 <th>Consumidor</th>
                                 <th>Localidad</th>
                                 <th>Supervisor</th>
-                                <th>Estado Admin</th>
-                                <th>Supervisor</th>
-                                <th>Inocuidad</th>
+                                <th style={{ textAlign: 'center' }}>Admin</th>
+                                <th style={{ textAlign: 'center' }}>Inocuidad</th>
+                                <th style={{ textAlign: 'center' }}>Supervisor</th>
+                                <th style={{ textAlign: 'center' }}>Consumidor</th>
                             </tr>
                         </thead>
                         <tbody>
                             {recent.length === 0 ? (
                                 <tr>
-                                    <td colSpan="8" style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)' }}>
+                                    <td colSpan="9" style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)' }}>
                                         {loading ? 'Cargando registros...' : 'No hay reclamos cargados por encima del corte.'}
                                     </td>
                                 </tr>
@@ -145,9 +146,10 @@ export const Dashboard = () => {
                                         <td>{r.nombre} {r.apellido}</td>
                                         <td>{r.localidad} ({r.provincia})</td>
                                         <td>{r.supervisor}</td>
-                                        <td><StatusBadge status={r.estado_admin} /></td>
-                                        <td><StatusBadge status={r.estado_supervisor} /></td>
-                                        <td><StatusBadge status={r.estado_inocuidad} /></td>
+                                        <td style={{ textAlign: 'center' }}><StatusBadge status={r.estado_admin} /></td>
+                                        <td style={{ textAlign: 'center' }}><StatusBadge status={r.estado_inocuidad} /></td>
+                                        <td style={{ textAlign: 'center' }}><StatusBadge status={r.estado_supervisor} /></td>
+                                        <td style={{ textAlign: 'center' }}><StatusBadge status={r.estado_consumidor} /></td>
                                     </tr>
                                 ))
                             )}

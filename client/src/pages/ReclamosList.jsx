@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-    Search, Filter, RefreshCw, Eye, AlertCircle,
+    Search, Filter, RefreshCw, AlertCircle,
     CheckCircle2, Clock, MapPin, Package, UserCheck, ShieldAlert,
     RotateCcw, Inbox, ChevronLeft, ChevronRight, X
 } from 'lucide-react';
@@ -339,15 +339,15 @@ export const ReclamosList = () => {
                     <table className="claims-table">
                         <thead>
                             <tr>
-                                <th style={{ width: '95px' }}>ID / Fecha</th>
-                                <th style={{ width: '17%' }}>Consumidor</th>
+                                <th style={{ width: '85px' }}>ID / Fecha</th>
+                                <th style={{ width: '16%' }}>Consumidor</th>
                                 <th style={{ width: '13%' }}>Ubicación</th>
                                 <th style={{ width: '19%' }}>Producto / Defecto</th>
                                 <th style={{ width: '14%' }}>Supervisor</th>
-                                <th style={{ width: '9%', textAlign: 'center' }}>Admin</th>
-                                <th style={{ width: '9%', textAlign: 'center' }}>Supervisor</th>
-                                <th style={{ width: '9%', textAlign: 'center' }}>Inocuidad</th>
-                                <th style={{ width: '42px', textAlign: 'center' }}></th>
+                                <th style={{ width: '9.5%', textAlign: 'center' }}>Admin</th>
+                                <th style={{ width: '9.5%', textAlign: 'center' }}>Inocuidad</th>
+                                <th style={{ width: '9.5%', textAlign: 'center' }}>Supervisor</th>
+                                <th style={{ width: '9.5%', textAlign: 'center' }}>Consumidor</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -450,9 +450,13 @@ export const ReclamosList = () => {
                                                 </div>
                                             </td>
 
-                                            {/* Estados */}
+                                            {/* Estados: Admin, Inocuidad, Supervisor, Consumidor */}
                                             <td style={{ textAlign: 'center' }}>
                                                 <StatusBadge status={r.estado_admin} />
+                                            </td>
+
+                                            <td style={{ textAlign: 'center' }}>
+                                                <StatusBadge status={r.estado_inocuidad} />
                                             </td>
 
                                             <td style={{ textAlign: 'center' }}>
@@ -460,29 +464,7 @@ export const ReclamosList = () => {
                                             </td>
 
                                             <td style={{ textAlign: 'center' }}>
-                                                <StatusBadge status={r.estado_inocuidad} />
-                                            </td>
-
-                                            {/* Acción */}
-                                            <td style={{ textAlign: 'center' }}>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setSelectedReclamo(r);
-                                                    }}
-                                                    className="btn btn-secondary"
-                                                    style={{
-                                                        padding: '6px',
-                                                        borderRadius: 'var(--radius-sm)',
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        lineHeight: 1
-                                                    }}
-                                                    title="Ver detalles"
-                                                >
-                                                    <Eye size={14} />
-                                                </button>
+                                                <StatusBadge status={r.estado_consumidor} />
                                             </td>
                                         </tr>
                                     );
