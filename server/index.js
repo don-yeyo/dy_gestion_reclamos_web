@@ -62,6 +62,16 @@ app.use('/api/cron', cronRoutes);
 app.use('/api/supervisores', supervisoresRoutes);
 app.use('/api/cortesia', cortesiaRoutes);
 
+// Info base API
+app.get('/api', (req, res) => {
+    res.json({
+        success: true,
+        service: 'dy-gestion-reclamos-server',
+        version: '1.0.0',
+        status: 'online'
+    });
+});
+
 // Health check
 app.get('/api/health', async (req, res) => {
     let dbStatus = 'disconnected';

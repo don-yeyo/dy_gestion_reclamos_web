@@ -41,10 +41,10 @@ export const AuthProvider = ({ children }) => {
             }
 
             // ── AUTENTICACIÓN OFICIAL MICROSOFT ENTRA ID (AZURE AD) ───────────
-            if (isMsAuthenticated && accounts.length > 0) {
-                const account = accounts[0];
-                const email = account.username || account.idTokenClaims?.preferred_username || '';
-                const name = account.name || account.idTokenClaims?.name || email;
+            const activeAcc = instance.getActiveAccount() || (accounts.length > 0 ? accounts[0] : null);
+            if (activeAcc) {
+                const email = activeAcc.username || activeAcc.idTokenClaims?.preferred_username || '';
+                const name = activeAcc.name || activeAcc.idTokenClaims?.name || email;
 
                 try {
                     // Validar con el backend para obtener token firmado y rol verificado
@@ -56,7 +56,7 @@ export const AuthProvider = ({ children }) => {
                         setAuthError(null);
                     }
                 } catch (e) {
-                    const errMsg = e.response?.data?.error || 'Tu cuenta no tiene autorización en el sistema.';
+                    const errMsg = e.response?.data?.error || (e.message?.includes('Network Error') ? 'No se pudo conectar con el servidor API (puerto 3001).' : 'Tu cuenta no tiene autorización en el sistema.');
                     setAuthError(errMsg);
                     setIsAuthenticated(false);
                     setUser(null);
@@ -86,12 +86,38 @@ export const AuthProvider = ({ children }) => {
         verifySession();
     }, [isMsAuthenticated, accounts]);
 
-    const loginMicrosoft = () => {
+    const loginMicrosoft = async () => {
         setAuthError(null);
-        instance.loginPopup(loginRequest).catch(e => {
-            console.error('Error en popup MSAL:', e);
-            setAuthError('No se pudo completar el inicio de sesión con Microsoft.');
-        });
+        setLoading(true);
+        try {
+            const response = await instance.loginPopup(loginRequest);
+            if (response && response.account) {
+                instance.setActiveAccount(response.account);
+                const email = response.account.username || response.account.idTokenClaims?.preferred_username || '';
+                const name = response.account.name || response.account.idTokenClaims?.name || email;
+
+                const res = await authApi.validate(email, name);
+                if (res.data.success) {
+                    localStorage.setItem('dy_auth_token', res.data.token);
+                    setUser(res.data.user);
+                    setIsAuthenticated(true);
+                    setAuthError(null);
+                }
+            }
+        } catch (e) {
+            console.error('Error en login de Microsoft o validación:', e);
+            if (e.response?.data?.error) {
+                setAuthError(e.response.data.error);
+            } else if (e.errorCode === 'user_cancelled') {
+                // Cancelado por el usuario
+            } else if (e.message?.includes('Network Error')) {
+                setAuthError('No se pudo conectar con el servidor API backend (puerto 3001).');
+            } else {
+                setAuthError(e.message || 'No se pudo completar el inicio de sesión con Microsoft.');
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
     const logout = () => {
