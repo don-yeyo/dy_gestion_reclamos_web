@@ -400,6 +400,68 @@ class EmailWorkflowService {
             html
         }, 'internal');
     }
+
+    /**
+     * Envía alerta CRÍTICA a los Administradores ante discrepancia de resolución:
+     * El supervisor declaró "Resuelto" pero el consumidor informó "No resuelto" (posible engaño o fraude).
+     */
+    async sendFraudAlertToAdmins(claim, motivoConflicto) {
+        const adminEmails = process.env.EMAILS_ADMINS || 'administracion@donyeyo.com.ar';
+        const elevationEmails = process.env.EMAILS_ELEVACION || '';
+        const recipients = [adminEmails, elevationEmails].filter(Boolean).join(',');
+
+        const html = `
+        <div style="font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width:640px; margin:auto; background:#ffffff; border:2px solid #dc2626; border-radius:12px; overflow:hidden;">
+            <div style="background:#dc2626; color:#ffffff; padding:20px; text-align:center;">
+                <h2 style="margin:0; font-size:1.4rem;">🚨 ALERTA CRÍTICA: POSIBLE FRAUDE / CONFLICTO</h2>
+                <p style="margin:6px 0 0 0; opacity:0.9; font-size:0.95rem;">Discrepancia de entrega en Reclamo #${claim.id}</p>
+            </div>
+            <div style="padding:24px; color:#1e293b; line-height:1.6;">
+                <p style="font-size:1.05rem; color:#991b1b; font-weight:700;">
+                    Atención Administración y Gerencia Comercial:
+                </p>
+                <p>
+                    Se ha detectado una <strong>inconsistencia grave</strong> en el seguimiento del Reclamo <strong>#${claim.id}</strong>:
+                </p>
+
+                <div style="background:#fef2f2; border-left:4px solid #dc2626; padding:14px; border-radius:6px; margin:16px 0;">
+                    <div style="margin-bottom:8px;">
+                        <strong>• Estado informado por Supervisor (${claim.supervisor}):</strong> <span style="color:#16a34a; font-weight:bold;">Resuelto (Declaró haber entregado la reposición)</span>
+                    </div>
+                    <div>
+                        <strong>• Respuesta del Consumidor (${claim.nombre} ${claim.apellido}):</strong> <span style="color:#dc2626; font-weight:bold;">✕ NO RESUELTO (Informó no haber recibido el producto)</span>
+                    </div>
+                </div>
+
+                <div style="background:#f8fafc; padding:14px; border-radius:8px; margin:16px 0; font-size:0.9rem;">
+                    <strong>Supervisor Asignado:</strong> ${claim.supervisor || 'N/A'} (${claim.supervisor_email || 'Sin email'})<br/>
+                    <strong>Consumidor:</strong> ${claim.nombre} ${claim.apellido}<br/>
+                    <strong>Contacto Consumidor:</strong> Tel: ${claim.telefono || 'Sin teléfono'} | Email: ${claim.email || 'Sin email'}<br/>
+                    <strong>Domicilio:</strong> ${claim.domicilio || 'N/A'} (${claim.localidad}, ${claim.provincia})
+                </div>
+
+                <p style="color:#64748b; font-size:0.88rem;">
+                    El reclamo ha sido marcado automáticamente en el sistema como <strong>EN CONFLICTO</strong> con fondo rojo para auditoría interna inmediata.
+                </p>
+
+                <div style="margin-top:24px; text-align:center;">
+                    <a href="${APP_BASE_URL}/reclamos/${claim.id}" style="display:inline-block; background:#dc2626; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:8px; font-weight:bold; font-size:0.95rem;">
+                        Auditar Reclamo #${claim.id} en Gestor Web
+                    </a>
+                </div>
+            </div>
+            <div style="background:#fef2f2; padding:12px; text-align:center; font-size:0.8rem; color:#991b1b; border-top:1px solid #fecaca;">
+                Don Yeyo S.A. | Detección Automática de Fraude y Auditoría Comercial
+            </div>
+        </div>
+        `;
+
+        return this.sendMail({
+            to: recipients,
+            subject: `🚨 [CONFLICTO / POSIBLE FRAUDE] Discrepancia en Reclamo #${claim.id} - ${claim.supervisor}`,
+            html
+        }, 'internal');
+    }
 }
 
 module.exports = new EmailWorkflowService();

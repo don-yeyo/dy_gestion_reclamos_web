@@ -60,13 +60,13 @@ export const ImposibilidadPublic = () => {
             return;
         }
 
-        const motivoFinal = observaciones.trim()
+        const observacionInterna = observaciones.trim()
             ? `${motivoOpcion} - ${observaciones.trim()}`
             : motivoOpcion;
 
         setSubmitting(true);
         try {
-            const res = await publicApi.submitImposibilidad(token, motivoFinal);
+            const res = await publicApi.submitImposibilidad(token, observacionInterna, motivoOpcion);
             if (res.data.success) {
                 setSubmittedSuccess(true);
             }

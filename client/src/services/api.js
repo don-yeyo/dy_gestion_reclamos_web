@@ -37,14 +37,14 @@ export const authApi = {
 export const reclamosApi = {
     getAll: (cutoff = null) => api.get('/reclamos', { params: cutoff ? { cutoff } : {} }),
     getById: (id) => api.get(`/reclamos/${id}`),
-    updateEstadoAdmin: (id, estado, motivo_desaprobado = '') =>
-        api.patch(`/reclamos/${id}/estado-admin`, { estado, motivo_desaprobado }),
+    updateEstadoAdmin: (id, estado, motivo_desaprobado = '', tipo_desaprobacion = '') =>
+        api.patch(`/reclamos/${id}/estado-admin`, { estado, motivo_desaprobado, tipo_desaprobacion }),
     updateEstadoInocuidad: (id, estado) =>
         api.patch(`/reclamos/${id}/estado-inocuidad`, { estado }),
     updateSupervisor: (id, supervisor, email) =>
         api.patch(`/reclamos/${id}/supervisor`, { supervisor, email }),
-    updateEstadoSupervisor: (id, estado, motivo_imposibilidad = '') =>
-        api.patch(`/reclamos/${id}/estado-supervisor`, { estado, motivo_imposibilidad }),
+    updateEstadoSupervisor: (id, estado, motivo_imposibilidad = '', tipo_imposibilidad = '') =>
+        api.patch(`/reclamos/${id}/estado-supervisor`, { estado, motivo_imposibilidad, tipo_imposibilidad }),
     updateEstadoConsumidor: (id, estado) =>
         api.patch(`/reclamos/${id}/estado-consumidor`, { estado }),
     reenviarEmailInocuidad: (id) =>
@@ -55,8 +55,8 @@ export const reclamosApi = {
 
 export const publicApi = {
     verifyToken: (token) => api.get('/public/actions/verify', { params: { token } }),
-    submitImposibilidad: (token, motivo) =>
-        api.post('/public/actions/supervisor-imposibilidad', { token, motivo })
+    submitImposibilidad: (token, motivo, tipo_imposibilidad = '') =>
+        api.post('/public/actions/supervisor-imposibilidad', { token, motivo, tipo_imposibilidad })
 };
 
 export const supervisoresApi = {
@@ -70,6 +70,12 @@ export const cortesiaApi = {
     getConfig: () => api.get('/cortesia/config'),
     updateConfig: (data) => api.put('/cortesia/config', data),
     simular: (defecto) => api.post('/cortesia/simular', { defecto })
+};
+
+export const estadosApi = {
+    getAll: () => api.get('/estados'),
+    updateConfig: (id, { descripcion, color }) => api.put(`/estados/${id}`, { descripcion, color }),
+    updateDescripcion: (id, descripcion, color) => api.put(`/estados/${id}`, { descripcion, color })
 };
 
 export default api;

@@ -5,6 +5,7 @@ import { PublicClientApplication, EventType } from '@azure/msal-browser';
 import { MsalProvider } from '@azure/msal-react';
 import { msalConfig } from './config/msal';
 import { AuthProvider } from './config/AuthContext';
+import { EstadosProvider } from './config/EstadosContext';
 import App from './App';
 import './index.css';
 
@@ -29,9 +30,11 @@ msalInstance.initialize().then(() => {
         <React.StrictMode>
             <MsalProvider instance={msalInstance}>
                 <AuthProvider>
-                    <BrowserRouter>
-                        <App />
-                    </BrowserRouter>
+                    <EstadosProvider>
+                        <BrowserRouter>
+                            <App />
+                        </BrowserRouter>
+                    </EstadosProvider>
                 </AuthProvider>
             </MsalProvider>
         </React.StrictMode>

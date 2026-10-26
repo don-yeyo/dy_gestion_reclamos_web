@@ -84,7 +84,7 @@ router.get('/:id/auditoria', async (req, res) => {
  * - Si es "Aprobado": marca aprobado y limpia motivos.
  */
 router.patch('/:id/estado-admin', requireRole(['admin', 'sysadmin']), async (req, res) => {
-    const { estado, motivo_desaprobado } = req.body;
+    const { estado, motivo_desaprobado, tipo_desaprobacion } = req.body;
     const claimId = req.params.id;
 
     if (!['Pendiente', 'En curso', 'Aprobado', 'Desaprobado'].includes(estado)) {
@@ -129,17 +129,20 @@ router.patch('/:id/estado-admin', requireRole(['admin', 'sysadmin']), async (req
         if (estado === 'En curso' || estado === 'Aprobado') {
             updates['AO'] = 'En curso';
             updates['AP'] = ''; // Blanquear motivos de desaprobado
+            updates['tipo_desaprobacion'] = '';
             updates['AS'] = 'En curso'; // estado_consumidor pasa a En curso
             updates['AQ'] = 'Pendiente'; // supervisor pasa a Pendiente
             updates['AT'] = 'Pendiente'; // calidad / inocuidad pasa a Pendiente
         } else if (estado === 'Desaprobado') {
             updates['AP'] = motivo_desaprobado || 'Desaprobado por administración';
-            // Regla solicitada: al desaprobar, cambiar los demás a "Sin acciones"
+            updates['tipo_desaprobacion'] = tipo_desaprobacion || 'No corresponde compensación según criterios de calidad';
+            // Regla solicitada: al desaprobar, consumidor pasa a "Cerrado", supervisor e inocuidad a "Sin acciones"
             updates['AQ'] = 'Sin acciones'; // estado_supervisor
-            updates['AS'] = 'Sin acciones'; // estado_consumidor
+            updates['AS'] = 'Cerrado'; // estado_consumidor pasa a Cerrado
             updates['AT'] = 'Sin acciones'; // estado_inocuidad
         } else if (estado === 'Pendiente') {
             updates['AP'] = '';
+            updates['tipo_desaprobacion'] = '';
             updates['AQ'] = 'Sin acciones';
             updates['AT'] = 'Sin acciones';
         }
@@ -147,7 +150,7 @@ router.patch('/:id/estado-admin', requireRole(['admin', 'sysadmin']), async (req
         const auditInfo = {
             actor: req.user ? req.user.role : 'admin',
             actorEmail: req.user ? req.user.email : null,
-            motivo: motivo_desaprobado || (estado === 'En curso' ? 'Reclamo aprobado por administración' : null)
+            motivo: motivo_desaprobado || tipo_desaprobacion || (estado === 'En curso' ? 'Reclamo aprobado por administración' : null)
         };
 
         await googleSheetsService.updateReclamo(claimId, updates, auditInfo);
@@ -266,7 +269,7 @@ router.patch('/:id/supervisor', requireRole(['admin', 'sysadmin']), async (req, 
  * Actualización manual o forzada de estado_supervisor desde el panel
  */
 router.patch('/:id/estado-supervisor', requireRole(['admin', 'sysadmin']), async (req, res) => {
-    const { estado, motivo_imposibilidad } = req.body;
+    const { estado, motivo_imposibilidad, tipo_imposibilidad } = req.body;
     const claimId = req.params.id;
 
     if (!['Pendiente', 'Resuelto', 'Imposibilidad', 'Sin respuesta', 'Sin acciones'].includes(estado)) {
@@ -279,12 +282,24 @@ router.patch('/:id/estado-supervisor', requireRole(['admin', 'sysadmin']), async
             updates['AR'] = motivo_imposibilidad;
         }
 
-        await googleSheetsService.updateReclamo(claimId, updates);
+        // Si se establece imposibilidad del supervisor:
+        // El consumidor ve el tipo de imposibilidad y pasa a Cerrado, e Inocuidad a Sin acciones
+        if (estado === 'Imposibilidad') {
+            updates['tipo_imposibilidad'] = tipo_imposibilidad || 'Imposibilidad operativa o de contacto informada por supervisor';
+            updates['AS'] = 'Cerrado'; // estado_consumidor pasa a Cerrado
+            updates['AT'] = 'Sin acciones'; // estado_inocuidad pasa a Sin acciones
+        }
+
+        await googleSheetsService.updateReclamo(claimId, updates, {
+            actor: req.user ? req.user.role : 'admin',
+            actorEmail: req.user ? req.user.email : null,
+            motivo: motivo_imposibilidad || (estado === 'Imposibilidad' ? `Imposibilidad: ${tipo_imposibilidad || ''}` : null)
+        });
 
         // Evaluar transicion automatica a Finalizado
         await reclamosDatabaseService.checkAndFinalizeAdminState(claimId);
 
-        res.json({ success: true, message: `Estado del supervisor actualizado a "${estado}".` });
+        res.json({ success: true, message: `Estado del supervisor actualizado a "${estado}".`, updates });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -298,12 +313,24 @@ router.patch('/:id/estado-consumidor', requireRole(['admin', 'sysadmin']), async
     const { estado } = req.body;
     const claimId = req.params.id;
 
-    if (!['Pendiente', 'Resuelto conforme', 'Resuelto disconforme', 'No resuelto', 'Sin respuesta', 'Sin acciones'].includes(estado)) {
+    if (!['Pendiente', 'En curso', 'Resuelto conforme', 'Resuelto disconforme', 'No resuelto', 'Sin respuesta', 'Sin acciones', 'Cerrado'].includes(estado)) {
         return res.status(400).json({ success: false, error: 'Estado del consumidor no válido.' });
     }
 
     try {
+        const claim = await googleSheetsService.getReclamoById(claimId);
+
         await googleSheetsService.updateReclamo(claimId, { 'AS': estado });
+
+        // Detección de conflicto / posible fraude:
+        // Si el supervisor informó "Resuelto" y el consumidor responde o se marca "No resuelto"
+        if (estado === 'No resuelto' && claim && (claim.estado_supervisor === 'Resuelto')) {
+            const motivoConflicto = `Discrepancia crítica: El supervisor ${claim.supervisor || ''} informó haber resuelto/entregado la reposición, pero el consumidor indicó que el reclamo NO fue resuelto. Posible engaño o fraude.`;
+            await reclamosDatabaseService.marcarConflicto(claimId, motivoConflicto);
+            emailWorkflowService.sendFraudAlertToAdmins(claim, motivoConflicto).catch(err => {
+                console.error('[FRAUDE/CONFLICTO] Error enviando alerta a administradores:', err.message);
+            });
+        }
 
         // Evaluar transicion automatica a Finalizado
         await reclamosDatabaseService.checkAndFinalizeAdminState(claimId);

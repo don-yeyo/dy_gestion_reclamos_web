@@ -292,6 +292,33 @@ El sistema reproduce y supera la lógica de la fórmula original de Google Sheet
 
 ---
 
+## 🚦 Abstracción de Estados del Workflow y Detección de Conflicto / Fraude
+
+### 1. Estados Dinámicos en Base de Datos (`workflow_estados`)
+- **Descripciones y Colores de Badge Personalizables:** Los administradores pueden gestionar el catálogo completo desde la sección de página completa **Estados** (`/estados`, accesible desde el menú lateral `Drawer` → `Configuración` → `Estados`). Los estados se presentan en una grilla estructurada con columnas (*Nombre con muestra de color, Rol, Descripción, Acciones*), disponiendo de un modal de fondo 100% opaco para:
+  1. **Definir el color del badge:** Selección rápida mediante paleta corporativa sugerida, picker cromático nativo o código hexadecimal, con previsualización reactiva en tiempo real.
+  2. **Editar la descripción operativa:** La cual se consume globalmente y se refleja de inmediato como **tooltip explicativo** al posar el cursor sobre cualquier badge en el Dashboard, Bandeja de Reclamos y expedientes.
+- **Protección de Workflows:** Los nombres y códigos de los estados permanecen estrictamente inmutables con candado de seguridad para preservar los flujos de negocio.
+
+### 2. Flujo de Imposibilidad y Desaprobación
+- **Supervisor (Imposibilidad):** Al reportar una imposibilidad (vía web o formulario público), se tipifica el `tipo_imposibilidad` que será transparente para el consumidor, resguardando la observación interna del supervisor de forma confidencial.
+- **Administrador (Desaprobado):** Al desaprobar un reclamo, se tipifica el `tipo_desaprobacion` visible para el consumidor y se registra la fundamentación interna protegida.
+- **Regla de Cierre Unificado:** En ambos escenarios, el estado del consumidor pasa automáticamente a **`Cerrado`**, y los estados de Inocuidad y Supervisor se fijan en **`Sin acciones`**.
+
+### 3. Detección de Discrepancia Crítica y Fraude Comercial
+- **Alerta de Fraude:** Si el supervisor comercial marcó la reposición como `Resuelto` (afirmando haber entregado la cortesía) y posteriormente el consumidor responde mediante el enlace de correo que **no fue resuelto** (`No resuelto`), el sistema detecta una anomalía severa o posible engaño.
+- **Acciones Automáticas:**
+  1. Se marca el reclamo como `en_conflicto = 1` y se guarda la traza temporal y motivo en la base de datos.
+  2. Se despacha de forma instantánea un **email crítico de alerta de fraude** a la casilla de los administradores con el expediente y los datos del supervisor.
+  3. En la grilla del Gestor Web y en el Dashboard, la fila del reclamo cambia su fondo a un tono de alerta rojizo (`.claim-row-conflicto`) y se muestra la insignia destacada **`⚠️ Conflicto`**.
+  4. En el modal de detalle del reclamo, se despliega un panel superior de auditoría con la advertencia de conflicto para la intervención administrativa.
+
+### 4. Seguimiento Automático y Auto-Cierre
+- Cuando el supervisor resuelve el reclamo, el servicio en segundo plano (`cronFollowupService`) consulta al consumidor vía correo electrónico. Si luego del ciclo programado de N consultas el consumidor no responde, su estado pasa automáticamente a **`Cerrado`** y el reclamo administrativo se declara como `Finalizado`.
+
+---
+
 ## 📄 Licencia y Confidencialidad
 Propiedad exclusiva de **Don Yeyo S.A.** Prohibida su reproducción, divulgación o distribución sin autorización previa.
+
 

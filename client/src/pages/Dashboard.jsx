@@ -140,8 +140,20 @@ export const Dashboard = () => {
                                 </tr>
                             ) : (
                                 recent.map(r => (
-                                    <tr key={r.id} onClick={() => navigate(`/reclamos?id=${r.id}`)}>
-                                        <td><strong>#{r.id}</strong></td>
+                                    <tr
+                                        key={r.id}
+                                        className={r.en_conflicto ? 'claim-row-conflicto' : ''}
+                                        onClick={() => navigate(`/reclamos?id=${r.id}`)}
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        <td>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <strong>#{r.id}</strong>
+                                                {Boolean(r.en_conflicto) && (
+                                                    <span className="badge badge-conflicto" style={{ fontSize: '0.62rem', padding: '1px 5px' }}>⚠️ Conflicto</span>
+                                                )}
+                                            </div>
+                                        </td>
                                         <td>{r.fecha_alta}</td>
                                         <td>{r.nombre} {r.apellido}</td>
                                         <td>{r.localidad} ({r.provincia})</td>

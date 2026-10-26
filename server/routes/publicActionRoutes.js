@@ -530,7 +530,7 @@ router.get('/supervisor-quick', async (req, res) => {
  * Envío del formulario de motivo de imposibilidad completado por el supervisor
  */
 router.post('/supervisor-imposibilidad', async (req, res) => {
-    const { token, motivo } = req.body;
+    const { token, motivo, tipo_imposibilidad } = req.body;
     const payload = emailWorkflowService.verifyToken(token);
 
     if (!payload || payload.actor !== 'supervisor') {
@@ -547,18 +547,24 @@ router.post('/supervisor-imposibilidad', async (req, res) => {
             return res.status(404).json({ success: false, error: 'Reclamo no encontrado.' });
         }
 
-        // Persistir estado y motivo en Google Sheets y MySQL
+        const tipoFinal = tipo_imposibilidad || 'Imposibilidad de entrega en domicilio';
+
+        // Persistir estado y motivos en MySQL y Sheets:
+        // Regla: si el supervisor establece imposibilidad, el consumidor pasa a Cerrado e Inocuidad a Sin acciones
         await googleSheetsService.updateReclamo(payload.claimId, {
             'AQ': 'Imposibilidad',
-            'AR': String(motivo).trim()
+            'AR': String(motivo).trim(),
+            'tipo_imposibilidad': tipoFinal,
+            'AS': 'Cerrado', // consumidor pasa a Cerrado
+            'AT': 'Sin acciones' // inocuidad pasa a Sin acciones
         }, {
             actor: 'supervisor_link',
             actorEmail: claim.supervisor_email || '',
-            motivo: String(motivo).trim()
+            motivo: `Imposibilidad: ${tipoFinal} - ${String(motivo).trim()}`
         });
 
         // Notificar por email a los administradores
-        emailWorkflowService.sendSupervisorImpossibilityAlertToAdmins(claim, motivo).catch(err => {
+        emailWorkflowService.sendSupervisorImpossibilityAlertToAdmins(claim, `${tipoFinal} - ${motivo}`).catch(err => {
             console.error('Error enviando alerta a administradores:', err.message);
         });
 
@@ -609,6 +615,16 @@ router.get('/consumidor-response', async (req, res) => {
             actorEmail: claim ? claim.email : '',
             motivo: `Consumidor respondió encuesta: ${payload.action}`
         });
+
+        // Detección de conflicto / posible fraude:
+        // Si el supervisor informó "Resuelto" y el consumidor responde "No resuelto"
+        if (payload.action === 'no_resuelto' && claim && claim.estado_supervisor === 'Resuelto') {
+            const motivoConflicto = `Discrepancia crítica: El supervisor ${claim.supervisor || ''} declaró haber entregado la reposición ("Resuelto"), pero el consumidor informó NO haberla recibido ("No resuelto"). Posible engaño o fraude.`;
+            await reclamosDatabaseService.marcarConflicto(payload.claimId, motivoConflicto);
+            emailWorkflowService.sendFraudAlertToAdmins(claim, motivoConflicto).catch(err => {
+                console.error('[FRAUDE/CONFLICTO] Error enviando alerta a administradores:', err.message);
+            });
+        }
 
         // Notificar a los administradores
         if (claim) {

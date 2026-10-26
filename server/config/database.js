@@ -101,12 +101,17 @@ async function initDatabase() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
-        // Migración suave: asegurar columnas de timestamp por estado en tablas preexistentes
+        // Migración suave: asegurar columnas de timestamp, conflicto y tipos tipificados por estado
         const colsToAdd = [
             'fecha_estado_admin DATETIME NULL',
             'fecha_estado_supervisor DATETIME NULL',
             'fecha_estado_consumidor DATETIME NULL',
-            'fecha_estado_inocuidad DATETIME NULL'
+            'fecha_estado_inocuidad DATETIME NULL',
+            'tipo_imposibilidad VARCHAR(150) NULL',
+            'tipo_desaprobacion VARCHAR(150) NULL',
+            'en_conflicto TINYINT(1) DEFAULT 0',
+            'conflicto_motivo TEXT NULL',
+            'fecha_conflicto DATETIME NULL'
         ];
         for (const colDef of colsToAdd) {
             try {
@@ -116,7 +121,67 @@ async function initDatabase() {
             }
         }
 
-        // 3. Tabla de Productos/Items asociados a cada Reclamo
+        // 3. Tabla de Estados Posibles del Workflow (Abstracción y descripciones para tooltips)
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS workflow_estados (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                actor VARCHAR(30) NOT NULL, -- 'admin', 'inocuidad', 'supervisor', 'consumidor'
+                codigo VARCHAR(50) NOT NULL,
+                nombre VARCHAR(50) NOT NULL,
+                descripcion TEXT NOT NULL,
+                color VARCHAR(30) DEFAULT '#64748b',
+                orden INT DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_actor_codigo (actor, codigo)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+
+        // Sembrado inicial de estados y descripciones si la tabla está vacía
+        const [estadosExistentes] = await connection.query(`SELECT COUNT(*) as cant FROM workflow_estados`);
+        if (estadosExistentes && estadosExistentes[0] && estadosExistentes[0].cant === 0) {
+            console.log('[STARTUP] Sembrando descripciones de estados de workflow iniciales...');
+            const estadosIniciales = [
+                // ADMIN
+                ['admin', 'Pendiente', 'Pendiente', 'Reclamo recién ingresado a la espera de evaluación inicial y aprobación por parte de la Administración.', '#f59e0b', 1],
+                ['admin', 'En curso', 'En curso', 'Reclamo aprobado administrativamente. Se disparan notificaciones a Inocuidad y al Supervisor comercial asignado.', '#3b82f6', 2],
+                ['admin', 'Desaprobado', 'Desaprobado', 'Reclamo desestimado o rechazado administrativamente con motivo fundado. Cancela intervenciones adicionales.', '#ef4444', 3],
+                ['admin', 'Finalizado', 'Finalizado', 'Caso cerrado definitivamente tras completarse los dictámenes técnicos de Inocuidad, entrega del Supervisor y conformidad o cierre del Consumidor.', '#10b981', 4],
+
+                // INOCUIDAD
+                ['inocuidad', 'Sin acciones', 'Sin acciones', 'No se requiere intervención técnica de laboratorio o el reclamo aún no ha sido aprobado por Administración.', '#94a3b8', 1],
+                ['inocuidad', 'Pendiente', 'Pendiente', 'Expediente técnico recibido por Calidad & Inocuidad. Análisis de lote, retramuestra y trazabilidad en proceso.', '#f59e0b', 2],
+                ['inocuidad', 'Resuelto', 'Resuelto', 'Peritaje técnico finalizado con informe de conformidad y dictamen de laboratorio asentado.', '#10b981', 3],
+                ['inocuidad', 'Imposibilidad', 'Imposibilidad', 'No es posible realizar el análisis técnico debido a falta de lote, ausencia de muestra física o datos insuficientes.', '#ef4444', 4],
+
+                // SUPERVISOR
+                ['supervisor', 'Sin acciones', 'Sin acciones', 'Sin entrega comercial asignada o reclamo cerrado/desaprobado administrativamente.', '#94a3b8', 1],
+                ['supervisor', 'Pendiente', 'Pendiente', 'Supervisor comercial notificado. Instrucciones de reposición y cortesía remitidas para entrega al consumidor.', '#f59e0b', 2],
+                ['supervisor', 'Resuelto', 'Resuelto', 'Reposición y producto de cortesía entregados en mano y confirmados por el supervisor comercial.', '#10b981', 3],
+                ['supervisor', 'Imposibilidad', 'Imposibilidad', 'El supervisor no pudo concretar la entrega al consumidor por motivo operativo tipificado.', '#ef4444', 4],
+                ['supervisor', 'Sin respuesta', 'Sin respuesta', 'El supervisor no respondió a las reiteradas solicitudes de seguimiento tras haberse agotado los plazos y reintentos máximos.', '#ea580c', 5],
+
+                // CONSUMIDOR
+                ['consumidor', 'Sin acciones', 'Sin acciones', 'Sin seguimiento directo hacia el consumidor por no corresponder compensación o reclamo desestimado.', '#94a3b8', 1],
+                ['consumidor', 'Pendiente', 'Pendiente', 'Reclamo recibido, a la espera del avance de la gestión comercial y reposición.', '#f59e0b', 2],
+                ['consumidor', 'En curso', 'En curso', 'Atención y coordinación de reposición en proceso de entrega hacia el consumidor.', '#3b82f6', 3],
+                ['consumidor', 'Resuelto conforme', 'Resuelto conforme', 'El consumidor confirmó haber recibido la reposición y manifestó su satisfacción con el servicio.', '#10b981', 4],
+                ['consumidor', 'Resuelto disconforme', 'Resuelto disconforme', 'El consumidor recibió los productos pero expresó disconformidad con la atención o el producto recibido.', '#f59e0b', 5],
+                ['consumidor', 'No resuelto', 'No resuelto', 'El consumidor informó no haber recibido la reposición comprometida o persistencia del problema (Alerta de Conflicto).', '#dc2626', 6],
+                ['consumidor', 'Sin respuesta', 'Sin respuesta', 'El consumidor no respondió a las encuestas periódicas de seguimiento de conformidad tras el plazo estipulado.', '#64748b', 7],
+                ['consumidor', 'Cerrado', 'Cerrado', 'Caso cerrado definitivamente para el consumidor por desaprobación administrativa, imposibilidad operativa de entrega o vencimiento de plazos de respuesta.', '#475569', 8]
+            ];
+
+            for (const est of estadosIniciales) {
+                await connection.query(`
+                    INSERT INTO workflow_estados (actor, codigo, nombre, descripcion, color, orden)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE descripcion = VALUES(descripcion), color = VALUES(color), orden = VALUES(orden)
+                `, est);
+            }
+        }
+
+        // 4. Tabla de Productos/Items asociados a cada Reclamo
         await connection.query(`
             CREATE TABLE IF NOT EXISTS reclamo_items (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -141,7 +206,7 @@ async function initDatabase() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
-        // 4. Tabla de Auditoría de Cambios de Estado
+        // 5. Tabla de Auditoría de Cambios de Estado
         await connection.query(`
             CREATE TABLE IF NOT EXISTS auditoria_reclamos (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -160,7 +225,7 @@ async function initDatabase() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
-        // 5. Tabla de Seguimiento de Notificaciones (para optimización del Cron y evitar reenvíos duplicados)
+        // 6. Tabla de Seguimiento de Notificaciones (para optimización del Cron y evitar reenvíos duplicados)
         await connection.query(`
             CREATE TABLE IF NOT EXISTS seguimiento_notificaciones (
                 id INT AUTO_INCREMENT PRIMARY KEY,

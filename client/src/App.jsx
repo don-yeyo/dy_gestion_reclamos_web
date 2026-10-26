@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './pages/Dashboard';
 import { ReclamosList } from './pages/ReclamosList';
+import { EstadosList } from './pages/EstadosList';
 import { ImposibilidadPublic } from './pages/ImposibilidadPublic';
 
 export const App = () => {
@@ -15,6 +16,7 @@ export const App = () => {
             <Route element={<Layout />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/reclamos" element={<ReclamosList />} />
+                <Route path="/estados" element={<EstadosList />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
         </Routes>

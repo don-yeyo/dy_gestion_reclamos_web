@@ -11,6 +11,7 @@ const publicActionRoutes = require('./routes/publicActionRoutes');
 const cronRoutes = require('./routes/cronRoutes');
 const supervisoresRoutes = require('./routes/supervisoresRoutes');
 const cortesiaRoutes = require('./routes/cortesiaRoutes');
+const estadosRoutes = require('./routes/estadosRoutes');
 const { initDatabase, pool } = require('./config/database');
 
 const app = express();
@@ -61,6 +62,7 @@ app.use('/api/public/actions', publicActionRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/supervisores', supervisoresRoutes);
 app.use('/api/cortesia', cortesiaRoutes);
+app.use('/api/estados', estadosRoutes);
 
 // Info base API
 app.get('/api', (req, res) => {

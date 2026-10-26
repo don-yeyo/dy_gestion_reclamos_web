@@ -118,12 +118,12 @@ class CronFollowupService {
                             const diffDiasCons = Math.floor((now - fechaUltimoEnvio) / (1000 * 60 * 60 * 24));
                             if (diffDiasCons >= diasFinSinRespuestaCons) {
                                 try {
-                                    console.log(`[CRON] Reclamo #${claim.id}: Consumidor sin respuesta tras ${diffDiasCons} días (límite J=${diasFinSinRespuestaCons}). Pasando a FSR...`);
+                                    console.log(`[CRON] Reclamo #${claim.id}: Consumidor sin respuesta tras ${diffDiasCons} días (límite J=${diasFinSinRespuestaCons}). Pasando a Cerrado...`);
                                     await googleSheetsService.updateReclamo(claim.id, {
-                                        'AS': 'FSR'
+                                        'AS': 'Cerrado'
                                     }, {
                                         actor: 'sistema_cron',
-                                        motivo: `Sin respuesta del consumidor tras ${diffDiasCons} días del último requerimiento de conformidad (FSR).`
+                                        motivo: `Sin respuesta del consumidor tras ${diffDiasCons} días del requerimiento de conformidad. Auto-establecido en Cerrado.`
                                     });
 
                                     // Evaluar si corresponde pasar estado_admin a Finalizado
@@ -131,7 +131,7 @@ class CronFollowupService {
 
                                     results.consumidoresFSR++;
                                 } catch (e) {
-                                    results.errores.push(`Error pasando a FSR reclamo #${claim.id}: ${e.message}`);
+                                    results.errores.push(`Error pasando a Cerrado reclamo #${claim.id}: ${e.message}`);
                                 }
                             }
                         }

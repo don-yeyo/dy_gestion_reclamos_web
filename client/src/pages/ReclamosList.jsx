@@ -22,6 +22,7 @@ export const ReclamosList = () => {
     const [filterSupervisor, setFilterSupervisor] = useState('ALL');
     const [filterInocuidad, setFilterInocuidad] = useState('ALL');
     const [filterConsumidor, setFilterConsumidor] = useState('ALL');
+    const [filterConflicto, setFilterConflicto] = useState(false);
 
     // Paginación
     const [currentPage, setCurrentPage] = useState(1);
@@ -82,6 +83,7 @@ export const ReclamosList = () => {
             aprobados: reclamos.filter(r => (r.estado_admin || '').toLowerCase() === 'aprobado').length,
             finalizados: reclamos.filter(r => (r.estado_admin || '').toLowerCase() === 'finalizado').length,
             imposibilidad: reclamos.filter(r => (r.estado_supervisor || '').toLowerCase() === 'imposibilidad').length,
+            conflictos: reclamos.filter(r => Boolean(r.en_conflicto)).length,
         };
     }, [reclamos]);
 
@@ -150,16 +152,21 @@ export const ReclamosList = () => {
                 if (filterConsumidor === 'Sin acciones' && estado !== 'sin acciones') return false;
             }
 
+            // Filtro Conflicto
+            if (filterConflicto && !r.en_conflicto) {
+                return false;
+            }
+
             return true;
         });
-    }, [reclamos, searchQuery, filterAdmin, filterSupervisor, filterInocuidad, filterConsumidor]);
+    }, [reclamos, searchQuery, filterAdmin, filterSupervisor, filterInocuidad, filterConsumidor, filterConflicto]);
 
     // Paginación
     const totalPages = Math.ceil(filteredReclamos.length / itemsPerPage) || 1;
     const startIndex = (currentPage - 1) * itemsPerPage;
     const paginatedReclamos = filteredReclamos.slice(startIndex, startIndex + itemsPerPage);
 
-    const isFiltered = searchQuery.trim() !== '' || filterAdmin !== 'ALL' || filterSupervisor !== 'ALL' || filterInocuidad !== 'ALL' || filterConsumidor !== 'ALL';
+    const isFiltered = searchQuery.trim() !== '' || filterAdmin !== 'ALL' || filterSupervisor !== 'ALL' || filterInocuidad !== 'ALL' || filterConsumidor !== 'ALL' || filterConflicto;
 
     const handleClearFilters = () => {
         setSearchQuery('');
@@ -167,6 +174,7 @@ export const ReclamosList = () => {
         setFilterSupervisor('ALL');
         setFilterInocuidad('ALL');
         setFilterConsumidor('ALL');
+        setFilterConflicto(false);
         setCurrentPage(1);
         if (searchParams.get('filtro')) {
             setSearchParams({});
@@ -261,6 +269,26 @@ export const ReclamosList = () => {
                         <span className="summary-chip-lbl">Imposibilidad</span>
                     </div>
                 </div>
+
+                {summary.conflictos > 0 && (
+                    <div
+                        className="summary-chip"
+                        onClick={() => { setFilterConflicto(prev => !prev); setCurrentPage(1); }}
+                        style={{
+                            cursor: 'pointer',
+                            borderColor: '#dc2626',
+                            background: filterConflicto ? 'rgba(220, 38, 38, 0.15)' : 'rgba(220, 38, 38, 0.06)'
+                        }}
+                    >
+                        <div className="summary-chip-icon" style={{ background: 'rgba(220, 38, 38, 0.2)', color: '#dc2626' }}>
+                            <AlertCircle size={20} />
+                        </div>
+                        <div className="summary-chip-content">
+                            <span className="summary-chip-val" style={{ color: '#dc2626' }}>{summary.conflictos}</span>
+                            <span className="summary-chip-lbl" style={{ color: '#dc2626', fontWeight: 700 }}>En Conflicto</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Panel de Filtros y Búsqueda */}
@@ -432,12 +460,20 @@ export const ReclamosList = () => {
                                     return (
                                         <tr
                                             key={r.id}
+                                            className={r.en_conflicto ? 'claim-row-conflicto' : ''}
                                             onClick={() => setSelectedReclamo(r)}
-                                            title="Clic para ver detalle y gestionar acciones"
+                                            title={r.en_conflicto ? "⚠️ RECLAMO EN CONFLICTO (posible fraude/discrepancia): Clic para ver auditoría" : "Clic para ver detalle y gestionar acciones"}
                                         >
                                             {/* ID y Fecha */}
                                             <td>
-                                                <div className="claim-id-tag">#{r.id}</div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                                    <div className="claim-id-tag">#{r.id}</div>
+                                                    {Boolean(r.en_conflicto) && (
+                                                        <span className="badge badge-conflicto" style={{ fontSize: '0.64rem', padding: '2px 6px', fontWeight: 700 }}>
+                                                            ⚠️ Conflicto
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <div className="claim-sub-text">{r.fecha_alta || 'S/F'}</div>
                                             </td>
 

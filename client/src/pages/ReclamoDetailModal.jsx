@@ -54,6 +54,15 @@ function formatFechaHoraSutil(isoStr) {
     }
 }
 
+const TIPOS_DESAPROBACION = [
+    'No se constata defecto atribuible a elaboración o envasado',
+    'Producto con fecha de vencimiento expirada al momento de la compra',
+    'Defecto originado por inadecuada conservación en punto de venta',
+    'Falta de evidencia probatoria o datos insuficientes de lote',
+    'Reclamo duplicado o previamente compensado',
+    'Otro motivo administrativo fundado'
+];
+
 export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
     const { isAdmin, isInocuidad } = useAuth();
 
@@ -62,6 +71,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
     const [loadingTitle, setLoadingTitle] = useState('');
     const [loadingMessage, setLoadingMessage] = useState('');
     const [actionMsg, setActionMsg] = useState(null);
+    const [tipoDesaprobacion, setTipoDesaprobacion] = useState(TIPOS_DESAPROBACION[0]);
     const [motivoDesaprobado, setMotivoDesaprobado] = useState('');
     const [showDesaprobarPrompt, setShowDesaprobarPrompt] = useState(false);
     const [selectedSupervisor, setSelectedSupervisor] = useState(claim?.supervisor || '');
@@ -185,28 +195,29 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
     const handleDesaprobar = async () => {
         if (!motivoDesaprobado.trim()) {
             showAlertModal(
-                'Motivo Requerido',
-                'Por favor ingresá un motivo de desaprobación antes de continuar.',
+                'Observación Requerida',
+                'Por favor ingresá una observación interna para fundamentar la desaprobación antes de continuar.',
                 'warning'
             );
             return;
         }
 
         setLoadingTitle('Desaprobando Reclamo...');
-        setLoadingMessage('Registrando motivo de desaprobación y cancelando derivaciones en Google Sheets y base de datos...');
+        setLoadingMessage('Registrando motivo formal y cancelando derivaciones en base de datos y Google Sheets...');
         setUpdating(true);
         setActionMsg(null);
         try {
-            await reclamosApi.updateEstadoAdmin(activeClaim.id, 'Desaprobado', motivoDesaprobado);
+            await reclamosApi.updateEstadoAdmin(activeClaim.id, 'Desaprobado', motivoDesaprobado, tipoDesaprobacion);
             setCurrentClaim(prev => ({
                 ...(prev || activeClaim),
                 estado_admin: 'Desaprobado',
                 admin_motivo_desaprobado: motivoDesaprobado,
+                tipo_desaprobacion: tipoDesaprobacion,
                 estado_supervisor: 'Sin acciones',
                 estado_inocuidad: 'Sin acciones',
-                estado_consumidor: 'Sin acciones'
+                estado_consumidor: 'Cerrado'
             }));
-            setActionMsg({ type: 'success', text: 'Reclamo desaprobado y estados derivados pasados a "Sin acciones".' });
+            setActionMsg({ type: 'success', text: 'Reclamo desaprobado: Consumidor pasado a "Cerrado" con motivo tipificado y ramas operativas a "Sin acciones".' });
             setShowDesaprobarPrompt(false);
             if (onRefresh) onRefresh();
         } catch (e) {
@@ -362,6 +373,36 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                 </div>
             )}
 
+            {/* ALERTA CRÍTICA DE CONFLICTO / POSIBLE FRAUDE COMERCIAL */}
+            {activeClaim.en_conflicto && (
+                <div style={{
+                    marginBottom: 16,
+                    padding: '14px 18px',
+                    borderRadius: 'var(--radius-md, 10px)',
+                    background: 'rgba(220, 38, 38, 0.12)',
+                    border: '2px solid #dc2626',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 14,
+                    color: '#dc2626'
+                }}>
+                    <AlertTriangle size={24} style={{ flexShrink: 0, marginTop: 2 }} />
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 800, fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            🚨 RECLAMO EN CONFLICTO / POSIBLE FRAUDE COMERCIAL
+                        </div>
+                        <div style={{ fontSize: '0.84rem', color: 'var(--text)', marginTop: 4, lineHeight: 1.45 }}>
+                            {activeClaim.conflicto_motivo || 'Discrepancia crítica: El supervisor informó haber entregado la reposición ("Resuelto"), pero el consumidor informó NO haberla recibido ("No resuelto"). Requiere auditoría interna inmediata.'}
+                        </div>
+                        {activeClaim.fecha_conflicto && (
+                            <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                                Registrado: {formatFechaHoraSutil(activeClaim.fecha_conflicto)}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* DIAGRAMA DE WORKFLOW EN RAMAS */}
             {isAdmin && (
                 <div className="workflow-diagram-card">
@@ -381,24 +422,50 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
 
                     {/* Formulario desplegable para desaprobar si está activo */}
                     {showDesaprobarPrompt && (
-                        <div style={{ marginBottom: 14, padding: 12, background: 'var(--surface-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
-                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, marginBottom: 6 }}>
-                                Indicar motivo de la desaprobación:
-                            </label>
-                            <textarea
-                                className="form-textarea"
-                                rows={2}
-                                value={motivoDesaprobado}
-                                onChange={(e) => setMotivoDesaprobado(e.target.value)}
-                                placeholder="Ej: Falta de evidencia concluyente o fuera del período de vencimiento..."
-                                style={{ marginBottom: 8, fontSize: '0.82rem' }}
-                            />
-                            <div style={{ display: 'flex', gap: 8 }}>
-                                <button className="btn btn-danger" onClick={handleDesaprobar} disabled={updating} style={{ padding: '5px 12px', fontSize: '0.78rem' }}>
-                                    Confirmar Desaprobación
-                                </button>
-                                <button className="btn btn-secondary" onClick={() => setShowDesaprobarPrompt(false)} style={{ padding: '5px 12px', fontSize: '0.78rem' }}>
+                        <div style={{ marginBottom: 14, padding: 14, background: 'var(--surface-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, marginBottom: 5, color: 'var(--text)' }}>
+                                    Tipo de Desaprobación (visible para el consumidor):
+                                </label>
+                                <select
+                                    value={tipoDesaprobacion}
+                                    onChange={(e) => setTipoDesaprobacion(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '8px 10px',
+                                        borderRadius: 'var(--radius-sm)',
+                                        border: '1px solid var(--border)',
+                                        background: 'var(--background)',
+                                        color: 'var(--text)',
+                                        fontSize: '0.84rem'
+                                    }}
+                                >
+                                    {TIPOS_DESAPROBACION.map(t => (
+                                        <option key={t} value={t}>{t}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, marginBottom: 5, color: 'var(--text)' }}>
+                                    Observación Interna (🔒 solo visible internamente por el personal):
+                                </label>
+                                <textarea
+                                    className="form-textarea"
+                                    rows={2}
+                                    value={motivoDesaprobado}
+                                    onChange={(e) => setMotivoDesaprobado(e.target.value)}
+                                    placeholder="Detalle administrativo interno que fundamenta la decisión..."
+                                    style={{ width: '100%', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                                />
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+                                <button className="btn btn-secondary" onClick={() => setShowDesaprobarPrompt(false)} style={{ padding: '6px 14px', fontSize: '0.8rem' }}>
                                     Cancelar
+                                </button>
+                                <button className="btn btn-danger" onClick={handleDesaprobar} disabled={updating} style={{ padding: '6px 14px', fontSize: '0.8rem' }}>
+                                    Confirmar Desaprobación
                                 </button>
                             </div>
                         </div>
@@ -415,7 +482,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
 
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>Estado:</span>
-                                <StatusBadge status={activeClaim.estado_admin || 'Pendiente'} />
+                                <StatusBadge status={activeClaim.estado_admin || 'Pendiente'} actor="admin" />
                             </div>
 
                             {activeClaim.fecha_estado_admin && (
@@ -425,18 +492,35 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                 </div>
                             )}
 
-                            {/* Motivo de desaprobación si existe */}
-                            {activeClaim.admin_motivo_desaprobado && (
-                                <div style={{
-                                    background: 'rgba(239, 68, 68, 0.12)',
-                                    color: 'var(--error)',
-                                    border: '1px solid rgba(239, 68, 68, 0.25)',
-                                    padding: '6px 8px',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontSize: '0.72rem',
-                                    lineHeight: 1.35
-                                }}>
-                                    <strong>Motivo:</strong> {activeClaim.admin_motivo_desaprobado}
+                            {/* Desaprobación: Motivo formal al consumidor + Observación interna */}
+                            {isDesaprobado && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '8px 0' }}>
+                                    {activeClaim.tipo_desaprobacion && (
+                                        <div style={{
+                                            background: 'rgba(239, 68, 68, 0.12)',
+                                            color: 'var(--error)',
+                                            border: '1px solid rgba(239, 68, 68, 0.25)',
+                                            padding: '6px 8px',
+                                            borderRadius: 'var(--radius-sm)',
+                                            fontSize: '0.72rem',
+                                            lineHeight: 1.35
+                                        }}>
+                                            <strong>Motivo Consumidor:</strong> {activeClaim.tipo_desaprobacion}
+                                        </div>
+                                    )}
+                                    {activeClaim.admin_motivo_desaprobado && (
+                                        <div style={{
+                                            background: 'var(--surface-subtle)',
+                                            color: 'var(--text-muted)',
+                                            border: '1px solid var(--border)',
+                                            padding: '6px 8px',
+                                            borderRadius: 'var(--radius-sm)',
+                                            fontSize: '0.71rem',
+                                            lineHeight: 1.35
+                                        }}>
+                                            <strong>🔒 Obs. Interna:</strong> {activeClaim.admin_motivo_desaprobado}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -586,8 +670,8 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                 </div>
                             )}
 
-                            {/* Motivo de imposibilidad del supervisor si existe */}
-                            {activeClaim.supervisor_motivo_imposibilidad && (
+                            {/* Tipo de Imposibilidad formal del supervisor */}
+                            {activeClaim.tipo_imposibilidad && (
                                 <div style={{
                                     background: 'rgba(245, 158, 11, 0.12)',
                                     color: 'var(--warning)',
@@ -597,7 +681,22 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                     fontSize: '0.72rem',
                                     lineHeight: 1.35
                                 }}>
-                                    <strong>Motivo Imposibilidad:</strong> {activeClaim.supervisor_motivo_imposibilidad}
+                                    <strong>Tipo Imposibilidad (consumidor):</strong> {activeClaim.tipo_imposibilidad}
+                                </div>
+                            )}
+
+                            {/* Motivo interno u observacion de imposibilidad del supervisor (confidencial) */}
+                            {activeClaim.supervisor_motivo_imposibilidad && (
+                                <div style={{
+                                    background: 'var(--surface-subtle)',
+                                    color: 'var(--text-muted)',
+                                    border: '1px dashed var(--border)',
+                                    padding: '6px 8px',
+                                    borderRadius: 'var(--radius-sm)',
+                                    fontSize: '0.70rem',
+                                    lineHeight: 1.35
+                                }}>
+                                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>🔒 Obs. Interna:</span> {activeClaim.supervisor_motivo_imposibilidad}
                                 </div>
                             )}
 
@@ -607,6 +706,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                     {activeClaim.estado_supervisor === 'Pendiente' && 'Supervisor notificado por correo electrónico. Seguimiento automático en curso.'}
                                     {activeClaim.estado_supervisor === 'Resuelto' && 'Compensación entregada y confirmada por el supervisor.'}
                                     {activeClaim.estado_supervisor === 'Imposibilidad' && 'El supervisor reportó un impedimento para concretar la entrega.'}
+                                    {activeClaim.estado_supervisor === 'Sin acciones' && 'Sin intervenciones pendientes requeridas.'}
                                 </div>
                             )}
                             {isEnCurso && activeClaim.estado_supervisor === 'Resuelto' && (
@@ -640,7 +740,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
 
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.76rem' }}>
                                 <span style={{ color: 'var(--text-muted)' }}>Estado:</span>
-                                <StatusBadge status={isDesaprobado ? 'Sin acciones' : (activeClaim.estado_consumidor || 'Pendiente')} />
+                                <StatusBadge status={activeClaim.estado_consumidor || (isDesaprobado ? 'Cerrado' : 'Pendiente')} />
                             </div>
 
                             {activeClaim.fecha_estado_consumidor && !isEnRecepcion && (
@@ -651,7 +751,14 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
 
                             <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
                                 {isEnRecepcion && 'En espera de resolución administrativa.'}
-                                {isDesaprobado && 'Caso finalizado sin compensación.'}
+                                {activeClaim.estado_consumidor === 'Cerrado' && (
+                                    <span>
+                                        Caso cerrado para el consumidor.
+                                        {activeClaim.tipo_desaprobacion && ` Motivo: ${activeClaim.tipo_desaprobacion}.`}
+                                        {activeClaim.tipo_imposibilidad && ` Imposibilidad informada: ${activeClaim.tipo_imposibilidad}.`}
+                                    </span>
+                                )}
+                                {isDesaprobado && activeClaim.estado_consumidor !== 'Cerrado' && 'Caso finalizado sin compensación.'}
                                 {isEnCurso && (activeClaim.estado_consumidor === 'Pendiente' || activeClaim.estado_consumidor === 'En curso') && (
                                     'Reclamo en curso de atención y reposición de producto.'
                                 )}

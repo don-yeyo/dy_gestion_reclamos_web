@@ -355,6 +355,11 @@ class ReclamosDatabaseService {
             fecha_estado_consumidor: r.fecha_estado_consumidor ? r.fecha_estado_consumidor.toISOString() : null,
             estado_inocuidad: r.estado_inocuidad,
             fecha_estado_inocuidad: r.fecha_estado_inocuidad ? r.fecha_estado_inocuidad.toISOString() : null,
+            tipo_imposibilidad: r.tipo_imposibilidad || '',
+            tipo_desaprobacion: r.tipo_desaprobacion || '',
+            en_conflicto: Boolean(r.en_conflicto),
+            conflicto_motivo: r.conflicto_motivo || '',
+            fecha_conflicto: r.fecha_conflicto ? r.fecha_conflicto.toISOString() : null,
             items: itemsByClaim.get(r.id) || []
         }));
     }
@@ -406,6 +411,11 @@ class ReclamosDatabaseService {
             fecha_estado_consumidor: r.fecha_estado_consumidor ? r.fecha_estado_consumidor.toISOString() : null,
             estado_inocuidad: r.estado_inocuidad,
             fecha_estado_inocuidad: r.fecha_estado_inocuidad ? r.fecha_estado_inocuidad.toISOString() : null,
+            tipo_imposibilidad: r.tipo_imposibilidad || '',
+            tipo_desaprobacion: r.tipo_desaprobacion || '',
+            en_conflicto: Boolean(r.en_conflicto),
+            conflicto_motivo: r.conflicto_motivo || '',
+            fecha_conflicto: r.fecha_conflicto ? r.fecha_conflicto.toISOString() : null,
             items: items.map(it => ({
                 rowNumber: it.item_row_number,
                 categoria: it.categoria,
@@ -422,6 +432,71 @@ class ReclamosDatabaseService {
                 conserva_envase: it.conserva_envase
             }))
         };
+    }
+
+    /**
+     * Obtiene los estados posibles del workflow con sus descripciones
+     */
+    async getWorkflowEstados() {
+        const [rows] = await pool.query('SELECT * FROM workflow_estados ORDER BY actor ASC, orden ASC, id ASC');
+        return rows;
+    }
+
+    /**
+     * Actualiza configuración editable de un estado (descripción y color del badge)
+     * No permite cambiar nombres ni códigos para preservar la integridad de los workflows
+     */
+    async updateWorkflowEstadoConfig(id, { descripcion, color }) {
+        const updates = [];
+        const values = [];
+
+        if (descripcion !== undefined && typeof descripcion === 'string') {
+            updates.push('descripcion = ?');
+            values.push(descripcion.trim());
+        }
+        if (color !== undefined && typeof color === 'string') {
+            updates.push('color = ?');
+            values.push(color.trim());
+        }
+
+        if (updates.length > 0) {
+            values.push(id);
+            await pool.execute(
+                `UPDATE workflow_estados SET ${updates.join(', ')} WHERE id = ?`,
+                values
+            );
+        }
+
+        const [rows] = await pool.execute('SELECT * FROM workflow_estados WHERE id = ?', [id]);
+        return rows[0] || null;
+    }
+
+    /**
+     * Wrapper retrocompatible para actualizar descripción
+     */
+    async updateWorkflowEstadoDescripcion(id, descripcion) {
+        return this.updateWorkflowEstadoConfig(id, { descripcion });
+    }
+
+    /**
+     * Marca un reclamo en estado de conflicto / posible fraude
+     */
+    async marcarConflicto(claimId, motivo) {
+        const now = new Date();
+        await pool.execute(
+            'UPDATE reclamos SET en_conflicto = 1, conflicto_motivo = ?, fecha_conflicto = ? WHERE id = ?',
+            [motivo, now, String(claimId)]
+        );
+        await this.logAudit({
+            reclamo_id: String(claimId),
+            actor: 'sistema_alerta',
+            actor_email: 'sistema@donyeyo.com.ar',
+            campo_modificado: 'en_conflicto',
+            valor_anterior: '0',
+            valor_nuevo: '1',
+            motivo
+        });
+        return true;
     }
 
     /**
@@ -615,8 +690,8 @@ class ReclamosDatabaseService {
             // 1. Inocuidad cambió estado pendiente a otro de sus estados
             const inocuidadOk = inocuidad !== '' && inocuidad !== 'pendiente';
 
-            // 2. Supervisor cambió su estado a resuelto o imposibilidad
-            const supervisorOk = supervisor === 'resuelto' || supervisor === 'imposibilidad';
+            // 2. Supervisor cambió su estado a resuelto, imposibilidad o sin acciones
+            const supervisorOk = supervisor === 'resuelto' || supervisor === 'imposibilidad' || supervisor === 'sin acciones';
 
             // 3. Consumidor cambió su estado a uno distinto de "pendiente", "en curso" y "sin acciones"
             const consumidorOk = consumidor !== '' &&
