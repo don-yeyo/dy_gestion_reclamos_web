@@ -82,6 +82,21 @@ router.post('/upload', authMiddleware, requireRole(['admin', 'sysadmin']), async
 
         const uploader = req.user && req.user.email ? req.user.email : 'admin';
         const updatedInfo = await supervisorLookupService.saveNewGeoJSON(geojson, uploader);
+
+        // Registro de log de configuración
+        const systemLogService = require('../services/systemLogService');
+        await systemLogService.logConfigChange({
+            modulo: 'cobertura_supervisores',
+            accion: 'modificacion',
+            descripcion: `Actualización de archivo GeoJSON de zonificación de supervisores (${updatedInfo?.zonasCount || 0} zonas configuradas)`,
+            actor: req.user?.role || 'admin',
+            actorEmail: uploader,
+            valoresNuevos: {
+                zonasCount: updatedInfo?.zonasCount,
+                supervisores: updatedInfo?.supervisores
+            }
+        });
+
         res.json({
             success: true,
             message: 'Archivo de cobertura geográfica de supervisores actualizado correctamente.',

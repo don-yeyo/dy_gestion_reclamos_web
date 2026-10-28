@@ -9,6 +9,12 @@
 [functions]
   node_bundler = "esbuild"
 
+# Tarea programada nativa de Netlify (Scheduled Function)
+# Se dispara de lunes a viernes en horario laboral (11:00 a 21:00 UTC = 08:00 a 18:00 hs Argentina)
+# El control de ejecución efectivo y las horas exactas se configuran por env vars (CRON_FOLLOWUP_ENABLED y CRON_HORAS_EJECUCION_ARG)
+[functions."scheduledFollowup"]
+  schedule = "0 11-21 * * 1-5"
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/api/:splat"

@@ -38,7 +38,7 @@ test.describe('CU-05, CU-06, CU-08: Gestión de Expediente en Modal de Detalle',
         await expect(btnAprobar).toBeEnabled();
     });
 
-    test('CU-06: debe aprobar el reclamo cuando cuenta con supervisor y actualizar las cards', async ({ page }) => {
+    test('CU-06: debe exigir prioridad obligatoria al aprobar el reclamo y actualizar las cards', async ({ page }) => {
         await page.goto('/reclamos');
 
         // Abrir reclamo REC-2026-002 (ya cuenta con supervisor Hugo Basile)
@@ -50,19 +50,35 @@ test.describe('CU-05, CU-06, CU-08: Gestión de Expediente en Modal de Detalle',
         await expect(btnAprobar).toBeEnabled();
         await btnAprobar.click();
 
-        // Debe aparecer el modal de confirmación
-        await expect(page.locator('text=¿Aprobar el Reclamo #REC-2026-002?')).toBeVisible();
+        // Debe aparecer el modal interactivo de prioridad obligatoria
+        await expect(page.locator('text=Aprobar Reclamo #REC-2026-002')).toBeVisible();
+
+        // El botón de confirmar aprobación debe estar deshabilitado mientras no se elija prioridad
+        const btnConfirmar = page.locator('[data-testid="btn-confirmar-aprobacion"]');
+        await expect(btnConfirmar).toBeDisabled();
+
+        // El select de prioridad debe estar visible y sin valor predeterminado
+        const selectPrioridad = page.locator('[data-testid="select-prioridad"]');
+        await expect(selectPrioridad).toBeVisible();
+        await expect(selectPrioridad).toHaveValue('');
+
+        // Seleccionar prioridad Alta (código 10)
+        await selectPrioridad.selectOption('10');
+        await expect(selectPrioridad).toHaveValue('10');
+        await expect(btnConfirmar).toBeEnabled();
 
         // Confirmar aprobación
-        const btnConfirmar = page.locator('.modal-overlay', { hasText: '¿Aprobar el Reclamo #REC-2026-002?' }).getByRole('button', { name: 'Aprobar Reclamo', exact: true });
         await btnConfirmar.click();
 
-        // Verificar mensaje de éxito
-        await expect(page.locator('text=Reclamo Aprobado con éxito')).toBeVisible();
+        // Verificar mensaje de éxito con la prioridad asignada
+        await expect(page.locator('text=Reclamo Aprobado con Prioridad Alta')).toBeVisible();
 
         // Las cards 2 y 3 pasan a estado Pendiente
         await expect(page.locator('.wf-branch-card', { hasText: '2. Calidad & Inocuidad' })).toContainText('Pendiente');
         await expect(page.locator('.wf-branch-card', { hasText: '3. Acción de Compensación' })).toContainText('Pendiente');
+
+        // La card 1 debe exhibir la prioridad y SLA asignado
+        await expect(page.locator('.wf-branch-card', { hasText: '1. Ingreso' })).toContainText('Prioridad: Alta');
     });
 
     test('CU-08: debe mostrar botones de reenvío de email en las cards 2 y 3 cuando el reclamo está aprobado', async ({ page }) => {

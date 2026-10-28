@@ -145,7 +145,8 @@ export const ReclamosList = () => {
                 const estado = (r.estado_consumidor || 'Pendiente').toLowerCase();
                 if (filterConsumidor === 'Pendiente' && estado !== 'pendiente') return false;
                 if (filterConsumidor === 'En curso' && estado !== 'en curso') return false;
-                if (filterConsumidor === 'Resuelto conforme' && !estado.includes('conforme')) return false;
+                if (filterConsumidor === 'Resuelto sin confirmar' && !estado.includes('sin confirmar')) return false;
+                if (filterConsumidor === 'Resuelto conforme' && (!estado.includes('conforme') || estado.includes('sin confirmar'))) return false;
                 if (filterConsumidor === 'Resuelto disconforme' && !estado.includes('disconforme')) return false;
                 if (filterConsumidor === 'No resuelto' && !estado.includes('no resuelto')) return false;
                 if (filterConsumidor === 'FSR' && (!estado.includes('fsr') && !estado.includes('sin respuesta'))) return false;
@@ -384,6 +385,7 @@ export const ReclamosList = () => {
                             <option value="ALL">Todos los estados</option>
                             <option value="Pendiente">Pendiente</option>
                             <option value="En curso">En curso</option>
+                            <option value="Resuelto sin confirmar">Resuelto sin confirmar</option>
                             <option value="Resuelto conforme">Resuelto conforme</option>
                             <option value="Resuelto disconforme">Resuelto disconforme</option>
                             <option value="No resuelto">No resuelto</option>

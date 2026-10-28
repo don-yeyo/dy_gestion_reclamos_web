@@ -3,6 +3,7 @@ const router = express.Router();
 const googleSheetsService = require('../services/googleSheetsService');
 const reclamosDatabaseService = require('../services/reclamosDatabaseService');
 const emailWorkflowService = require('../services/emailWorkflowService');
+const prioridadesService = require('../services/prioridadesService');
 const { authMiddleware, requireRole } = require('../middlewares/authMiddleware');
 
 // Todos los endpoints de gestión requieren autenticación y rol válido
@@ -84,7 +85,7 @@ router.get('/:id/auditoria', async (req, res) => {
  * - Si es "Aprobado": marca aprobado y limpia motivos.
  */
 router.patch('/:id/estado-admin', requireRole(['admin', 'sysadmin']), async (req, res) => {
-    const { estado, motivo_desaprobado, tipo_desaprobacion } = req.body;
+    const { estado, motivo_desaprobado, tipo_desaprobacion, prioridad, regla_cortesia } = req.body;
     const claimId = req.params.id;
 
     if (!['Pendiente', 'En curso', 'Aprobado', 'Desaprobado'].includes(estado)) {
@@ -99,6 +100,9 @@ router.patch('/:id/estado-admin', requireRole(['admin', 'sysadmin']), async (req
         if (!claim) {
             return res.status(404).json({ success: false, error: 'Reclamo no encontrado.' });
         }
+
+        let prioridadObj = null;
+        let reglaCortesiaAplicada = null;
 
         if (estado === 'En curso' || estado === 'Aprobado') {
             const rawSup = (claim.supervisor || '').trim().toLowerCase();
@@ -122,6 +126,25 @@ router.patch('/:id/estado-admin', requireRole(['admin', 'sysadmin']), async (req
                     error: 'El reclamo ya ha sido aprobado previamente.'
                 });
             }
+
+            // Exigencia obligatoria de prioridad según la gravedad del caso
+            if (prioridad === undefined || prioridad === null || String(prioridad).trim() === '') {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Debe seleccionar obligatoriamente el nivel de prioridad según la gravedad del caso.'
+                });
+            }
+
+            prioridadObj = await prioridadesService.getPrioridadByCodigo(prioridad);
+            if (!prioridadObj) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Nivel de prioridad inválido. Debe seleccionar Alta (10), Media (20) o Baja (30).'
+                });
+            }
+
+            const fechaLimiteSla = new Date(Date.now() + prioridadObj.sla * 24 * 60 * 60 * 1000);
+            reglaCortesiaAplicada = regla_cortesia || (prioridadObj.reglas_cortesia && prioridadObj.reglas_cortesia[0] ? prioridadObj.reglas_cortesia[0].descripcion : '1 reemplazo');
         }
 
         const updates = { 'AO': estado };
@@ -133,6 +156,13 @@ router.patch('/:id/estado-admin', requireRole(['admin', 'sysadmin']), async (req
             updates['AS'] = 'En curso'; // estado_consumidor pasa a En curso
             updates['AQ'] = 'Pendiente'; // supervisor pasa a Pendiente
             updates['AT'] = 'Pendiente'; // calidad / inocuidad pasa a Pendiente
+            if (prioridadObj) {
+                updates['prioridad'] = prioridadObj.codigo;
+                updates['prioridad_nombre'] = prioridadObj.nombre;
+                updates['sla_dias'] = prioridadObj.sla;
+                updates['fecha_limite_sla'] = new Date(Date.now() + prioridadObj.sla * 24 * 60 * 60 * 1000);
+                updates['regla_cortesia_aplicada'] = reglaCortesiaAplicada;
+            }
         } else if (estado === 'Desaprobado') {
             updates['AP'] = motivo_desaprobado || 'Desaprobado por administración';
             updates['tipo_desaprobacion'] = tipo_desaprobacion || 'No corresponde compensación según criterios de calidad';
@@ -150,7 +180,8 @@ router.patch('/:id/estado-admin', requireRole(['admin', 'sysadmin']), async (req
         const auditInfo = {
             actor: req.user ? req.user.role : 'admin',
             actorEmail: req.user ? req.user.email : null,
-            motivo: motivo_desaprobado || tipo_desaprobacion || (estado === 'En curso' ? 'Reclamo aprobado por administración' : null)
+            motivo: motivo_desaprobado || tipo_desaprobacion || (estado === 'En curso' ? `Reclamo aprobado con prioridad ${prioridadObj?.nombre || 'Media'} (SLA: ${prioridadObj?.sla || 7} días)` : null),
+            metadata: prioridadObj ? { prioridad: prioridadObj.codigo, nombre: prioridadObj.nombre, sla: prioridadObj.sla, regla: reglaCortesiaAplicada } : null
         };
 
         await googleSheetsService.updateReclamo(claimId, updates, auditInfo);
@@ -158,7 +189,7 @@ router.patch('/:id/estado-admin', requireRole(['admin', 'sysadmin']), async (req
         // Si fue aprobado / puesto en curso, calcular y aplicar cortesía, luego disparar emails
         if (estado === 'En curso' || estado === 'Aprobado') {
             try {
-                await googleSheetsService.aplicarProductoCortesia(claimId);
+                await googleSheetsService.aplicarProductoCortesia(claimId, reglaCortesiaAplicada);
             } catch (errCortesia) {
                 console.error(`[CORTESIA] Error aplicando producto cortesía al reclamo #${claimId}:`, errCortesia.message);
             }
@@ -282,6 +313,11 @@ router.patch('/:id/estado-supervisor', requireRole(['admin', 'sysadmin']), async
             updates['AR'] = motivo_imposibilidad;
         }
 
+        // Si el supervisor declara que está "Resuelto", el estado_consumidor pasa a "Resuelto sin confirmar"
+        if (estado === 'Resuelto') {
+            updates['AS'] = 'Resuelto sin confirmar';
+        }
+
         // Si se establece imposibilidad del supervisor:
         // El consumidor ve el tipo de imposibilidad y pasa a Cerrado, e Inocuidad a Sin acciones
         if (estado === 'Imposibilidad') {
@@ -313,7 +349,7 @@ router.patch('/:id/estado-consumidor', requireRole(['admin', 'sysadmin']), async
     const { estado } = req.body;
     const claimId = req.params.id;
 
-    if (!['Pendiente', 'En curso', 'Resuelto conforme', 'Resuelto disconforme', 'No resuelto', 'Sin respuesta', 'Sin acciones', 'Cerrado'].includes(estado)) {
+    if (!['Pendiente', 'En curso', 'Resuelto sin confirmar', 'Resuelto conforme', 'Resuelto disconforme', 'No resuelto', 'Sin respuesta', 'Sin acciones', 'Cerrado'].includes(estado)) {
         return res.status(400).json({ success: false, error: 'Estado del consumidor no válido.' });
     }
 
@@ -354,7 +390,12 @@ router.post('/:id/reenviar-inocuidad', requireRole(['admin', 'sysadmin']), async
             return res.status(404).json({ success: false, error: 'Reclamo no encontrado.' });
         }
 
-        await emailWorkflowService.sendInocuidadActionEmail(claim);
+        await emailWorkflowService.sendInocuidadActionEmail(claim, {
+            manual: true,
+            actorEmail: req.user ? req.user.email : null,
+            actor: req.user ? req.user.role : 'admin',
+            motivo: `Reenvío manual de expediente técnico a Calidad & Inocuidad por ${req.user?.email || 'admin'}`
+        });
 
         await reclamosDatabaseService.logAudit({
             reclamo_id: claimId,
@@ -397,7 +438,12 @@ router.post('/:id/reenviar-supervisor', requireRole(['admin', 'sysadmin']), asyn
             });
         }
 
-        await emailWorkflowService.sendSupervisorActionEmail(claim);
+        await emailWorkflowService.sendSupervisorActionEmail(claim, {
+            manual: true,
+            actorEmail: req.user ? req.user.email : null,
+            actor: req.user ? req.user.role : 'admin',
+            motivo: `Reenvío manual de instrucciones de compensación a supervisor ${claim.supervisor} por ${req.user?.email || 'admin'}`
+        });
 
         await reclamosDatabaseService.logAudit({
             reclamo_id: claimId,

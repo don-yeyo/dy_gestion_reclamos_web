@@ -34,6 +34,11 @@ class ReclamosDatabaseService {
             supervisor_motivo_imposibilidad: claim.supervisor_motivo_imposibilidad || '',
             estado_consumidor: claim.estado_consumidor || 'Pendiente',
             estado_inocuidad: claim.estado_inocuidad || 'Sin acciones',
+            prioridad: claim.prioridad !== undefined ? claim.prioridad : null,
+            prioridad_nombre: claim.prioridad_nombre || null,
+            sla_dias: claim.sla_dias !== undefined ? claim.sla_dias : null,
+            fecha_limite_sla: claim.fecha_limite_sla ? new Date(claim.fecha_limite_sla) : null,
+            regla_cortesia_aplicada: claim.regla_cortesia_aplicada || null,
             row_numbers: JSON.stringify(claim.rowNumbers || [])
         };
     }
@@ -360,6 +365,11 @@ class ReclamosDatabaseService {
             en_conflicto: Boolean(r.en_conflicto),
             conflicto_motivo: r.conflicto_motivo || '',
             fecha_conflicto: r.fecha_conflicto ? r.fecha_conflicto.toISOString() : null,
+            prioridad: r.prioridad !== null && r.prioridad !== undefined ? Number(r.prioridad) : null,
+            prioridad_nombre: r.prioridad_nombre || '',
+            sla_dias: r.sla_dias !== null && r.sla_dias !== undefined ? Number(r.sla_dias) : null,
+            fecha_limite_sla: r.fecha_limite_sla ? r.fecha_limite_sla.toISOString() : null,
+            regla_cortesia_aplicada: r.regla_cortesia_aplicada || '',
             items: itemsByClaim.get(r.id) || []
         }));
     }
@@ -416,6 +426,11 @@ class ReclamosDatabaseService {
             en_conflicto: Boolean(r.en_conflicto),
             conflicto_motivo: r.conflicto_motivo || '',
             fecha_conflicto: r.fecha_conflicto ? r.fecha_conflicto.toISOString() : null,
+            prioridad: r.prioridad !== null && r.prioridad !== undefined ? Number(r.prioridad) : null,
+            prioridad_nombre: r.prioridad_nombre || '',
+            sla_dias: r.sla_dias !== null && r.sla_dias !== undefined ? Number(r.sla_dias) : null,
+            fecha_limite_sla: r.fecha_limite_sla ? r.fecha_limite_sla.toISOString() : null,
+            regla_cortesia_aplicada: r.regla_cortesia_aplicada || '',
             items: items.map(it => ({
                 rowNumber: it.item_row_number,
                 categoria: it.categoria,
@@ -693,11 +708,12 @@ class ReclamosDatabaseService {
             // 2. Supervisor cambió su estado a resuelto, imposibilidad o sin acciones
             const supervisorOk = supervisor === 'resuelto' || supervisor === 'imposibilidad' || supervisor === 'sin acciones';
 
-            // 3. Consumidor cambió su estado a uno distinto de "pendiente", "en curso" y "sin acciones"
+            // 3. Consumidor cambió su estado a uno de respuesta/cierre (distinto de "pendiente", "en curso", "sin acciones" y "resuelto sin confirmar")
             const consumidorOk = consumidor !== '' &&
                 consumidor !== 'pendiente' &&
                 consumidor !== 'en curso' &&
-                consumidor !== 'sin acciones';
+                consumidor !== 'sin acciones' &&
+                consumidor !== 'resuelto sin confirmar';
 
             if (inocuidadOk && supervisorOk && consumidorOk) {
                 console.log(`[AUTO-FINALIZADO] Reclamo #${idStr} cumple las 3 condiciones de cierre. Asumiendo estado_admin como "Finalizado"...`);

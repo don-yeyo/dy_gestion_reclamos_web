@@ -45,6 +45,21 @@ router.put('/config', requireRole(['admin', 'sysadmin']), async (req, res) => {
             defectos_estandar
         }, userEmail);
 
+        // Registro de log de configuración
+        const systemLogService = require('../services/systemLogService');
+        await systemLogService.logConfigChange({
+            modulo: 'cortesia_global',
+            accion: 'modificacion',
+            descripcion: 'Actualización de configuración global de cortesía y defectos estándar',
+            actor: req.user?.role || 'admin',
+            actorEmail: userEmail,
+            valoresNuevos: {
+                cortesia_estandar,
+                cortesia_especial,
+                defectos_estandar
+            }
+        });
+
         res.json({
             success: true,
             message: 'Regla de producto de cortesía actualizada correctamente.',

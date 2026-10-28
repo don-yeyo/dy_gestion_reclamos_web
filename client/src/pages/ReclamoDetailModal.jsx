@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '../components/Modal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { StatusBadge } from '../components/StatusBadge';
-import { reclamosApi } from '../services/api';
+import { reclamosApi, prioridadesApi } from '../services/api';
 import { useAuth } from '../config/AuthContext';
 import {
     MapPin,
@@ -75,6 +75,28 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
     const [motivoDesaprobado, setMotivoDesaprobado] = useState('');
     const [showDesaprobarPrompt, setShowDesaprobarPrompt] = useState(false);
     const [selectedSupervisor, setSelectedSupervisor] = useState(claim?.supervisor || '');
+    
+    // Prioridad obligatoria al aprobar
+    const [showAprobarModal, setShowAprobarModal] = useState(false);
+    const [selectedPrioridad, setSelectedPrioridad] = useState(''); // Sin valor por defecto prefijado
+    const [prioridades, setPrioridades] = useState([]);
+
+    useEffect(() => {
+        prioridadesApi.getAll()
+            .then(res => {
+                if (res.data?.success && Array.isArray(res.data.prioridades)) {
+                    setPrioridades(res.data.prioridades);
+                }
+            })
+            .catch(err => {
+                console.error('Error cargando prioridades:', err);
+                setPrioridades([
+                    { codigo: 10, nombre: 'Alta', descripcion: 'Casos críticos y graves que implican reconocer el error rápidamente', sla: 3, reglas_cortesia: [{ codigo: 'codigo1', descripcion: ' 1 reemplazo + 2 productos a elección + 2 de kg' }] },
+                    { codigo: 20, nombre: 'Media', descripcion: 'Casos leves que no representan un daño importante para el consumidor', sla: 7, reglas_cortesia: [{ codigo: 'codigo2', descripcion: ' 1 reemplazo' }] },
+                    { codigo: 30, nombre: 'Baja', descripcion: 'Casos donde es notorio que el problema se debió a cuestiones agenas a la empresa', sla: 14, reglas_cortesia: [{ codigo: 'codigo3', descripcion: ' 1 reemplazo + 1 de kg' }] }
+                ]);
+            });
+    }, []);
 
     // Modal de diálogo (reemplaza alert y confirm de JS nativo)
     const [dialogConfig, setDialogConfig] = useState({
@@ -150,46 +172,64 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
             return;
         }
 
-        showConfirmModal({
-            title: `Aprobar Reclamo #${activeClaim.id}`,
-            message: `¿Aprobar el Reclamo #${activeClaim.id}?\n\n` +
-                `• Se notificará por correo al supervisor ${activeClaim.supervisor} con las instrucciones de entrega de reposición y cortesía.\n` +
-                `• Se enviará copia completa del expediente al departamento de Calidad & Inocuidad para su investigación técnica.\n` +
-                `• Ambos estados pasarán a "Pendiente" y el reclamo quedará En curso.`,
-            variant: 'primary',
-            confirmText: 'Aprobar Reclamo',
-            onConfirm: async () => {
-                setLoadingTitle('Aprobando Reclamo...');
-                setLoadingMessage('Despachando notificaciones por correo electrónico al supervisor y Calidad & Inocuidad, y sincronizando con Google Sheets y MySQL...');
-                setUpdating(true);
-                setActionMsg(null);
-                try {
-                    await reclamosApi.updateEstadoAdmin(activeClaim.id, 'En curso');
-                    const nowIso = new Date().toISOString();
-                    setCurrentClaim(prev => ({
-                        ...(prev || activeClaim),
-                        estado_admin: 'En curso',
-                        fecha_estado_admin: nowIso,
-                        estado_supervisor: 'Pendiente',
-                        fecha_estado_supervisor: nowIso,
-                        estado_inocuidad: 'Pendiente',
-                        fecha_estado_inocuidad: nowIso,
-                        estado_consumidor: 'En curso',
-                        fecha_estado_consumidor: nowIso,
-                        admin_motivo_desaprobado: ''
-                    }));
-                    setActionMsg({
-                        type: 'success',
-                        text: 'Reclamo Aprobado con éxito. Se notificó al supervisor comercial y se derivó copia a Calidad & Inocuidad.'
-                    });
-                    if (onRefresh) onRefresh();
-                } catch (e) {
-                    setActionMsg({ type: 'error', text: 'Error al aprobar reclamo: ' + (e.response?.data?.error || e.message) });
-                } finally {
-                    setUpdating(false);
-                }
-            }
-        });
+        // Control mandatorio: sin valor por defecto prefijado
+        setSelectedPrioridad('');
+        setShowAprobarModal(true);
+    };
+
+    const handleConfirmAprobar = async () => {
+        if (!selectedPrioridad) {
+            showAlertModal(
+                'Prioridad Requerida',
+                'Debe seleccionar obligatoriamente un nivel de prioridad según la gravedad del caso para poder avanzar.',
+                'warning'
+            );
+            return;
+        }
+
+        const prioridadNum = Number(selectedPrioridad);
+        const pObj = prioridades.find(p => Number(p.codigo) === prioridadNum);
+
+        setShowAprobarModal(false);
+        setLoadingTitle('Aprobando Reclamo...');
+        setLoadingMessage('Despachando notificaciones por correo electrónico al supervisor y Calidad & Inocuidad, y sincronizando con base de datos...');
+        setUpdating(true);
+        setActionMsg(null);
+        try {
+            await reclamosApi.updateEstadoAdmin(activeClaim.id, 'En curso', '', '', prioridadNum);
+            const nowIso = new Date().toISOString();
+            const slaDias = pObj?.sla || 7;
+            const fechaLimiteSla = new Date(Date.now() + slaDias * 24 * 60 * 60 * 1000).toISOString();
+            const reglas = Array.isArray(pObj?.reglas_cortesia) ? pObj.reglas_cortesia : [];
+            const reglaAplicada = reglas.length > 0 ? (reglas[0].descripcion || '') : '';
+
+            setCurrentClaim(prev => ({
+                ...(prev || activeClaim),
+                estado_admin: 'En curso',
+                fecha_estado_admin: nowIso,
+                estado_supervisor: 'Pendiente',
+                fecha_estado_supervisor: nowIso,
+                estado_inocuidad: 'Pendiente',
+                fecha_estado_inocuidad: nowIso,
+                estado_consumidor: 'En curso',
+                fecha_estado_consumidor: nowIso,
+                admin_motivo_desaprobado: '',
+                prioridad: prioridadNum,
+                prioridad_nombre: pObj?.nombre || '',
+                sla_dias: slaDias,
+                fecha_limite_sla: fechaLimiteSla,
+                regla_cortesia_aplicada: reglaAplicada
+            }));
+            setActionMsg({
+                type: 'success',
+                text: `Reclamo Aprobado con Prioridad ${pObj?.nombre || prioridadNum}. Se notificó al supervisor comercial y se derivó copia a Calidad & Inocuidad.`
+            });
+            if (onRefresh) onRefresh();
+        } catch (e) {
+            setActionMsg({ type: 'error', text: 'Error al aprobar reclamo: ' + (e.response?.data?.error || e.message) });
+        } finally {
+            setUpdating(false);
+        }
     };
 
     const handleDesaprobar = async () => {
@@ -530,6 +570,28 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                 {activeClaim.estado_admin === 'Finalizado' && 'Reclamo completado y cerrado exitosamente en todos sus circuitos.'}
                             </div>
 
+                            {/* Detalle de Prioridad y SLA si está aprobado */}
+                            {isReclamoAprobado && activeClaim.prioridad_nombre && (
+                                <div style={{
+                                    margin: '6px 0',
+                                    padding: '6px 8px',
+                                    borderRadius: 'var(--radius-sm, 6px)',
+                                    background: Number(activeClaim.prioridad) === 10 ? 'rgba(239, 68, 68, 0.12)' : Number(activeClaim.prioridad) === 20 ? 'rgba(245, 158, 11, 0.12)' : 'rgba(59, 130, 246, 0.12)',
+                                    border: `1px solid ${Number(activeClaim.prioridad) === 10 ? 'rgba(239, 68, 68, 0.3)' : Number(activeClaim.prioridad) === 20 ? 'rgba(245, 158, 11, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
+                                    fontSize: '0.72rem',
+                                    lineHeight: 1.35
+                                }}>
+                                    <div style={{ fontWeight: 700, color: Number(activeClaim.prioridad) === 10 ? 'var(--error)' : Number(activeClaim.prioridad) === 20 ? 'var(--warning)' : 'var(--info)' }}>
+                                        Prioridad: {activeClaim.prioridad_nombre} (SLA: {activeClaim.sla_dias || 'N/A'} días)
+                                    </div>
+                                    {activeClaim.regla_cortesia_aplicada && (
+                                        <div style={{ fontSize: '0.69rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                                            🎁 Cortesía: {activeClaim.regla_cortesia_aplicada}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Botones de acción en recepción: Desaprobar primero, Aprobar por debajo */}
                             {isEnRecepcion && (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 'auto' }}>
@@ -762,6 +824,9 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                 {isEnCurso && (activeClaim.estado_consumidor === 'Pendiente' || activeClaim.estado_consumidor === 'En curso') && (
                                     'Reclamo en curso de atención y reposición de producto.'
                                 )}
+                                {isEnCurso && activeClaim.estado_consumidor === 'Resuelto sin confirmar' && (
+                                    'El supervisor comercial declaró haber resuelto el caso y entregado la compensación. A la espera de confirmación de recepción y conformidad por parte del consumidor.'
+                                )}
                                 {isEnCurso && activeClaim.estado_consumidor === 'Resuelto' && (
                                     'Reposición y cortesía recibidas por el consumidor.'
                                 )}
@@ -899,6 +964,159 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                     </table>
                 </div>
             </div>
+
+            {/* Modal Mandatorio de Selección de Prioridad al Aprobar */}
+            {showAprobarModal && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(10, 15, 29, 0.82)',
+                        backdropFilter: 'blur(5px)',
+                        WebkitBackdropFilter: 'blur(5px)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1350,
+                        padding: 20
+                    }}
+                    onClick={() => setShowAprobarModal(false)}
+                >
+                    <div
+                        className="modal-content-card glass"
+                        style={{
+                            maxWidth: 540,
+                            width: '100%',
+                            padding: '28px 32px',
+                            borderRadius: 'var(--radius-lg, 16px)',
+                            border: '1px solid var(--border)',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.75)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 16
+                        }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{
+                                width: 38,
+                                height: 38,
+                                borderRadius: '50%',
+                                background: 'rgba(229, 53, 59, 0.15)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'var(--primary)'
+                            }}>
+                                <CheckCircle2 size={20} />
+                            </div>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text-main)', fontWeight: 700 }}>
+                                    Aprobar Reclamo #{activeClaim.id}
+                                </h3>
+                                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                    Asignación obligatoria de gravedad y SLA
+                                </span>
+                            </div>
+                        </div>
+
+                        <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                            Para poner el reclamo en estado <strong>En curso</strong> y derivar las notificaciones al supervisor comercial 
+                            y al sector de Calidad & Inocuidad, <strong>es mandatorio seleccionar el nivel de prioridad</strong> según la gravedad del caso.
+                        </p>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <label htmlFor="select-prioridad-modal" style={{ fontSize: '0.86rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                                Nivel de Prioridad <span style={{ color: 'var(--error)' }}>*</span>
+                            </label>
+                            <select
+                                id="select-prioridad-modal"
+                                data-testid="select-prioridad"
+                                value={selectedPrioridad}
+                                onChange={e => setSelectedPrioridad(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '11px 14px',
+                                    borderRadius: 'var(--radius-md, 8px)',
+                                    background: 'var(--surface-input, #0e1428)',
+                                    border: '1px solid var(--border)',
+                                    color: 'var(--text-main)',
+                                    fontSize: '0.92rem',
+                                    outline: 'none',
+                                    cursor: 'pointer'
+                                }}
+                                required
+                            >
+                                <option value="" disabled>-- Seleccionar nivel de prioridad (obligatorio) --</option>
+                                {prioridades.map(p => (
+                                    <option key={p.codigo} value={p.codigo}>
+                                        {p.nombre} (SLA: {p.sla} días) — {p.descripcion}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {selectedPrioridad && (() => {
+                            const sel = prioridades.find(p => Number(p.codigo) === Number(selectedPrioridad));
+                            if (!sel) return null;
+                            const regla = sel.reglas_cortesia?.[0]?.descripcion || '1 reemplazo';
+                            const isAlta = Number(sel.codigo) === 10;
+                            const isMedia = Number(sel.codigo) === 20;
+
+                            return (
+                                <div style={{
+                                    padding: '12px 14px',
+                                    borderRadius: 'var(--radius-md, 8px)',
+                                    background: isAlta ? 'rgba(239, 68, 68, 0.1)' : isMedia ? 'rgba(245, 158, 11, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                                    border: `1px solid ${isAlta ? 'rgba(239, 68, 68, 0.3)' : isMedia ? 'rgba(245, 158, 11, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`,
+                                    fontSize: '0.82rem',
+                                    lineHeight: 1.5,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 4
+                                }}>
+                                    <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>
+                                        Prioridad {sel.nombre} • SLA {sel.sla} días corridos
+                                    </div>
+                                    <div style={{ color: 'var(--text-muted)' }}>
+                                        {sel.descripcion}
+                                    </div>
+                                    <div style={{ marginTop: 4, fontWeight: 600, color: 'var(--primary)' }}>
+                                        🎁 Regla de cortesía sugerida: <span style={{ fontWeight: 400 }}>{regla}</span>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 6 }}>
+                            <button
+                                type="button"
+                                className="wf-node-btn"
+                                onClick={() => setShowAprobarModal(false)}
+                                disabled={updating}
+                                style={{ background: 'var(--surface-subtle)', color: 'var(--text-muted)' }}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                className="wf-node-btn wf-primary"
+                                data-testid="btn-confirmar-aprobacion"
+                                onClick={handleConfirmAprobar}
+                                disabled={!selectedPrioridad || updating}
+                                title={!selectedPrioridad ? "Seleccione un nivel de prioridad para avanzar" : "Confirmar y Aprobar Reclamo"}
+                                style={{
+                                    opacity: !selectedPrioridad ? 0.5 : 1,
+                                    cursor: !selectedPrioridad ? 'not-allowed' : 'pointer'
+                                }}
+                            >
+                                <CheckCircle2 size={14} />
+                                <span>Confirmar y Aprobar</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Modal de Alerta / Confirmación Estilo Don Yeyo */}
             <ConfirmModal

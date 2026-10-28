@@ -37,8 +37,15 @@ export const authApi = {
 export const reclamosApi = {
     getAll: (cutoff = null) => api.get('/reclamos', { params: cutoff ? { cutoff } : {} }),
     getById: (id) => api.get(`/reclamos/${id}`),
-    updateEstadoAdmin: (id, estado, motivo_desaprobado = '', tipo_desaprobacion = '') =>
-        api.patch(`/reclamos/${id}/estado-admin`, { estado, motivo_desaprobado, tipo_desaprobacion }),
+    updateEstadoAdmin: (id, estado, motivo_desaprobado = '', tipo_desaprobacion = '', prioridad = null) => {
+        let payload = { estado };
+        if (typeof motivo_desaprobado === 'object' && motivo_desaprobado !== null) {
+            payload = { estado, ...motivo_desaprobado };
+        } else {
+            payload = { estado, motivo_desaprobado, tipo_desaprobacion, prioridad };
+        }
+        return api.patch(`/reclamos/${id}/estado-admin`, payload);
+    },
     updateEstadoInocuidad: (id, estado) =>
         api.patch(`/reclamos/${id}/estado-inocuidad`, { estado }),
     updateSupervisor: (id, supervisor, email) =>
@@ -72,10 +79,34 @@ export const cortesiaApi = {
     simular: (defecto) => api.post('/cortesia/simular', { defecto })
 };
 
+export const prioridadesApi = {
+    getAll: () => api.get('/prioridades'),
+    updateReglas: (codigo, reglas_cortesia, sla = null) =>
+        api.put(`/prioridades/${codigo}/reglas`, {
+            reglas_cortesia,
+            reglas: reglas_cortesia,
+            sla
+        })
+};
+
 export const estadosApi = {
     getAll: () => api.get('/estados'),
     updateConfig: (id, { descripcion, color }) => api.put(`/estados/${id}`, { descripcion, color }),
     updateDescripcion: (id, descripcion, color) => api.put(`/estados/${id}`, { descripcion, color })
+};
+
+export const seguimientosApi = {
+    getAll: (params) => api.get('/seguimientos', { params }),
+    getById: (id) => api.get(`/seguimientos/${id}`),
+    create: (data) => api.post('/seguimientos', data),
+    update: (id, data) => api.put(`/seguimientos/${id}`, data),
+    toggle: (id) => api.patch(`/seguimientos/${id}/toggle`),
+    delete: (id) => api.delete(`/seguimientos/${id}`)
+};
+
+export const logsApi = {
+    getLogs: (params) => api.get('/logs', { params }),
+    getStats: () => api.get('/logs/stats')
 };
 
 export default api;

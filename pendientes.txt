@@ -1,1 +1,27 @@
-refrescar grilla gestor cada x segundos
+### Pendientes
+-[x] Reglas de Seguimientos: sección con grilla completa para configurar momentos de seguimiento, repeticiones e intervalo N = SLA / Repeticiones con emails de elevación según rol, estado y prioridad. (Sistemas)
+-[x] En la pantalla de Reglas de Seguimiento, poder definir cuantos dias deben pasar para emitir el primer email, validar que no sea superior al valor de sla
+-[x] Corregir la perioricidad, en lugar de ser sla / repeticiones, deberia ser (sla - dias para el primer envío)/ repeticiones
+-[ ] Agregar pantalla de configuracion de los textos a enviar en los emails (persistir toda config en base de datos). Establecer los mensajes actuales como los establecidos de fabrica. Ver que otras env vars tenemos
+-[ ] Revisar el mail que recibe el consumidor y evaluar la posibilidad de agregar una encuesta (5 estrellas por ejemplo). (Sistemas)
+-[ ] crear un simulador que permita avanzar en el tiempo y ver como se irian disparando los mails al pasar los dias
+-[ ] Soportar que Inocuidad cuenta con dos grupos de email de notificacion según el tipo de producto involucrado en el reclamo
+-[x] Descripción de los estados: agregar una descripción a los estados para que se entienda qué significa cada uno. (Sistemas)
+-[ ] Sopportar el rol calidad al gestor de reclamos
+-[no es posible] Imágenes adjuntas: agregar las imágenes en el cuerpo del mail que llega a calidad. (Sistemas)
+-[x] Soportar prioridad de reclamos Clasificación de reclamos
+-[x] Soporte para configurar los emails de elevación de los ejecutivos: revisar los correos de escalamiento (Mkt)
+
+### Web
+-[ ] Para el email que le llega al admin, agregar boton para rechazar reclamo
+-[ ] Agregar un mensaje que sugiera conservar el producto para un análisis posterior en la carga del reclamo.
+-[ ] Nuevo reclamo consumidor: al recibir el mail, que se pueda acceder directamente al reclamo, sin tener que buscarlo manualmente por el número de reclamo.
+-[ ] Primer mail del admin: boton para rechazar el reclamo desde el propio correo.
+
+### Revisar
+-[ ] Vinculación de planillas: investigar cómo están vinculadas las planillas de marketing con las de calidad.
+
+### No es parte del MVP
+-[ ] refrescar grilla gestor cada x segundos
+-[ ] evaluar si es posible asociar codigos de productos a los items de resarcimiento con el objetivo de crear el mecanismo de autogeneracion de solicitudes de notas de credito
+

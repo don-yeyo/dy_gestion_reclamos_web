@@ -379,10 +379,11 @@ class GoogleSheetsService {
 
     /**
      * Calcula y actualiza el Producto Cortesía (columna S en Sheets y reclamo_items en DB)
-     * al aprobar el reclamo según la severidad del defecto
+     * al aprobar el reclamo según la prioridad asignada y severidad del defecto
      * @param {string|number} claimId ID del reclamo
+     * @param {string} [cortesiaOverride] Texto forzado de la regla de cortesía de la prioridad seleccionada
      */
-    async aplicarProductoCortesia(claimId) {
+    async aplicarProductoCortesia(claimId, cortesiaOverride = null) {
         const claim = await this.getReclamoById(claimId);
         if (!claim || !claim.items || claim.items.length === 0) return [];
 
@@ -391,9 +392,11 @@ class GoogleSheetsService {
         const itemsActualizados = [];
         const dataUpdates = [];
 
+        const reglaDefinida = cortesiaOverride || claim.regla_cortesia_aplicada || null;
+
         for (let idx = 0; idx < claim.items.length; idx++) {
             const item = claim.items[idx];
-            const cortesiaCalculada = await cortesiaService.calcularProductoCortesia(item.defecto, cortesiaConfig);
+            const cortesiaCalculada = reglaDefinida || await cortesiaService.calcularProductoCortesia(item.defecto, cortesiaConfig);
             item.producto_cortesia = cortesiaCalculada;
             itemsActualizados.push(item);
 

@@ -65,6 +65,24 @@ router.put('/:id', authMiddleware, requireRole(['admin', 'sysadmin']), async (re
             });
         }
 
+        // Registro de log de auditoría de configuración
+        const systemLogService = require('../services/systemLogService');
+        await systemLogService.logConfigChange({
+            modulo: 'estados_workflow',
+            accion: 'modificacion',
+            descripcion: `Actualización de apariencia/tooltip del estado "${estadoActualizado.nombre}" (Rol: ${estadoActualizado.actor})`,
+            actor: req.user?.role || 'admin',
+            actorEmail: req.user?.email || 'admin',
+            valoresNuevos: {
+                id,
+                actor: estadoActualizado.actor,
+                codigo: estadoActualizado.codigo,
+                nombre: estadoActualizado.nombre,
+                color: estadoActualizado.color,
+                descripcion: estadoActualizado.descripcion
+            }
+        });
+
         res.json({
             success: true,
             message: `Estado "${estadoActualizado.nombre}" actualizado correctamente.`,

@@ -90,7 +90,7 @@ class CronFollowupService {
             // Si el supervisor ya resolvió la compensación y el consumidor aún no completó su respuesta
             if (claim.estado_supervisor === 'Resuelto') {
                 const consumidorEstado = (claim.estado_consumidor || '').trim();
-                const consumidorSinRespuestaAun = consumidorEstado === 'Pendiente' || consumidorEstado === 'En curso';
+                const consumidorSinRespuestaAun = consumidorEstado === 'Pendiente' || consumidorEstado === 'En curso' || consumidorEstado === 'Resuelto sin confirmar';
 
                 if (consumidorSinRespuestaAun) {
                     const notifConsumidorCount = await reclamosDatabaseService.getNotificationCount(claim.id, 'consumidor');

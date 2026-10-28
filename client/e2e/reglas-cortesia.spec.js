@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { setupMockApi } from './fixtures/mockApi.js';
 
-test.describe('Reglas de Compensación & Cortesía (Fórmula Google Sheet)', () => {
+test.describe('Reglas de Cortesía por Nivel de Prioridad', () => {
     test.beforeEach(async ({ page }) => {
         await setupMockApi(page);
     });
 
-    test('El administrador puede abrir el modal de Reglas de Cortesía desde el Drawer, ver la fórmula explicada y simular', async ({ page }) => {
+    test('El administrador puede abrir el modal de Reglas de Cortesía, ver las prioridades y editar las reglas de cortesía', async ({ page }) => {
         await page.goto('/');
 
         // Abrir Drawer de navegación
@@ -14,7 +14,6 @@ test.describe('Reglas de Compensación & Cortesía (Fórmula Google Sheet)', () 
         if (await menuButton.isVisible()) {
             await menuButton.click();
         } else {
-            // Si el header tiene otro selector
             await page.locator('header button').first().click();
         }
 
@@ -24,32 +23,44 @@ test.describe('Reglas de Compensación & Cortesía (Fórmula Google Sheet)', () 
         await btnReglas.click();
 
         // Verificar que el modal de Reglas de Cortesía se abre
-        await expect(page.locator('h3:has-text("Reglas de Compensación & Cortesía")')).toBeVisible();
+        await expect(page.locator('h3:has-text("Reglas de Cortesía por Nivel de Prioridad")')).toBeVisible();
 
-        // Verificar que se ve la fórmula de Google Sheets
-        await expect(page.locator('text=BUSCARV(P;$AJ$15:$AJ$19;1;0)')).toBeVisible();
+        // Verificar que se listan las 3 prioridades canónicas
+        await expect(page.locator('text=Alta (Código 10)')).toBeVisible();
+        await expect(page.locator('text=Media (Código 20)')).toBeVisible();
+        await expect(page.locator('text=Baja (Código 30)')).toBeVisible();
 
-        // Verificar inputs de compensación estándar y especial
-        const inputEstandar = page.locator('input[value="1 reemplazo + 1 de kg"]');
-        await expect(inputEstandar).toBeVisible();
+        // Verificar que los inputs de SLA son editables
+        const inputSlaAlta = page.locator('[data-testid="input-sla-10"]');
+        await expect(inputSlaAlta).toBeVisible();
+        await expect(inputSlaAlta).toHaveValue('3');
 
-        // Probar el simulador con un defecto estándar
-        const inputSimulador = page.locator('input[placeholder*="Probar cualquier defecto"]');
-        await inputSimulador.fill('Vida util');
+        // Modificar SLA de Alta de 3 a 5 días
+        await inputSlaAlta.fill('5');
+        await expect(inputSlaAlta).toHaveValue('5');
 
-        // Debe indicar COMPENSACIÓN ESTÁNDAR
-        await expect(page.getByText('🟢 COMPENSACIÓN ESTÁNDAR')).toBeVisible();
-        await expect(page.locator('text=1 reemplazo + 1 de kg').first()).toBeVisible();
+        // Verificar inputs de reglas de cortesía existentes
+        const inputsReglas = page.locator('input[placeholder*="Texto descriptivo de cortesía"]');
+        await expect(inputsReglas.first()).toBeVisible();
 
-        // Probar el simulador con un defecto grave / especial
-        await inputSimulador.fill('Presencia de cuerpo extraño');
+        // Agregar una nueva regla a la prioridad Alta
+        const btnAgregarRegla = page.locator('button:has-text("Agregar regla")').first();
+        await btnAgregarRegla.click();
 
-        // Debe indicar COMPENSACIÓN ESPECIAL / CRÍTICA
-        await expect(page.getByText('🔴 COMPENSACIÓN ESPECIAL / CRÍTICA')).toBeVisible();
-        await expect(page.locator('text=1 reemplazo + 2 productos a elección + 2 de kg.').first()).toBeVisible();
+        // Llenar la nueva regla agregada
+        const nuevoInputRegla = page.locator('input[placeholder*="Texto descriptivo de cortesía"]').nth(1);
+        await nuevoInputRegla.fill('2 reemplazos especiales');
+
+        // Guardar cambios
+        const btnGuardar = page.locator('button:has-text("Guardar Cambios")');
+        await expect(btnGuardar).toBeVisible();
+        await btnGuardar.click();
+
+        // Verificar mensaje de éxito
+        await expect(page.locator('text=¡Reglas de cortesía y SLA actualizados correctamente')).toBeVisible();
 
         // Cerrar modal
         await page.locator('button:has-text("Cancelar")').click();
-        await expect(page.locator('h3:has-text("Reglas de Compensación & Cortesía")')).not.toBeVisible();
+        await expect(page.locator('h3:has-text("Reglas de Cortesía por Nivel de Prioridad")')).not.toBeVisible();
     });
 });

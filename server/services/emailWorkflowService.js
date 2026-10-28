@@ -51,8 +51,9 @@ class EmailWorkflowService {
      * y añade un banner informativo en la cabecera del correo con los destinatarios originales.
      * @param {Object} mailOptions Opciones de correo (to, subject, html, etc.)
      * @param {string} channel 'internal' (default) para áreas de la empresa y supervisores, o 'consumer' para clientes
+     * @param {Object} logMeta Metadatos de auditoría para registro en historial
      */
-    async sendMail(mailOptions, channel = 'internal') {
+    async sendMail(mailOptions, channel = 'internal', logMeta = {}) {
         const isConsumer = channel === 'consumer';
         const transporter = isConsumer ? this.consumerTransporter : this.internalTransporter;
         const defaultFrom = isConsumer ? this.consumerFrom : this.internalFrom;
@@ -99,7 +100,44 @@ class EmailWorkflowService {
             }
         }
 
-        return transporter.sendMail(finalOptions);
+        let sendResult = null;
+        let sendError = null;
+
+        try {
+            sendResult = await transporter.sendMail(finalOptions);
+        } catch (err) {
+            sendError = err;
+            console.error('[EMAIL WORKFLOW ERROR] Error al despachar email:', err.message);
+        }
+
+        // Registro automático de auditoría en logs_emails
+        try {
+            const systemLogService = require('./systemLogService');
+            await systemLogService.logEmail({
+                reclamoId: logMeta.reclamoId || null,
+                destinatarioTipo: logMeta.destinatarioTipo || (channel === 'consumer' ? 'consumidor' : 'interno'),
+                destinatarioEmail: finalOptions.to,
+                tipoDisparo: logMeta.tipoDisparo || 'automatico',
+                asunto: finalOptions.subject || mailOptions.subject,
+                motivo: logMeta.motivo || 'Emisión de correo del sistema',
+                mensajeResumen: logMeta.mensajeResumen || null,
+                cuerpoHtml: finalOptions.html || mailOptions.html,
+                actor: logMeta.actor || (logMeta.tipoDisparo === 'manual' ? 'administrador' : 'sistema'),
+                actorEmail: logMeta.actorEmail || null,
+                reintentoNro: logMeta.reintentoNro || 1,
+                estadoEnvio: sendError ? 'fallido' : (testMode ? 'simulado_test' : 'enviado'),
+                errorMensaje: sendError ? sendError.message : null,
+                metadata: logMeta.metadata || null
+            });
+        } catch (logErr) {
+            console.error('[EMAIL LOG ERROR] No se pudo persistir el log del email:', logErr.message);
+        }
+
+        if (sendError) {
+            throw sendError;
+        }
+
+        return sendResult;
     }
 
     /**
@@ -139,7 +177,7 @@ class EmailWorkflowService {
     /**
      * Envía email de acción al Supervisor asignado cuando el Administrador pone el reclamo "En curso"
      */
-    async sendSupervisorActionEmail(claim) {
+    async sendSupervisorActionEmail(claim, opts = {}) {
         if (!claim.supervisor_email) {
             console.warn(`[EMAIL] Reclamo #${claim.id}: Supervisor sin email definido.`);
             return false;
@@ -214,11 +252,26 @@ class EmailWorkflowService {
         </div>
         `;
 
+        const isManual = Boolean(opts.manual);
         return this.sendMail({
             to: claim.supervisor_email,
             subject: `[Acción Requerida] Reclamo #${claim.id} - ${claim.nombre} ${claim.apellido} (${claim.localidad})`,
             html
-        }, 'internal');
+        }, 'internal', {
+            reclamoId: claim.id,
+            destinatarioTipo: 'supervisor',
+            tipoDisparo: isManual ? 'manual' : 'automatico',
+            motivo: opts.motivo || (isManual 
+                ? `Reenvío manual de instrucciones de reposición y cortesía por administrador (${opts.actorEmail || 'admin'})`
+                : 'Aprobación de reclamo: Asignación e instrucciones de reposición con regla de cortesía al supervisor'),
+            actor: opts.actor || (isManual ? 'administrador' : 'sistema'),
+            actorEmail: opts.actorEmail || null,
+            metadata: {
+                supervisor: claim.supervisor,
+                prioridad: claim.prioridad_nombre || claim.prioridad,
+                regla_cortesia: claim.regla_cortesia_aplicada
+            }
+        });
     }
 
     /**
@@ -244,13 +297,21 @@ class EmailWorkflowService {
             to: adminEmails,
             subject: `[ALERTA] Supervisor reportó Imposibilidad - Reclamo #${claim.id}`,
             html
-        }, 'internal');
+        }, 'internal', {
+            reclamoId: claim.id,
+            destinatarioTipo: 'admin',
+            tipoDisparo: 'automatico',
+            motivo: `Alerta a administradores: Supervisor ${claim.supervisor} reportó imposibilidad operativa (${motivo})`,
+            actor: 'supervisor_link',
+            actorEmail: claim.supervisor_email || null,
+            metadata: { supervisor: claim.supervisor, motivo_imposibilidad: motivo }
+        });
     }
 
     /**
      * Envía consulta al consumidor transcurridos F días de la resolución del supervisor
      */
-    async sendConsumerFollowupEmail(claim) {
+    async sendConsumerFollowupEmail(claim, opts = {}) {
         if (!claim.email) return false;
 
         const tokenConforme = this.generateToken(claim.id, 'consumidor', 'conforme');
@@ -289,7 +350,14 @@ class EmailWorkflowService {
             to: claim.email,
             subject: `Seguimiento de tu Reclamo en Don Yeyo #${claim.id}`,
             html
-        }, 'consumer');
+        }, 'consumer', {
+            reclamoId: claim.id,
+            destinatarioTipo: 'consumidor',
+            tipoDisparo: 'automatico',
+            motivo: 'Seguimiento de conformidad: Envío de encuesta periódica de recepción y satisfacción tras resolución informada por supervisor',
+            actor: 'cron_sistema',
+            reintentoNro: opts.reintentoNro || 1
+        });
     }
 
     /**
@@ -317,13 +385,21 @@ class EmailWorkflowService {
             to: adminEmails,
             subject: `${isUrgent ? '[URGENTE] ' : ''}Consumidor respondió "${feedback}" - Reclamo #${claim.id}`,
             html
-        }, 'internal');
+        }, 'internal', {
+            reclamoId: claim.id,
+            destinatarioTipo: 'admin',
+            tipoDisparo: 'automatico',
+            motivo: `Respuesta de consumidor a encuesta de seguimiento: "${feedback}"`,
+            actor: 'consumidor_link',
+            actorEmail: claim.email || null,
+            metadata: { feedback }
+        });
     }
 
     /**
      * Envía expediente completo a Calidad e Inocuidad cuando el administrador aprueba el reclamo
      */
-    async sendInocuidadActionEmail(claim) {
+    async sendInocuidadActionEmail(claim, opts = {}) {
         const inocuidadEmails = process.env.EMAILS_INOCUIDAD || 'inocuidad@donyeyo.com.ar';
         const items = Array.isArray(claim.items) ? claim.items : [];
         const itemsHtml = items.map(item => `
@@ -371,11 +447,25 @@ class EmailWorkflowService {
         </div>
         `;
 
+        const isManual = Boolean(opts.manual);
         return this.sendMail({
             to: inocuidadEmails,
             subject: `[Calidad / Inocuidad] Nuevo Reclamo Aprobado #${claim.id} - ${claim.nombre} ${claim.apellido}`,
             html
-        }, 'internal');
+        }, 'internal', {
+            reclamoId: claim.id,
+            destinatarioTipo: 'inocuidad',
+            tipoDisparo: isManual ? 'manual' : 'automatico',
+            motivo: opts.motivo || (isManual 
+                ? `Reenvío manual de expediente técnico por administrador (${opts.actorEmail || 'admin'})`
+                : 'Aprobación de reclamo: Remisión de expediente técnico con lote, productos y evidencia para dictamen de laboratorio'),
+            actor: opts.actor || (isManual ? 'administrador' : 'sistema'),
+            actorEmail: opts.actorEmail || null,
+            metadata: {
+                prioridad: claim.prioridad_nombre || claim.prioridad,
+                items_cant: items.length
+            }
+        });
     }
 
     /**
@@ -398,7 +488,14 @@ class EmailWorkflowService {
             to: elevationEmails,
             subject: `[ELEVACIÓN] Sin respuesta de acción - Reclamo #${claim.id} (${claim.supervisor})`,
             html
-        }, 'internal');
+        }, 'internal', {
+            reclamoId: claim.id,
+            destinatarioTipo: 'elevacion',
+            tipoDisparo: 'automatico',
+            motivo: `Alerta de elevación por agotamiento de repeticiones sin respuesta: ${reason}`,
+            actor: 'cron_sistema',
+            metadata: { supervisor: claim.supervisor, reason }
+        });
     }
 
     /**
@@ -460,7 +557,14 @@ class EmailWorkflowService {
             to: recipients,
             subject: `🚨 [CONFLICTO / POSIBLE FRAUDE] Discrepancia en Reclamo #${claim.id} - ${claim.supervisor}`,
             html
-        }, 'internal');
+        }, 'internal', {
+            reclamoId: claim.id,
+            destinatarioTipo: 'admin',
+            tipoDisparo: 'automatico',
+            motivo: `Alerta crítica de conflicto / sospecha de fraude: ${motivoConflicto}`,
+            actor: 'sistema_alerta',
+            metadata: { supervisor: claim.supervisor, motivo: motivoConflicto }
+        });
     }
 }
 

@@ -12,6 +12,9 @@ const cronRoutes = require('./routes/cronRoutes');
 const supervisoresRoutes = require('./routes/supervisoresRoutes');
 const cortesiaRoutes = require('./routes/cortesiaRoutes');
 const estadosRoutes = require('./routes/estadosRoutes');
+const prioridadesRoutes = require('./routes/prioridadesRoutes');
+const seguimientosRoutes = require('./routes/seguimientosRoutes');
+const logsRoutes = require('./routes/logsRoutes');
 const { initDatabase, pool } = require('./config/database');
 
 const app = express();
@@ -63,6 +66,9 @@ app.use('/api/cron', cronRoutes);
 app.use('/api/supervisores', supervisoresRoutes);
 app.use('/api/cortesia', cortesiaRoutes);
 app.use('/api/estados', estadosRoutes);
+app.use('/api/prioridades', prioridadesRoutes);
+app.use('/api/seguimientos', seguimientosRoutes);
+app.use('/api/logs', logsRoutes);
 
 // Info base API
 app.get('/api', (req, res) => {

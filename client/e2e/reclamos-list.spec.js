@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { setupMockApi } from './fixtures/mockApi.js';
+import { mockReclamos } from './fixtures/mockData.js';
 
 test.describe('CU-04: Listado General y Filtros de Reclamos', () => {
     test.beforeEach(async ({ page }) => {
@@ -51,6 +52,33 @@ test.describe('CU-04: Listado General y Filtros de Reclamos', () => {
         await expect(page.locator('table tbody tr')).toHaveCount(1);
         await expect(page.locator('td', { hasText: 'REC-2026-004' })).toBeVisible();
         await expect(page.locator('.badge', { hasText: 'FSR' })).toBeVisible();
+    });
+
+    test('debe permitir filtrar reclamos por "Resuelto sin confirmar" en Estado Consumidor', async ({ page }) => {
+        const custom = [
+            ...mockReclamos,
+            {
+                id: 'REC-2026-005',
+                nro_reclamo: 'REC-2026-005',
+                fecha: '2026-10-15',
+                cliente: 'Valeria Morales',
+                nombre_consumidor: 'Valeria Morales',
+                estado_admin: 'En curso',
+                estado_supervisor: 'Resuelto',
+                estado_inocuidad: 'Pendiente',
+                estado_consumidor: 'Resuelto sin confirmar',
+                items: []
+            }
+        ];
+        await setupMockApi(page, custom);
+        await page.goto('/reclamos');
+
+        const selectConsumidor = page.locator('.filter-box', { hasText: 'Estado Consumidor' }).locator('select');
+        await selectConsumidor.selectOption('Resuelto sin confirmar');
+
+        await expect(page.locator('table tbody tr')).toHaveCount(1);
+        await expect(page.locator('td', { hasText: 'REC-2026-005' })).toBeVisible();
+        await expect(page.locator('.badge', { hasText: 'Resuelto sin confirmar' })).toBeVisible();
     });
 
     test('debe abrir el modal de detalle al hacer click en un reclamo de la grilla', async ({ page }) => {

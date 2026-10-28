@@ -105,6 +105,15 @@ En las variables de entorno de la configuración de Netlify (**Site configuratio
 > - `GOOGLE_SERVICE_ACCOUNT_JSON_BASE64`: El contenido del archivo de la cuenta de servicio codificado en Base64 (método más confiable para evitar problemas de saltos de línea).
 > - o `GOOGLE_SERVICE_ACCOUNT_JSON`: El texto JSON completo de la cuenta de servicio.
 
+### ⏰ Tarea Programada Nativa de Netlify (Scheduled Function)
+El seguimiento de reclamos, recordatorios a supervisores y encuestas a consumidores se ejecutan automáticamente de forma nativa en Netlify, sin necesidad de servidores 24/7 ni de servicios de cron externos:
+- **Función Serverless:** `server/functions/scheduledFollowup.js`.
+- **Cronograma Base:** Configurado en `netlify.toml` para dispararse en días hábiles durante el horario laboral.
+- **Parametrización por Variables de Entorno:**
+  - `CRON_FOLLOWUP_ENABLED`: `true` (por defecto) o `false` para desactivar el cron por completo con efecto inmediato y sin redeploy.
+  - `CRON_HORAS_EJECUCION_ARG`: Lista de horas en zona horaria Argentina (`America/Argentina/Buenos_Aires`) en las que se debe ejecutar (ej. `"9,16"` para ejecutar a las 09:00 y a las 16:00 hs, o `"10"` para una sola vez al día). Si la hora actual no coincide, la función finaliza en milisegundos sin consumir cómputo.
+
+
 ---
 
 ## 🔑 Configuración en Microsoft Entra ID (Azure AD SSO)
@@ -270,25 +279,34 @@ npm --prefix client run test:e2e:ui
 
 ---
 
-## 🎁 Reglas de Compensación y Producto de Cortesía
+## 🎯 Prioridades Mandatorias y Reglas de Cortesía
 
-El sistema reproduce y supera la lógica de la fórmula original de Google Sheets:
-```excel
-=+SI(P3361="";"";SI(SI.ERROR(BUSCARV(P3361;'Reclamos 2023'!$AJ$15:$AJ$19;1;0);'Reclamos 2023'!$AG$19)=P3361;'Reclamos 2023'!$AG$18;'Reclamos 2023'!$AG$19))
-```
+Al momento de aprobar un reclamo (ya sea desde el botón del correo electrónico o desde el panel de gestión web), **es mandatorio exigir el nivel de prioridad según la gravedad del caso mediante un control de lista desplegable sin valor por defecto prefijado**, garantizando que el operador tome una decisión consciente antes de avanzar.
 
-### Funcionamiento:
-1. **Interpretación:**
-   - **Columna P:** Defecto reportado en el reclamo.
-   - **Rango `$AJ$15:$AJ$19`:** Lista de defectos estándar catalogados (*Defectos del producto, Vida util, Menor cantidad de unidades, Defecto en el envase*).
-   - **Celda `$AG$18`:** Compensación Estándar (`1 reemplazo + 1 de kg`).
-   - **Celda `$AG$19`:** Compensación Especial / Crítica (`1 reemplazo + 2 productos a elección + 2 de kg.`).
-2. **Edición Dinámica por el Administrador:**
-   - Accesible desde el menú lateral (`Drawer` → `Configuración` → `Reglas de Cortesía`).
-   - Permite modificar los textos de compensación, agregar o quitar defectos estándar mediante tags/chips interactivos y simular cualquier defecto en tiempo real.
-   - Persistido de forma centralizada en la base de datos MySQL (`config_sistema.clave = 'regla_producto_cortesia'`).
-3. **Automatización al Aprobar:**
-   - Al aprobar un reclamo (vía panel web o enlace seguro de un solo clic), el sistema calcula el producto de cortesía para cada ítem, actualiza la **Columna S** en Google Sheets, actualiza la tabla `reclamo_items` en MySQL y resalta la compensación a entregar en el correo enviado al supervisor comercial.
+### 1. Tabla de Prioridades (`workflow_prioridades`)
+
+Al igual que la tabla de estados, el sistema dispone de la tabla MySQL `workflow_prioridades` estructurada con las prioridades canónicas corporativas:
+
+| Código | Prioridad | SLA (Días) | Descripción Operativa | Regla de Cortesía Sugerida (JSON) |
+| :---: | :---: | :---: | :--- | :--- |
+| **10** | **Alta** | 3 | Casos críticos y graves que implican reconocer el error rápidamente | `[{"codigo":"codigo1","descripcion":" 1 reemplazo + 2 productos a elección + 2 de kg"}]` |
+| **20** | **Media** | 7 | Casos leves que no representan un daño importante para el consumidor | `[{"codigo":"codigo2","descripcion":" 1 reemplazo"}]` |
+| **30** | **Baja** | 14 | Casos donde es notorio que el problema se debió a cuestiones agenas a la empresa | `[{"codigo":"codigo3","descripcion":" 1 reemplazo + 1 de kg"}]` |
+
+> [!NOTE]
+> **Políticas de Configuración:** Los nombres, códigos y descripciones operativas de las prioridades son estrictamente inmutables para resguardar la coherencia del workflow (no es posible crear nuevas prioridades, eliminarlas, ni alterar sus nombres). La **cantidad de días de SLA** y las **reglas de cortesía asociadas** son plenamente configurables y editables por el administrador.
+
+### 2. Edición Dinámica de Reglas de Cortesía y SLA por Prioridad
+- **Acceso:** Menú lateral (`Drawer` → `Configuración` → `Reglas de Cortesía`).
+- **Administración Flexible:** Permite al administrador definir una o más reglas de cortesía para cada prioridad (`Alta`, `Media`, `Baja`), agregando, editando el texto descriptivo o eliminando reglas redundantes. Asimismo, permite **ajustar la cantidad de días de SLA** de cada nivel de prioridad.
+- **Validación Mandatoria:** Cada nivel de prioridad debe contener un SLA numérico válido (> 0) y obligatoriamente **al menos una regla de cortesía** no vacía para poder guardar.
+- **Persistencia:** Las reglas se almacenan serializadas en formato JSON en la columna `reglas_cortesia` y el tiempo de resolución en la columna `sla` de la tabla `workflow_prioridades` (`PUT /api/prioridades/:codigo/reglas`).
+
+### 3. Aprobación y Aplicación Automática
+1. **Control Desplegable Mandatorio:** Tanto en el modal de aprobación de la interfaz web como en el enlace rápido del email (`/api/public/actions/admin-quick`), el control `<select>` inicia sin valor prefijado (`-- Seleccionar nivel de prioridad (obligatorio) --`), bloqueando el avance hasta que se seleccione una opción.
+2. **Cálculo de SLA:** Al confirmar la aprobación, el sistema calcula automáticamente la fecha límite de SLA (`fecha_limite_sla = now() + sla * 24h`) y guarda en la base de datos `prioridad`, `prioridad_nombre`, `sla_dias` y `regla_cortesia_aplicada`.
+3. **Cortesía en Reclamo e Ítems:** Aplica automáticamente la regla de cortesía de la prioridad en los ítems del reclamo y en la columna S de Google Sheets, notificando al supervisor comercial y al área de Calidad & Inocuidad.
+4. **Visibilidad en el Expediente:** El reclamo aprobado exhibe en la Card de Ingreso una insignia destacada con el nivel de prioridad, el SLA comprometido y el detalle del producto de cortesía derivado.
 
 ---
 
@@ -305,7 +323,13 @@ El sistema reproduce y supera la lógica de la fórmula original de Google Sheet
 - **Administrador (Desaprobado):** Al desaprobar un reclamo, se tipifica el `tipo_desaprobacion` visible para el consumidor y se registra la fundamentación interna protegida.
 - **Regla de Cierre Unificado:** En ambos escenarios, el estado del consumidor pasa automáticamente a **`Cerrado`**, y los estados de Inocuidad y Supervisor se fijan en **`Sin acciones`**.
 
-### 3. Detección de Discrepancia Crítica y Fraude Comercial
+### 3. Transición Automática a "Resuelto sin confirmar" (Consumidor)
+- **Declaración de Resolución por Supervisor:** En el momento en que el `estado_supervisor` se establece como **`Resuelto`** (ya sea mediante el botón de acción rápida del email del supervisor `/api/public/actions/supervisor-quick` o manualmente desde el panel de gestión `/api/reclamos/:id/estado-supervisor`), el sistema dispara la transición automática de `estado_consumidor` al estado:
+  $$\text{estado\_supervisor} = \text{"Resuelto"} \implies \text{estado\_consumidor} = \text{"Resuelto sin confirmar"}$$
+- **Significado y Regla de Negocio:** Este estado indica que el supervisor comercial declaró haber entregado la reposición y cortesía acordada, pero se encuentra a la espera de la confirmación efectiva de recepción y satisfacción por parte del consumidor.
+- **Protección de Cierre Administrativo:** El auto-finalizado administrativo (`checkAndFinalizeAdminState`) no da por finalizado el reclamo mientras el consumidor permanezca en `Resuelto sin confirmar`, garantizando que deba existir una respuesta formal del consumidor (`Resuelto conforme`, `Resuelto disconforme`, `No resuelto`), o bien el vencimiento de los plazos de seguimiento (`FSR` / `Cerrado`).
+
+### 4. Detección de Discrepancia Crítica y Fraude Comercial
 - **Alerta de Fraude:** Si el supervisor comercial marcó la reposición como `Resuelto` (afirmando haber entregado la cortesía) y posteriormente el consumidor responde mediante el enlace de correo que **no fue resuelto** (`No resuelto`), el sistema detecta una anomalía severa o posible engaño.
 - **Acciones Automáticas:**
   1. Se marca el reclamo como `en_conflicto = 1` y se guarda la traza temporal y motivo en la base de datos.
@@ -313,12 +337,96 @@ El sistema reproduce y supera la lógica de la fórmula original de Google Sheet
   3. En la grilla del Gestor Web y en el Dashboard, la fila del reclamo cambia su fondo a un tono de alerta rojizo (`.claim-row-conflicto`) y se muestra la insignia destacada **`⚠️ Conflicto`**.
   4. En el modal de detalle del reclamo, se despliega un panel superior de auditoría con la advertencia de conflicto para la intervención administrativa.
 
-### 4. Seguimiento Automático y Auto-Cierre
+### 5. Seguimiento Automático y Auto-Cierre
 - Cuando el supervisor resuelve el reclamo, el servicio en segundo plano (`cronFollowupService`) consulta al consumidor vía correo electrónico. Si luego del ciclo programado de N consultas el consumidor no responde, su estado pasa automáticamente a **`Cerrado`** y el reclamo administrativo se declara como `Finalizado`.
+
+---
+
+## ⏱️ Reglas de Seguimientos de Workflow y Escalamiento Automático
+
+### 1. Pantalla de Gestión de Reglas (`/seguimientos`)
+- **Acceso:** Menú lateral (`Drawer` → `Configuración` → `Reglas de Seguimientos`).
+- **Arquitectura de Grilla Completa:** Diseñada como pantalla independiente (al igual que el gestor de estados `/estados`), permitiendo administrar reglas complejas con filtros reactivos por rol, prioridad y estado activo/inactivo.
+- **Persistencia en Base de Datos:** Los registros se almacenan en la tabla MySQL `workflow_seguimientos`, vinculada relacionalmente con `workflow_estados` (actor y código) y `workflow_prioridades` (código numérico y SLA).
+
+### 2. Estructura de la Tabla `workflow_seguimientos`
+| Campo | Tipo | Descripción |
+| :--- | :--- | :--- |
+| `id` | `INT AUTO_INCREMENT PRIMARY KEY` | Identificador único de la regla |
+| `rol` | `VARCHAR(30)` | Rol destinatario (`admin`, `supervisor`, `inocuidad`, `consumidor`) |
+| `estado_codigo` | `VARCHAR(50)` | Código del estado en el que debe encontrarse el reclamo |
+| `prioridad_codigo` | `INT` | Nivel de prioridad del caso (`10` Alta, `20` Media, `30` Baja) |
+| `disparo_dias` | `DECIMAL(6,2)` | Días tras la asignación del estado para enviar el 1° email interactivo |
+| `repeticiones` | `INT` | Cantidad máxima de recordatorios periódicos antes de escalar |
+| `emails_elevacion` | `TEXT` | Direcciones de correo notificadas ante el agotamiento de repeticiones |
+| `activo` | `TINYINT(1)` | Flag para habilitar o pausar la regla en el cron de automatización |
+
+### 3. Dinámica del Intervalo $N$ y Escalamiento
+Para garantizar que la periodicidad de los recordatorios respete la urgencia del caso y el tiempo remanente antes del vencimiento del SLA, el intervalo de reenvío **$N$** (en días y horas) se calcula deduciendo los días de disparo del 1° correo interactivo y dividiendo ese remanente por la cantidad de **Repeticiones de Seguimiento**:
+
+$$N = \frac{\text{SLA de la Prioridad} - \text{Disparo Inicial}}{\text{Repeticiones de Seguimiento}}$$
+
+> [!NOTE]
+> - Se valida que el **Disparo Inicial** no sea superior al **SLA de la Prioridad**.
+> - Si el Disparo Inicial iguala al SLA, el remanente resulta 0 ($N = 0$), lo cual indica que no habrá recordatorios intermedios antes de la elevación.
+> - $N$ puede resultar en un número no entero que represente fracciones de día (por ejemplo, con SLA de 3 días, disparo inicial de 1 día y 4 repeticiones: $(3 - 1) / 4 = 0.5$ días = 12 horas entre recordatorios).
+
+#### Ciclo de Notificación y Elevación:
+1. **Asignación del Estado:** El caso ingresa o cambia al estado configurado en la regla (ej. Supervisor `Pendiente`).
+2. **Disparo Inicial:** Se aguardan los días establecidos en **Disparo Inicial** para remitir el primer correo electrónico interactivo con botones de acción rápida para cambio de estado.
+3. **Recordatorios periódicos (cada $N$ días):** Si el destinatario no procede a cambiar el estado del reclamo (no interactúa con los botones del correo ni gestiona desde la web), transcurren $N$ días y el sistema reenvía un recordatorio (si $N > 0$).
+4. **Ciclo de Reenvío:** El recordatorio se reitera cada $N$ días mientras el reclamo continúe sin modificarse, hasta alcanzar el número máximo configurado en **Repeticiones de Seguimiento**.
+5. **Elevación Ejecutiva:** Al agotarse el tope de repeticiones sin resolución, el sistema procede de inmediato a **elevar el caso**, remitiendo una advertencia a las casillas indicadas en **Emails de Elevación** para la intervención de jefatura o gerencia.
+
+---
+
+## 📋 Auditoría y Logs del Sistema (`/logs`)
+
+Para garantizar trazabilidad absoluta, transparencia operativa y control de auditoría corporativa, el sistema dispone de un módulo integral de **Logs del Sistema**, accesible desde el menú lateral (`Drawer` → `Auditoría` → `Logs del Sistema`).
+
+### 1. Registros de Auditoría y Trazabilidad
+
+El módulo consolida dos grandes fuentes de eventos:
+
+1. **Envíos de Emails (Todos los correos emitidos):**
+   - Registra de manera unificada y automática cada correo electrónico despachado por el sistema, sin importar el motivo (aprobación, acciones de supervisor, resarcimiento, notificaciones de inocuidad, seguimiento interactivo, alertas de elevación, alertas de posible fraude comercial, o notificaciones de imposibilidad).
+   - **Trazabilidad de Disparo:** Tipifica si el correo fue emitido mediante un **disparo automático** (por workflow de aprobación o por el servicio en segundo plano cron) o un **disparo manual** (reenvío intencional realizado por un administrador desde el expediente).
+   - **Información Detallada:**
+     - **Motivo del Envío:** Explicación humana y contextual clara de la razón del envío (ej. *"Disparo de seguimiento interactivo #1 al supervisor..."*, *"Alerta de fraude comercial enviada a administradores..."*, *"Reenvío manual de correo de acciones al supervisor solicitado por admin"*).
+     - **Contenido y Resumen:** Resumen sintetizado del mensaje, asunto oficial y visor del cuerpo HTML completo emitido.
+     - **Destinatarios y Roles:** Dirección de correo destino y tipo de rol (`supervisor`, `inocuidad`, `consumidor`, `admin`).
+     - **Actor y Responsable:** Email del actor responsable o identificador del proceso de sistema/cron.
+     - **Estado de Envío:** `enviado`, `simulado_test` o `fallido` con mensaje de error técnico capturado ante excepciones.
+
+2. **Modificaciones en Configuraciones del Sistema:**
+   - Registra cualquier alteración en los catálogos y parámetros del sistema:
+     - **Reglas de Cortesía y SLA:** Cambios en descripciones de cortesía o días de SLA por nivel de prioridad.
+     - **Configuración Global de Cortesía:** Ajustes en políticas globales.
+     - **Estados de Workflow:** Modificaciones en descripciones operativas o colores de badge.
+     - **Reglas de Seguimiento:** Creación, edición de parámetros ($N$, disparos, repeticiones, emails de elevación), cambios de estado activo/inactivo o eliminación de reglas.
+     - **Zonificación de Supervisores:** Actualizaciones del archivo GeoJSON de polígonos de cobertura.
+   - **Inspección Comparativa (Diff):** Cada registro de configuración almacena en formato JSON estructurado los `valores_anteriores` y los `valores_nuevos`, permitiendo al auditor contrastar con exactitud el antes y después en el modal de detalle.
+
+### 2. Tablas de Base de Datos MySQL
+
+| Tabla | Propósito | Campos Clave |
+| :--- | :--- | :--- |
+| `logs_emails` | Historial integral de correos emitidos | `id`, `reclamo_id`, `destinatario_tipo`, `destinatario_email`, `tipo_disparo` (`automatico`/`manual`), `asunto`, `motivo`, `mensaje_resumen`, `cuerpo_html`, `actor`, `actor_email`, `reintento_nro`, `estado_envio`, `error_mensaje`, `metadata`, `created_at` |
+| `logs_configuracion` | Auditoría de cambios en parámetros y reglas | `id`, `modulo`, `accion`, `descripcion`, `actor`, `actor_email`, `valores_anteriores`, `valores_nuevos`, `ip_address`, `created_at` |
+
+### 3. Experiencia de Usuario y Filtros Interactivos
+
+- **Filtro por Categoría:** Pestañas reactivas para ver *Todos*, sólo *Emails* o sólo *Configuraciones*.
+- **Filtro por Disparo:** Visualización exclusiva de disparos *Automáticos* o *Manuales*.
+- **Filtro por Estado:** Filtrado instantáneo por envíos *Enviados*, *Simulados* o *Fallidos*.
+- **Buscador en Vivo:** Búsqueda libre por destinatario, asunto, motivo, reclamo ID, actor, módulo o descripción.
+- **Modal Flotante de Inspección:** Ventana emergente con fondo opaco que despliega la ficha completa del log, con renderizado visual del correo enviado y comparativa de valores antes/después en configuraciones.
 
 ---
 
 ## 📄 Licencia y Confidencialidad
 Propiedad exclusiva de **Don Yeyo S.A.** Prohibida su reproducción, divulgación o distribución sin autorización previa.
+
+
 
 

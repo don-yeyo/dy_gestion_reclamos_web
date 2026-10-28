@@ -10,6 +10,8 @@ build/
 coverage/
 client/test-results/
 client/playwright-report/
+test-results/
+playwright-report/
 
 # Environment and sensitive keys
 .env
@@ -38,3 +40,4 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+pendientes.txt
