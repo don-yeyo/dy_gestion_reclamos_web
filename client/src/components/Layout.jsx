@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Header } from './Header';
 import { Drawer } from './Drawer';
 import { useAuth } from '../config/AuthContext';
@@ -9,12 +9,27 @@ import { ReglasCortesiaModal } from './ReglasCortesiaModal';
 
 export const Layout = () => {
     const { isAuthenticated, loading } = useAuth();
+    const location = useLocation();
+    const navigate = useNavigate();
+    const lastNonModalPathRef = useRef('/');
+
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-    const [isCoberturaOpen, setIsCoberturaOpen] = useState(false);
-    const [isReglasCortesiaOpen, setIsReglasCortesiaOpen] = useState(false);
     const [darkMode, setDarkMode] = useState(() => {
         return localStorage.getItem('dy_theme') === 'dark';
     });
+
+    const isCoberturaOpen = location.pathname === '/cobertura-supervisores';
+    const isReglasCortesiaOpen = location.pathname === '/reglas-cortesia';
+
+    useEffect(() => {
+        if (location.pathname !== '/cobertura-supervisores' && location.pathname !== '/reglas-cortesia') {
+            lastNonModalPathRef.current = `${location.pathname}${location.search}`;
+        }
+    }, [location.pathname, location.search]);
+
+    const handleCloseModalRoute = () => {
+        navigate(lastNonModalPathRef.current || '/');
+    };
 
     useEffect(() => {
         if (darkMode) {
@@ -58,19 +73,19 @@ export const Layout = () => {
             <Drawer
                 isOpen={isDrawerOpen}
                 onClose={closeDrawer}
-                onOpenCobertura={() => setIsCoberturaOpen(true)}
-                onOpenReglasCortesia={() => setIsReglasCortesiaOpen(true)}
+                onOpenCobertura={() => navigate('/cobertura-supervisores')}
+                onOpenReglasCortesia={() => navigate('/reglas-cortesia')}
             />
             <main className="main-content">
                 <Outlet />
             </main>
             <CoberturaSupervisoresModal
                 isOpen={isCoberturaOpen}
-                onClose={() => setIsCoberturaOpen(false)}
+                onClose={handleCloseModalRoute}
             />
             <ReglasCortesiaModal
                 isOpen={isReglasCortesiaOpen}
-                onClose={() => setIsReglasCortesiaOpen(false)}
+                onClose={handleCloseModalRoute}
             />
         </div>
     );

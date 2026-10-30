@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Inbox, UserCheck, ShieldAlert, X, ChevronRight, HelpCircle, Map, Gift, Sliders, Clock, History } from 'lucide-react';
+import { LayoutDashboard, Inbox, UserCheck, ShieldAlert, X, ChevronRight, HelpCircle, Map, Gift, Sliders, Clock, History, Settings } from 'lucide-react';
 import { useAuth } from '../config/AuthContext';
 
 export const Drawer = ({ isOpen, onClose, onOpenCobertura, onOpenReglasCortesia }) => {
@@ -128,6 +128,14 @@ export const Drawer = ({ isOpen, onClose, onOpenCobertura, onOpenReglasCortesia 
                             >
                                 <History size={18} color="#06b6d4" />
                                 <span>Logs del Sistema</span>
+                            </NavLink>
+                            <NavLink
+                                to="/configuracion"
+                                onClick={onClose}
+                                className={({ isActive }) => `drawer-nav-item ${isActive ? 'active' : ''}`}
+                            >
+                                <Settings size={18} color="#151C5B" />
+                                <span>Configuración General</span>
                             </NavLink>
                         </>
                     )}

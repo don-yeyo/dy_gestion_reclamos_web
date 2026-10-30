@@ -37,12 +37,12 @@ export const authApi = {
 export const reclamosApi = {
     getAll: (cutoff = null) => api.get('/reclamos', { params: cutoff ? { cutoff } : {} }),
     getById: (id) => api.get(`/reclamos/${id}`),
-    updateEstadoAdmin: (id, estado, motivo_desaprobado = '', tipo_desaprobacion = '', prioridad = null) => {
+    updateEstadoAdmin: (id, estado, motivo_desaprobado = '', tipo_desaprobacion = '', prioridad = null, regla_cortesia = null) => {
         let payload = { estado };
         if (typeof motivo_desaprobado === 'object' && motivo_desaprobado !== null) {
             payload = { estado, ...motivo_desaprobado };
         } else {
-            payload = { estado, motivo_desaprobado, tipo_desaprobacion, prioridad };
+            payload = { estado, motivo_desaprobado, tipo_desaprobacion, prioridad, regla_cortesia };
         }
         return api.patch(`/reclamos/${id}/estado-admin`, payload);
     },
@@ -63,7 +63,9 @@ export const reclamosApi = {
 export const publicApi = {
     verifyToken: (token) => api.get('/public/actions/verify', { params: { token } }),
     submitImposibilidad: (token, motivo, tipo_imposibilidad = '') =>
-        api.post('/public/actions/supervisor-imposibilidad', { token, motivo, tipo_imposibilidad })
+        api.post('/public/actions/supervisor-imposibilidad', { token, motivo, tipo_imposibilidad }),
+    submitEncuestaConsumidor: (data) =>
+        api.post('/public/actions/consumidor-encuesta', data)
 };
 
 export const supervisoresApi = {
@@ -107,6 +109,35 @@ export const seguimientosApi = {
 export const logsApi = {
     getLogs: (params) => api.get('/logs', { params }),
     getStats: () => api.get('/logs/stats')
+};
+
+export const configuracionApi = {
+    getAll: () => api.get('/configuracion'),
+    updateBatch: (configs) => api.put('/configuracion', { configs }),
+    resetToDefaults: () => api.post('/configuracion/reset'),
+    getTestRecipient: () => api.get('/configuracion/test-recipient'),
+    enviarMuestraEmail: (data) => api.post('/configuracion/enviar-muestra', data)
+};
+
+export const categoriasApi = {
+    getAll: (params) => api.get('/categorias', { params }),
+    create: (data) => api.post('/categorias', data),
+    update: (id, data) => api.put(`/categorias/${id}`, data),
+    toggle: (id) => api.patch(`/categorias/${id}/toggle`)
+};
+
+export const productosApi = {
+    getAll: (params) => api.get('/productos', { params }),
+    searchPublic: (query) => api.get('/public/productos', { params: { q: query } }),
+    create: (data) => api.post('/productos', data),
+    update: (id, data) => api.put(`/productos/${id}`, data),
+    toggle: (id) => api.patch(`/productos/${id}/toggle`)
+};
+
+export const simuladorApi = {
+    getEstadoReclamo: (id) => api.get(`/simulador/reclamo/${id}/estado`),
+    avanzarReclamo: (id, data) => api.post(`/simulador/reclamo/${id}/avanzar`, data),
+    resetNotificaciones: (id) => api.post(`/simulador/reclamo/${id}/reset-notificaciones`)
 };
 
 export default api;

@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
     Sliders, RefreshCw, Search, Pencil, Lock, CheckCircle2,
     AlertCircle, X, Save, UserCheck, ShieldAlert, Gift, User,
@@ -29,6 +30,8 @@ const PALETA_PRESETS = [
 ];
 
 export const EstadosList = () => {
+    const { id: routeEstadoId } = useParams();
+    const navigate = useNavigate();
     const { estados, loading, refreshEstados, updateConfig } = useEstados();
 
     // Filtros
@@ -41,6 +44,25 @@ export const EstadosList = () => {
     const [colorDraft, setColorDraft] = useState('#64748b');
     const [saving, setSaving] = useState(false);
     const [notification, setNotification] = useState(null);
+
+    // Sincronizar modal con URL (/estados/:id)
+    useEffect(() => {
+        if (!routeEstadoId) {
+            setEditingEstado(null);
+            return;
+        }
+        if (estados.length > 0) {
+            const found = estados.find(
+                e => String(e.id) === String(routeEstadoId) ||
+                     String(e.codigo || '').toLowerCase() === String(routeEstadoId).toLowerCase()
+            );
+            if (found && (!editingEstado || String(editingEstado.id) !== String(found.id))) {
+                setEditingEstado(found);
+                setDescripcionDraft(found.descripcion || '');
+                setColorDraft(found.color || '#64748b');
+            }
+        }
+    }, [routeEstadoId, estados]);
 
     // Conteo por actor
     const counts = useMemo(() => {
@@ -80,6 +102,7 @@ export const EstadosList = () => {
         setEditingEstado(estado);
         setDescripcionDraft(estado.descripcion || '');
         setColorDraft(estado.color || '#64748b');
+        navigate(`/estados/${encodeURIComponent(estado.id || estado.codigo)}`);
     };
 
     const handleCloseEdit = () => {
@@ -87,6 +110,9 @@ export const EstadosList = () => {
         setEditingEstado(null);
         setDescripcionDraft('');
         setColorDraft('#64748b');
+        if (routeEstadoId) {
+            navigate('/estados');
+        }
     };
 
     const handleSaveConfig = async (e) => {
@@ -105,6 +131,9 @@ export const EstadosList = () => {
                     message: `Estado "${editingEstado.nombre}" actualizado correctamente (descripción y color).`
                 });
                 setEditingEstado(null);
+                if (routeEstadoId) {
+                    navigate('/estados');
+                }
                 setTimeout(() => setNotification(null), 4000);
             } else {
                 setNotification({

@@ -15,6 +15,9 @@ const estadosRoutes = require('./routes/estadosRoutes');
 const prioridadesRoutes = require('./routes/prioridadesRoutes');
 const seguimientosRoutes = require('./routes/seguimientosRoutes');
 const logsRoutes = require('./routes/logsRoutes');
+const configuracionRoutes = require('./routes/configuracionRoutes');
+const productosRoutes = require('./routes/productosRoutes');
+const simuladorRoutes = require('./routes/simuladorRoutes');
 const { initDatabase, pool } = require('./config/database');
 
 const app = express();
@@ -53,6 +56,11 @@ app.use('/api/', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Archivos estáticos públicos (logo institucional, assets)
+const path = require('path');
+app.use('/public', express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public')));
+
 // Logging
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
@@ -61,6 +69,7 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 // Rutas de API
 app.use('/api/auth', authRoutes);
 app.use('/api/reclamos', reclamosRoutes);
+app.use('/api/public', publicActionRoutes);
 app.use('/api/public/actions', publicActionRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/supervisores', supervisoresRoutes);
@@ -69,6 +78,9 @@ app.use('/api/estados', estadosRoutes);
 app.use('/api/prioridades', prioridadesRoutes);
 app.use('/api/seguimientos', seguimientosRoutes);
 app.use('/api/logs', logsRoutes);
+app.use('/api/configuracion', configuracionRoutes);
+app.use('/api/simulador', simuladorRoutes);
+app.use('/api', productosRoutes);
 
 // Info base API
 app.get('/api', (req, res) => {

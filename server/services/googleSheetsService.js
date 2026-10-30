@@ -352,10 +352,13 @@ class GoogleSheetsService {
                 const dataUpdates = [];
                 for (const rowNum of claim.rowNumbers) {
                     for (const [col, val] of Object.entries(updates)) {
-                        dataUpdates.push({
-                            range: `${this.tabName}!${col}${rowNum}`,
-                            values: [[val]]
-                        });
+                        // Solo enviar a Google Sheets si es una columna válida de hoja (A-Z o AA-ZZ)
+                        if (/^[A-Z]{1,2}$/.test(col)) {
+                            dataUpdates.push({
+                                range: `${this.tabName}!${col}${rowNum}`,
+                                values: [[val]]
+                            });
+                        }
                     }
                 }
 

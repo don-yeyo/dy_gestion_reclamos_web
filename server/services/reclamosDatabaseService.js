@@ -370,6 +370,9 @@ class ReclamosDatabaseService {
             sla_dias: r.sla_dias !== null && r.sla_dias !== undefined ? Number(r.sla_dias) : null,
             fecha_limite_sla: r.fecha_limite_sla ? r.fecha_limite_sla.toISOString() : null,
             regla_cortesia_aplicada: r.regla_cortesia_aplicada || '',
+            consumidor_puntuacion: r.consumidor_puntuacion !== null && r.consumidor_puntuacion !== undefined ? Number(r.consumidor_puntuacion) : null,
+            consumidor_tipo_problema: r.consumidor_tipo_problema || '',
+            consumidor_comentario: r.consumidor_comentario || '',
             items: itemsByClaim.get(r.id) || []
         }));
     }
@@ -431,6 +434,9 @@ class ReclamosDatabaseService {
             sla_dias: r.sla_dias !== null && r.sla_dias !== undefined ? Number(r.sla_dias) : null,
             fecha_limite_sla: r.fecha_limite_sla ? r.fecha_limite_sla.toISOString() : null,
             regla_cortesia_aplicada: r.regla_cortesia_aplicada || '',
+            consumidor_puntuacion: r.consumidor_puntuacion !== null && r.consumidor_puntuacion !== undefined ? Number(r.consumidor_puntuacion) : null,
+            consumidor_tipo_problema: r.consumidor_tipo_problema || '',
+            consumidor_comentario: r.consumidor_comentario || '',
             items: items.map(it => ({
                 rowNumber: it.item_row_number,
                 categoria: it.categoria,
@@ -673,10 +679,10 @@ class ReclamosDatabaseService {
      */
     async getLastNotificationDate(claimId, destinatarioTipo) {
         const [rows] = await pool.execute(
-            'SELECT created_at FROM seguimiento_notificaciones WHERE reclamo_id = ? AND destinatario_tipo = ? AND estado_envio = "enviado" ORDER BY created_at DESC LIMIT 1',
+            'SELECT enviado_at FROM seguimiento_notificaciones WHERE reclamo_id = ? AND destinatario_tipo = ? AND estado_envio = "enviado" ORDER BY id DESC LIMIT 1',
             [String(claimId), destinatarioTipo]
         );
-        return rows[0] && rows[0].created_at ? new Date(rows[0].created_at) : null;
+        return rows[0] && rows[0].enviado_at ? new Date(rows[0].enviado_at) : null;
     }
 
     /**

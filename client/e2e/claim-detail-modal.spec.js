@@ -107,4 +107,128 @@ test.describe('CU-05, CU-06, CU-08: Gestión de Expediente en Modal de Detalle',
         // Notificación de éxito
         await expect(page.locator('text=Expediente reenviado a Calidad & Inocuidad con éxito.')).toBeVisible();
     });
+
+    test('Actualización reactiva de regalo de cortesía con ítems al cambiar nivel de prioridad', async ({ page }) => {
+        await page.goto('/reclamos');
+
+        // Abrir reclamo REC-2026-002 (con supervisor listo para aprobar)
+        await page.locator('tr', { hasText: 'REC-2026-002' }).click();
+        await expect(page.locator('.modal-overlay')).toBeVisible();
+
+        // Click en "Aprobar"
+        const btnAprobar = page.getByRole('button', { name: 'Aprobar', exact: true });
+        await expect(btnAprobar).toBeEnabled();
+        await btnAprobar.click();
+
+        const selectPrioridad = page.locator('[data-testid="select-prioridad"]');
+        await expect(selectPrioridad).toBeVisible();
+
+        // 1. Seleccionar prioridad Alta (10): debe mostrar 3 ítems
+        await selectPrioridad.selectOption('10');
+        await expect(page.locator('text=Prioridad Alta')).toBeVisible();
+        await expect(page.locator('text=SLA: 3 días corridos')).toBeVisible();
+        await expect(page.locator('text=Regalo / Ítems de Cortesía (3):')).toBeVisible();
+        await expect(page.locator('text=1 reemplazo')).toBeVisible();
+        await expect(page.locator('text=2 productos a elección')).toBeVisible();
+        await expect(page.locator('text=2 de kg')).toBeVisible();
+
+        // 2. Cambiar a prioridad Media (20): debe actualizarse a 2 ítems y NO mostrar "2 productos a elección"
+        await selectPrioridad.selectOption('20');
+        await expect(page.locator('text=Prioridad Media')).toBeVisible();
+        await expect(page.locator('text=SLA: 7 días corridos')).toBeVisible();
+        await expect(page.locator('text=Regalo / Ítems de Cortesía (2):')).toBeVisible();
+        await expect(page.locator('text=1 de kg')).toBeVisible();
+        await expect(page.locator('text=2 productos a elección')).not.toBeVisible();
+
+        // 3. Cambiar a prioridad Baja (30): debe actualizarse a 1 ítem y NO mostrar "1 de kg"
+        await selectPrioridad.selectOption('30');
+        await expect(page.locator('text=Prioridad Baja')).toBeVisible();
+        await expect(page.locator('text=SLA: 14 días corridos')).toBeVisible();
+        await expect(page.locator('text=Regalo / Ítems de Cortesía (1):')).toBeVisible();
+        await expect(page.locator('text=1 de kg')).not.toBeVisible();
+    });
+
+    test('Adaptabilidad mobile del modal de detalle y modal de aprobación por portal', async ({ page }) => {
+        // Establecer viewport móvil (375x667 tipo iPhone SE)
+        await page.setViewportSize({ width: 375, height: 667 });
+        await page.goto('/reclamos');
+
+        // Abrir reclamo REC-2026-002
+        await page.locator('tr', { hasText: 'REC-2026-002' }).click();
+        await expect(page.locator('.modal-overlay').first()).toBeVisible();
+
+        // Verificar que el modal de detalle se ajusta al viewport y el contenedor de tabla existe
+        const tableContainer = page.locator('.claim-products-table-container');
+        await expect(tableContainer).toBeVisible();
+
+        // Click en "Aprobar"
+        const btnAprobar = page.getByRole('button', { name: 'Aprobar', exact: true });
+        await expect(btnAprobar).toBeVisible();
+        await btnAprobar.click();
+
+        // El modal de aprobación se monta directamente en document.body (portal)
+        const modalAprobar = page.locator('body > .modal-overlay', { hasText: 'Aprobar Reclamo #REC-2026-002' });
+        await expect(modalAprobar).toBeVisible();
+
+        // La cabecera y el pie con los botones deben estar visibles en el viewport
+        const headerAprobar = modalAprobar.locator('h3:has-text("Aprobar Reclamo #REC-2026-002")');
+        await expect(headerAprobar).toBeVisible();
+
+        const btnConfirmar = modalAprobar.locator('[data-testid="btn-confirmar-aprobacion"]');
+        await expect(btnConfirmar).toBeVisible();
+
+        // Seleccionar prioridad Alta
+        const selectPrioridad = modalAprobar.locator('[data-testid="select-prioridad"]');
+        await selectPrioridad.selectOption('10');
+
+        // El botón Confirmar queda habilitado y completamente accesible sin cortes
+        await expect(btnConfirmar).toBeEnabled();
+        await btnConfirmar.click();
+
+        // Verificar mensaje de éxito
+        await expect(page.locator('text=Reclamo Aprobado con Prioridad Alta')).toBeVisible();
+    });
+
+    test('Desaprobación de reclamo mediante submodal interactivo con portal', async ({ page }) => {
+        await page.goto('/reclamos');
+
+        // Abrir reclamo REC-2026-001 (Pendiente en recepción)
+        await page.locator('tr', { hasText: 'REC-2026-001' }).click();
+        await expect(page.locator('.modal-overlay').first()).toBeVisible();
+
+        // En la Card 1 (Ingreso), pulsar botón Desaprobar
+        const btnDesaprobar = page.locator('[data-testid="btn-abrir-desaprobar"]');
+        await expect(btnDesaprobar).toBeVisible();
+        await btnDesaprobar.click();
+
+        // Se despliega el submodal de desaprobación montado en document.body
+        const modalDesaprobar = page.locator('body > .modal-overlay', { hasText: 'Desaprobar Reclamo #REC-2026-001' });
+        await expect(modalDesaprobar).toBeVisible();
+
+        // El botón Confirmar Desaprobación debe estar deshabilitado mientras falte la observación interna
+        const btnConfirmarDesaprobar = modalDesaprobar.locator('[data-testid="btn-confirmar-desaprobacion"]');
+        await expect(btnConfirmarDesaprobar).toBeDisabled();
+
+        // Seleccionar tipo de desaprobación
+        const selectTipo = modalDesaprobar.locator('[data-testid="select-tipo-desaprobacion"]');
+        await expect(selectTipo).toBeVisible();
+        await selectTipo.selectOption('Producto con fecha de vencimiento expirada al momento de la compra');
+
+        // Completar la observación interna
+        const textareaObs = modalDesaprobar.locator('[data-testid="textarea-motivo-desaprobado"]');
+        await expect(textareaObs).toBeVisible();
+        await textareaObs.fill('Se constata ticket con fecha posterior a 30 días de vencimiento impreso.');
+
+        // Ahora el botón queda habilitado
+        await expect(btnConfirmarDesaprobar).toBeEnabled();
+        await btnConfirmarDesaprobar.click();
+
+        // El submodal se cierra y se muestra la notificación de éxito
+        await expect(page.getByText('Reclamo desaprobado: Consumidor pasado a "Cerrado')).toBeVisible();
+
+        // La card 1 debe exhibir el estado Desaprobado y los motivos formal e interno
+        const cardIngreso = page.locator('.wf-branch-card', { hasText: '1. Ingreso' });
+        await expect(cardIngreso).toContainText('Desaprobado');
+        await expect(cardIngreso).toContainText('Producto con fecha de vencimiento expirada');
+    });
 });

@@ -2,10 +2,19 @@
 -[x] Reglas de Seguimientos: sección con grilla completa para configurar momentos de seguimiento, repeticiones e intervalo N = SLA / Repeticiones con emails de elevación según rol, estado y prioridad. (Sistemas)
 -[x] En la pantalla de Reglas de Seguimiento, poder definir cuantos dias deben pasar para emitir el primer email, validar que no sea superior al valor de sla
 -[x] Corregir la perioricidad, en lugar de ser sla / repeticiones, deberia ser (sla - dias para el primer envío)/ repeticiones
--[ ] Agregar pantalla de configuracion de los textos a enviar en los emails (persistir toda config en base de datos). Establecer los mensajes actuales como los establecidos de fabrica. Ver que otras env vars tenemos
--[ ] Revisar el mail que recibe el consumidor y evaluar la posibilidad de agregar una encuesta (5 estrellas por ejemplo). (Sistemas)
--[ ] crear un simulador que permita avanzar en el tiempo y ver como se irian disparando los mails al pasar los dias
--[ ] Soportar que Inocuidad cuenta con dos grupos de email de notificacion según el tipo de producto involucrado en el reclamo
+-[x] Agregar pantalla de configuracion de los textos a enviar en los emails (persistir toda config en base de datos). Establecer los mensajes actuales como los establecidos de fabrica. Ver que otras env vars tenemos
+-[x] Botón Guardar Cambios en Configuración: desactivación y estado de spinner de carga para prevenir dobles clics
+-[x] Herramienta de testeo de emails: botón "Enviar Email de Muestra" en configuración para probar plantillas con número de reclamo y correo de prueba
+-[x] Soporte de Logotipo Institucional Don Yeyo en cabeceras de emails y páginas públicas por URL pública HTTPS configurable en /configuracion/parametros (con fallback textual)
+-[x] Encuesta de Seguimiento al Consumidor (/encuesta-consumidor): simplificación de UI, alto contraste, escala de 5 emojis de satisfacción (😡 🙁 😐 🙂 😄), flujo directo sin preguntas redundantes y textos limpios
+-[x] Url directa a secciones y apertura automática del modal de reclamo por URL (/reclamos/:id)
+-[x] crear un simulador que permita avanzar en el tiempo y ver como se irian disparando los mails al pasar los dias (Simulador temporal en modal de reclamo con selector de días, protección opcional de Google Sheets y envíos forzados a casilla de pruebas)
+-[x] Modal de aprobación de reclamos con reactividad en vivo de ítems de cortesía al conmutar prioridad. Correo al supervisor con bloque de prioridad, SLA y lista detallada de los ítems de cortesía configurados a entregar.
+-[x] Submodal interactivo de desaprobación de reclamos (vía React Portal a document.body) en lugar de formulario inline, tipificación obligatoria de motivos formales e internos, y diseño responsivo sin desbordes.
+-[ ] validar y evitar que si un rol, presionó uno de los botones hasheados y ello produzco un cambio en los estados del flujo de un caso, vuelve a apretar el mismo boton u otro del cuerpo del email, ya no le sea posible continuar. Mostrar una pantalla, en el caso del consumidor, que ya se cuenta con una accion anterior registrada (mostrar cual y en que fecha), en el caso de supervisores o rol de inocuidad, tambien avisarle pero aclararle que si necesita cambiar su desicion reabriendo el caso se dirija al bla bla bla... que ese texto se pueda setear desde configuracion
+-[x] cuando un supervisor presiona en el boton de resuelto, en lugar de mostrar la pantalla con el cambio de estado realidado, antes de ello pedir confirmacion, advirtiendo que posterior a ello se enviará un email de aviso al consumidor (en esa pantalla debe poder cancelar, lo cual no hace mas que cerrar la ventana o aceptar y proceder a cambiar el estado a resuelto)
+-[x] la pantalla del supervisor tras clickear el boton del email de impedimiento se ve mal como si no estuviese tomando los estilos css
+-[x] Soportar que Inocuidad cuenta con dos grupos de email de notificacion según el tipo de producto involucrado en el reclamo
 -[x] Descripción de los estados: agregar una descripción a los estados para que se entienda qué significa cada uno. (Sistemas)
 -[ ] Sopportar el rol calidad al gestor de reclamos
 -[no es posible] Imágenes adjuntas: agregar las imágenes en el cuerpo del mail que llega a calidad. (Sistemas)
@@ -13,9 +22,10 @@
 -[x] Soporte para configurar los emails de elevación de los ejecutivos: revisar los correos de escalamiento (Mkt)
 
 ### Web
+-[ ] Revisar pantalla de mis-reclamos para controlar que mensajes se le mustra al consumidor segun la descripcion de estados
 -[ ] Para el email que le llega al admin, agregar boton para rechazar reclamo
 -[ ] Agregar un mensaje que sugiera conservar el producto para un análisis posterior en la carga del reclamo.
--[ ] Nuevo reclamo consumidor: al recibir el mail, que se pueda acceder directamente al reclamo, sin tener que buscarlo manualmente por el número de reclamo.
+-[x] Nuevo reclamo consumidor: al recibir el mail, que se pueda acceder directamente al reclamo, sin tener que buscarlo manualmente por el número de reclamo.
 -[ ] Primer mail del admin: boton para rechazar el reclamo desde el propio correo.
 
 ### Revisar
@@ -24,4 +34,3 @@
 ### No es parte del MVP
 -[ ] refrescar grilla gestor cada x segundos
 -[ ] evaluar si es posible asociar codigos de productos a los items de resarcimiento con el objetivo de crear el mecanismo de autogeneracion de solicitudes de notas de credito
-

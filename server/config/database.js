@@ -116,7 +116,10 @@ async function initDatabase() {
             'prioridad_nombre VARCHAR(50) NULL',
             'sla_dias INT NULL',
             'fecha_limite_sla DATETIME NULL',
-            'regla_cortesia_aplicada TEXT NULL'
+            'regla_cortesia_aplicada TEXT NULL',
+            'consumidor_puntuacion INT NULL',
+            'consumidor_tipo_problema VARCHAR(150) NULL',
+            'consumidor_comentario TEXT NULL'
         ];
         for (const colDef of colsToAdd) {
             try {
@@ -370,11 +373,16 @@ async function initDatabase() {
                 estado_envio VARCHAR(50) DEFAULT 'enviado',
                 error_mensaje TEXT,
                 enviado_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 KEY idx_seg_reclamo (reclamo_id),
                 KEY idx_seg_destinatario (destinatario_tipo),
                 KEY idx_seg_fecha (enviado_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
+
+        try {
+            await connection.query('ALTER TABLE seguimiento_notificaciones ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+        } catch (_) {}
 
         // 7. Tabla de Logs de Modificaciones en Configuraciones del Sistema
         await connection.query(`
@@ -455,6 +463,146 @@ async function initDatabase() {
                 END IF;
             END;
         `);
+
+        // 8. Tabla de Categorías de Productos (con mapeo de emails de Inocuidad)
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS producto_categorias (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                nombre VARCHAR(150) NOT NULL UNIQUE,
+                inocuidad_emails TEXT NOT NULL,
+                activo TINYINT(1) NOT NULL DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_activo (activo)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+
+        // Sembrado inicial de categorías de productos si está vacía
+        const [catsExistentes] = await connection.query(`SELECT COUNT(*) as cant FROM producto_categorias`);
+        if (catsExistentes && catsExistentes[0] && catsExistentes[0].cant === 0) {
+            console.log('[STARTUP] Sembrando categorías de productos iniciales con emails de inocuidad...');
+            const categoriasIniciales = [
+                ['Pastas Frescas', 'inocuidad.pastas@donyeyo.com.ar, calidad@donyeyo.com.ar', 1],
+                ['Tapas y Masas', 'inocuidad.tapas@donyeyo.com.ar, calidad@donyeyo.com.ar', 1],
+                ['Panificados y Secos', 'inocuidad.panificados@donyeyo.com.ar, calidad@donyeyo.com.ar', 1]
+            ];
+            for (const cat of categoriasIniciales) {
+                await connection.query(`
+                    INSERT INTO producto_categorias (nombre, inocuidad_emails, activo)
+                    VALUES (?, ?, ?)
+                    ON DUPLICATE KEY UPDATE inocuidad_emails = VALUES(inocuidad_emails)
+                `, cat);
+            }
+        }
+
+        // 9. Tabla de Catálogo de Productos (nombre interno, packaging y categoría)
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS productos (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                nombre_interno VARCHAR(255) NOT NULL,
+                nombre_empaque VARCHAR(255) NOT NULL,
+                categoria_id INT NOT NULL,
+                activo TINYINT(1) NOT NULL DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_nombre_empaque (nombre_empaque),
+                INDEX idx_categoria_id (categoria_id),
+                CONSTRAINT fk_productos_categoria FOREIGN KEY (categoria_id) 
+                    REFERENCES producto_categorias(id) ON UPDATE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+
+        // Sembrado inicial de productos si está vacía
+        const [prodsExistentes] = await connection.query(`SELECT COUNT(*) as cant FROM productos`);
+        if (prodsExistentes && prodsExistentes[0] && prodsExistentes[0].cant === 0) {
+            console.log('[STARTUP] Sembrando productos iniciales de catálogo...');
+            const productosIniciales = [
+                ['Ravioles de Ricota y Pollo 500g', 'Ravioles Ricota y Pollo Don Yeyo x 500g', 1, 1],
+                ['Ñoquis de Papa 500g', 'Ñoquis de Papa Clásicos Don Yeyo x 500g', 1, 1],
+                ['Tallarines al Huevo 500g', 'Fideos Tallarines al Huevo Don Yeyo x 500g', 1, 1],
+                ['Tapas de Empanadas Hojaldre x 12', 'Tapas para Empanadas Hojaldradas Don Yeyo 12 un', 2, 1],
+                ['Tapas de Pascualina Criolla x 2', 'Pascualina Criolla Don Yeyo x 2 discos', 2, 1],
+                ['Pan de Mesa Blanco 400g', 'Pan de Mesa Lactal Blanco Don Yeyo 400g', 3, 1]
+            ];
+            for (const prod of productosIniciales) {
+                await connection.query(`
+                    INSERT INTO productos (nombre_interno, nombre_empaque, categoria_id, activo)
+                    VALUES (?, ?, ?, ?)
+                `, prod);
+            }
+        }
+
+        // 10. Tabla de Configuración Global del Sistema (Textos de Emails, Botones y Parámetros)
+        await connection.query(`
+            CREATE TABLE IF NOT EXISTS config_sistema (
+                clave VARCHAR(100) NOT NULL PRIMARY KEY,
+                valor LONGTEXT NULL,
+                categoria VARCHAR(50) NOT NULL DEFAULT 'general',
+                etiqueta VARCHAR(150) NULL,
+                descripcion VARCHAR(255) NULL,
+                valor_defecto LONGTEXT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_categoria (categoria)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+
+        // Sembrado inicial de configuraciones si está vacía
+        const [configsExistentes] = await connection.query(`SELECT COUNT(*) as cant FROM config_sistema WHERE clave LIKE 'email_%'`);
+        if (configsExistentes && configsExistentes[0] && configsExistentes[0].cant === 0) {
+            console.log('[STARTUP] Sembrando configuraciones globales y textos de fábrica para emails...');
+            const configuracionesIniciales = [
+                // 1. Email Supervisor
+                ['email_supervisor_asunto', '[Acción Requerida] Reclamo #{claim_id} - {consumidor_nombre} ({localidad})', 'email_supervisor', 'Asunto del correo a Supervisor', 'Variables admitidas: {claim_id}, {consumidor_nombre}, {localidad}', '[Acción Requerida] Reclamo #{claim_id} - {consumidor_nombre} ({localidad})'],
+                ['email_supervisor_titulo', 'Acción Comercial Requerida - Reclamo #{claim_id}', 'email_supervisor', 'Título del encabezado', 'Título principal del banner superior', 'Acción Comercial Requerida - Reclamo #{claim_id}'],
+                ['email_supervisor_intro', 'Se ha puesto en curso un reclamo en tu zona de cobertura que requiere de tu intervención para reposición o entrega de cortesía.', 'email_supervisor', 'Mensaje introductorio', 'Párrafo de apertura antes de los datos del consumidor', 'Se ha puesto en curso un reclamo en tu zona de cobertura que requiere de tu intervención para reposición o entrega de cortesía.'],
+                ['email_supervisor_leyenda_botones', 'Por favor, una vez gestionado este caso, informá el estado haciendo clic en el botón correspondiente:', 'email_supervisor', 'Texto sobre botones de acción', 'Instrucción antes de los botones de interacción rápida', 'Por favor, una vez gestionado este caso, informá el estado haciendo clic en el botón correspondiente:'],
+                ['email_supervisor_btn_resuelto', '✓ Pude Resolver la Acción', 'email_supervisor', 'Texto botón: Resuelto', 'Botón verde de acción rápida', '✓ Pude Resolver la Acción'],
+                ['email_supervisor_btn_imposibilidad', '✕ Existe una Imposibilidad', 'email_supervisor', 'Texto botón: Imposibilidad', 'Botón rojo que abre el formulario de motivo', '✕ Existe una Imposibilidad'],
+
+                // 2. Email Consumidor
+                ['email_consumidor_asunto', 'Seguimiento de tu Reclamo en Don Yeyo #{claim_id}', 'email_consumidor', 'Asunto del correo a Consumidor', 'Variables: {claim_id}, {consumidor_nombre}', 'Seguimiento de tu Reclamo en Don Yeyo #{claim_id}'],
+                ['email_consumidor_titulo', 'Don Yeyo - Seguimiento de tu Reclamo #{claim_id}', 'email_consumidor', 'Título de cabecera', 'Encabezado del correo de conformidad', 'Don Yeyo - Seguimiento de tu Reclamo #{claim_id}'],
+                ['email_consumidor_intro', 'Nos contactamos para saber cómo te fue con la resolución de tu reclamo y si recibiste la reposición de tus productos de parte de nuestro equipo comercial.', 'email_consumidor', 'Mensaje de consulta', 'Cuerpo explicativo de la encuesta', 'Nos contactamos para saber cómo te fue con la resolución de tu reclamo y si recibiste la reposición de tus productos de parte de nuestro equipo comercial.'],
+                ['email_consumidor_btn_conforme', '✓ Resuelto', 'email_consumidor', 'Texto botón: Resuelto', 'Botón verde que abre la página de encuesta (5 estrellas y comentario)', '✓ Resuelto'],
+                ['email_consumidor_btn_disconforme', '~ Resuelto Disconforme', 'email_consumidor', 'Texto botón: Disconforme (Legacy)', 'Botón naranja de disconformidad', '~ Resuelto Disconforme'],
+                ['email_consumidor_btn_no_resuelto', '✕ No Resuelto', 'email_consumidor', 'Texto botón: No Resuelto', 'Botón rojo que abre la página para seleccionar tipo de problema y comentario', '✕ No Resuelto'],
+
+                // 3. Email Inocuidad
+                ['email_inocuidad_asunto', '[Calidad / Inocuidad] Nuevo Reclamo Aprobado #{claim_id} - {consumidor_nombre}', 'email_inocuidad', 'Asunto del correo a Inocuidad', 'Variables: {claim_id}, {consumidor_nombre}', '[Calidad / Inocuidad] Nuevo Reclamo Aprobado #{claim_id} - {consumidor_nombre}'],
+                ['email_inocuidad_titulo', 'Expediente Técnico - Reclamo Aprobado #{claim_id}', 'email_inocuidad', 'Título de cabecera', 'Encabezado del expediente técnico', 'Expediente Técnico - Reclamo Aprobado #{claim_id}'],
+                ['email_inocuidad_intro', 'El reclamo #{claim_id} ha sido Aprobado por la administración. Se envía copia completa del expediente para iniciar la investigación técnica, análisis de lote y trazabilidad correspondiente.', 'email_inocuidad', 'Mensaje introductorio', 'Párrafo de remisión técnica', 'El reclamo #{claim_id} ha sido Aprobado por la administración. Se envía copia completa del expediente para iniciar la investigación técnica, análisis de lote y trazabilidad correspondiente.'],
+                ['email_inocuidad_btn_gestor', 'Abrir en el Gestor Web', 'email_inocuidad', 'Texto botón: Gestor Web', 'Botón azul marino para ver el reclamo online', 'Abrir en el Gestor Web'],
+                ['email_inocuidad_btn_evidencias', 'Descargar Evidencias ZIP', 'email_inocuidad', 'Texto botón: Evidencias', 'Botón violeta para descargar paquete de fotos', 'Descargar Evidencias ZIP'],
+
+                // 4. Email Elevación
+                ['email_elevacion_asunto', '[ELEVACIÓN] Sin respuesta de acción - Reclamo #{claim_id} ({supervisor})', 'email_elevacion', 'Asunto del correo de elevación', 'Variables: {claim_id}, {supervisor}', '[ELEVACIÓN] Sin respuesta de acción - Reclamo #{claim_id} ({supervisor})'],
+                ['email_elevacion_titulo', 'ALERTA DE ELEVACIÓN AUTOMÁTICA - Reclamo #{claim_id}', 'email_elevacion', 'Título de cabecera', 'Encabezado de alerta directiva', 'ALERTA DE ELEVACIÓN AUTOMÁTICA - Reclamo #{claim_id}'],
+                ['email_elevacion_intro', 'Se ha activado la regla de elevación ejecutiva por haberse agotado el número máximo de recordatorios sin respuesta oportuna.', 'email_elevacion', 'Mensaje de advertencia', 'Cuerpo de la alerta de escalamiento', 'Se ha activado la regla de elevación ejecutiva por haberse agotado el número máximo de recordatorios sin respuesta oportuna.'],
+                ['email_elevacion_btn_revisar', 'Revisar caso en el Gestor Web', 'email_elevacion', 'Texto botón: Revisar', 'Enlace directo al caso en el gestor', 'Revisar caso en el Gestor Web'],
+
+                // 5. Email Conflicto / Fraude
+                ['email_fraude_asunto', '🚨 [CONFLICTO / POSIBLE FRAUDE] Discrepancia en Reclamo #{claim_id} - {supervisor}', 'email_fraude', 'Asunto de alerta de fraude', 'Variables: {claim_id}, {supervisor}', '🚨 [CONFLICTO / POSIBLE FRAUDE] Discrepancia en Reclamo #{claim_id} - {supervisor}'],
+                ['email_fraude_titulo', '🚨 ALERTA CRÍTICA: POSIBLE FRAUDE / CONFLICTO', 'email_fraude', 'Título de cabecera', 'Encabezado rojo de discrepancia grave', '🚨 ALERTA CRÍTICA: POSIBLE FRAUDE / CONFLICTO'],
+                ['email_fraude_intro', 'Se ha detectado una inconsistencia grave en el seguimiento del Reclamo #{claim_id}: El supervisor declaró haber entregado la reposición pero el consumidor informó NO haber recibido el producto.', 'email_fraude', 'Mensaje de auditoría', 'Detalle de la discrepancia comercial', 'Se ha detectado una inconsistencia grave en el seguimiento del Reclamo #{claim_id}: El supervisor declaró haber entregado la reposición pero el consumidor informó NO haber recibido el producto.'],
+                ['email_fraude_btn_auditar', 'Auditar Reclamo en Gestor Web', 'email_fraude', 'Texto botón: Auditar', 'Botón de auditoría inmediata', 'Auditar Reclamo en Gestor Web'],
+
+                // 6. Configuración General y Notificaciones de Respaldo
+                ['emails_admin_notificaciones', 'administracion@donyeyo.com.ar', 'general', 'Emails de Administración', 'Direcciones receptoras de avisos de imposibilidad, respuestas de consumidores y alertas de conflicto (separadas por coma)', 'administracion@donyeyo.com.ar'],
+                ['emails_inocuidad_default', 'inocuidad@donyeyo.com.ar', 'general', 'Email Inocuidad General (Respaldo)', 'Casilla a la que se remite el expediente si el producto no tiene categoría asignada', 'inocuidad@donyeyo.com.ar'],
+                ['emails_elevacion_default', 'calidad@donyeyo.com.ar, gerencia@donyeyo.com.ar', 'general', 'Emails de Elevación (Respaldo)', 'Casillas directivas notificadas cuando una regla de seguimiento no especifica emails propios', 'calidad@donyeyo.com.ar, gerencia@donyeyo.com.ar'],
+                ['email_logo_url', '', 'general', 'URL Pública del Logotipo (HTTPS)', 'URL pública absoluta con HTTPS al logotipo de Don Yeyo para encabezados de emails y vistas públicas. Si está vacío, se muestra texto corporativo.', ''],
+                ['email_pie_institucional', 'Sistema de Gestión de Reclamos Automatizado - Don Yeyo S.A.', 'general', 'Firma y Pie de Página de Correos', 'Texto al pie de todas las plantillas HTML', 'Sistema de Gestión de Reclamos Automatizado - Don Yeyo S.A.'],
+                ['mensaje_conservar_muestra', 'Por favor, recordá conservar el producto reclamado junto a su envase y lote original para un eventual peritaje o análisis de laboratorio.', 'general', 'Mensaje de Conservación de Muestra', 'Texto de recomendación al registrar un nuevo reclamo', 'Por favor, recordá conservar el producto reclamado junto a su envase y lote original para un eventual peritaje o análisis de laboratorio.']
+            ];
+
+            for (const cfg of configuracionesIniciales) {
+                await connection.query(`
+                    INSERT INTO config_sistema (clave, valor, categoria, etiqueta, descripcion, valor_defecto)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE categoria = VALUES(categoria), etiqueta = VALUES(etiqueta), descripcion = VALUES(descripcion), valor_defecto = VALUES(valor_defecto)
+                `, cfg);
+            }
+        }
 
         console.log('[MYSQL] Estructura de tablas, índices y triggers inicializados correctamente.');
         return true;

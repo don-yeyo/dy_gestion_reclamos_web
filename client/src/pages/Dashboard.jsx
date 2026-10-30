@@ -143,7 +143,7 @@ export const Dashboard = () => {
                                     <tr
                                         key={r.id}
                                         className={r.en_conflicto ? 'claim-row-conflicto' : ''}
-                                        onClick={() => navigate(`/reclamos?id=${r.id}`)}
+                                        onClick={() => navigate(`/reclamos/${r.id}`)}
                                         style={{ cursor: 'pointer' }}
                                     >
                                         <td>

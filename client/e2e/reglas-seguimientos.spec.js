@@ -31,8 +31,8 @@ test.describe('CU-11: Reglas de Seguimientos de Workflow (Grilla, Disparos, Repe
         await expect(thead).toContainText('Acciones');
 
         // Verificar cálculo de N en fila existente
-        // Para Supervisor / Alta (SLA 3d, 3 repeticiones): N = 3/3 = 1 día
-        await expect(page.locator('.data-table tbody')).toContainText('N = 1 día');
+        // Para Supervisor / Alta (SLA 3d, Disparo 1d, 3 repeticiones): N = (3 - 1)/3 = 0.67 días (16 hs)
+        await expect(page.locator('.data-table tbody')).toContainText('N = 0.67 días');
         await expect(page.locator('.data-table tbody')).toContainText('gerencia@donyeyo.com.ar');
     });
 
@@ -51,10 +51,12 @@ test.describe('CU-11: Reglas de Seguimientos de Workflow (Grilla, Disparos, Repe
         // Seleccionar rol Inocuidad
         await page.locator('.modal-body').getByText('Inocuidad', { exact: true }).click();
 
-        // Configurar 6 repeticiones para ver cálculo reactivo de N con número no entero/horas:
-        // Prioridad Alta (SLA 3 días) / 6 repeticiones = 0.5 días (12 hs)
+        // Configurar Disparo = 1 día y Repeticiones = 4:
+        // Fórmula: (SLA 3d - Disparo 1d) / 4 repeticiones = 0.5 días (12 hs)
+        const inputDisparo = page.locator('input[type="number"]').nth(0);
+        await inputDisparo.fill('1');
         const inputRepeticiones = page.locator('input[type="number"]').nth(1);
-        await inputRepeticiones.fill('6');
+        await inputRepeticiones.fill('4');
 
         // Verificar cálculo reactivo de N en vivo en el simulador
         await expect(page.locator('.modal-body')).toContainText('N = 0.5 días (12 hs)');

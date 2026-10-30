@@ -102,6 +102,61 @@ class PrioridadesService {
     }
 
     /**
+     * Resuelve de forma exhaustiva la prioridad y los ítems de cortesía correspondientes a un reclamo
+     * según la configuración vigente en workflow_prioridades (que ahora maneja ítems).
+     */
+    async getReglasCortesiaForClaim(claim) {
+        let codigo = (claim && claim.prioridad !== null && claim.prioridad !== undefined) 
+            ? Number(claim.prioridad) 
+            : null;
+
+        if (!codigo && claim && claim.prioridad_nombre) {
+            const nom = String(claim.prioridad_nombre).toLowerCase();
+            if (nom.includes('alta')) codigo = 10;
+            else if (nom.includes('media')) codigo = 20;
+            else if (nom.includes('baja')) codigo = 30;
+        }
+
+        if (codigo) {
+            const p = await this.getPrioridadByCodigo(codigo);
+            if (p) {
+                let reglas = p.reglas_cortesia;
+                if (typeof reglas === 'string') {
+                    try { reglas = JSON.parse(reglas); } catch { reglas = []; }
+                }
+                if (Array.isArray(reglas) && reglas.length > 0) {
+                    const items = reglas
+                        .map(r => (typeof r === 'string' ? r : (r?.descripcion || '')).trim())
+                        .filter(Boolean);
+                    if (items.length > 0) {
+                        return {
+                            prioridad: p,
+                            items,
+                            texto: items.join(' + ')
+                        };
+                    }
+                }
+            }
+        }
+
+        if (claim && claim.regla_cortesia_aplicada && String(claim.regla_cortesia_aplicada).trim()) {
+            const texto = String(claim.regla_cortesia_aplicada).trim();
+            const items = texto.includes('+') ? texto.split('+').map(s => s.trim()).filter(Boolean) : [texto];
+            return {
+                prioridad: null,
+                items,
+                texto
+            };
+        }
+
+        return {
+            prioridad: null,
+            items: ['1 reemplazo'],
+            texto: '1 reemplazo'
+        };
+    }
+
+    /**
      * Actualiza las reglas de cortesía y opcionalmente el SLA de una prioridad.
      * Regla de negocio: No se permite cambiar nombre ni descripción, ni agregar ni eliminar prioridades.
      * Se guardan las reglas de cortesía como JSON (al menos una obligatoria) y opcionalmente el SLA en días.

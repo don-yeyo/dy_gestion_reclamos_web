@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { publicApi } from '../services/api';
-import { ConfirmModal } from '../components/ConfirmModal';
 import {
     AlertTriangle, CheckCircle2, Clock, MapPin, Package,
-    ShieldAlert, ArrowRight, Loader2
+    ShieldAlert, ArrowRight, Loader2, XCircle, User, Info
 } from 'lucide-react';
 
 export const ImposibilidadPublic = () => {
@@ -20,9 +19,6 @@ export const ImposibilidadPublic = () => {
     const [submitting, setSubmitting] = useState(false);
     const [submittedSuccess, setSubmittedSuccess] = useState(false);
 
-    // Modal de alertas estéticas
-    const [alertDialog, setAlertDialog] = useState({ isOpen: false, title: '', message: '', variant: 'warning' });
-
     useEffect(() => {
         const verify = async () => {
             if (!token) {
@@ -34,7 +30,7 @@ export const ImposibilidadPublic = () => {
             try {
                 const res = await publicApi.verifyToken(token);
                 if (res.data.success) {
-                    setTokenData(res.data.payload);
+                    setTokenData(res.data);
                 } else {
                     setError('El enlace es inválido o ha expirado.');
                 }
@@ -51,12 +47,7 @@ export const ImposibilidadPublic = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!motivoOpcion) {
-            setAlertDialog({
-                isOpen: true,
-                title: 'Motivo Requerido',
-                message: 'Por favor seleccioná el motivo de la imposibilidad antes de confirmar.',
-                variant: 'warning'
-            });
+            alert('Por favor seleccioná el motivo de la imposibilidad antes de confirmar.');
             return;
         }
 
@@ -71,37 +62,103 @@ export const ImposibilidadPublic = () => {
                 setSubmittedSuccess(true);
             }
         } catch (err) {
-            setAlertDialog({
-                isOpen: true,
-                title: 'Error al Registrar',
-                message: err.response?.data?.error || 'Ocurrió un error al registrar el motivo de la imposibilidad.',
-                variant: 'danger'
-            });
+            alert(err.response?.data?.error || 'Ocurrió un error al registrar el motivo de la imposibilidad.');
         } finally {
             setSubmitting(false);
         }
     };
 
+    // Estilos base de la página con estética institucional Don Yeyo
+    const pageContainerStyle = {
+        minHeight: '100vh',
+        backgroundColor: '#090e1a',
+        backgroundImage: 'radial-gradient(circle at 50% 10%, #152238 0%, #090e1a 100%)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px 16px',
+        fontFamily: "'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+        color: '#f8fafc'
+    };
+
+    const cardStyle = {
+        width: '100%',
+        maxWidth: '580px',
+        backgroundColor: '#10192e',
+        border: '1px solid #1e2e50',
+        borderRadius: '16px',
+        padding: '32px',
+        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.45)',
+        boxSizing: 'border-box'
+    };
+
+    const inputStyle = {
+        width: '100%',
+        padding: '12px 14px',
+        borderRadius: '8px',
+        border: '1px solid #2a3b60',
+        backgroundColor: '#16233f',
+        color: '#f8fafc',
+        fontSize: '0.92rem',
+        outline: 'none',
+        boxSizing: 'border-box',
+        transition: 'border-color 0.2s, box-shadow 0.2s'
+    };
+
+    const labelStyle = {
+        display: 'block',
+        fontSize: '0.88rem',
+        fontWeight: 600,
+        color: '#f1f5f9',
+        marginBottom: '8px'
+    };
+
+    // 1. Estado de Carga
     if (loading) {
         return (
-            <div className="min-h-screen bg-dy-bg flex flex-col items-center justify-center p-4">
-                <div className="p-8 rounded-2xl bg-dy-card border border-dy-border max-w-md w-full text-center space-y-4">
-                    <Loader2 className="w-10 h-10 animate-spin text-dy-gold mx-auto" />
-                    <h2 className="text-lg font-bold text-white">Verificando enlace de acción...</h2>
-                    <p className="text-xs text-dy-muted">Comprobando token criptográfico con los servidores de Don Yeyo.</p>
+            <div style={pageContainerStyle}>
+                <div style={{ ...cardStyle, maxWidth: '440px', textAlign: 'center', padding: '40px 24px' }}>
+                    <div style={{ display: 'inline-block', animation: 'spin 1.2s linear infinite', marginBottom: '16px', color: '#f59e0b' }}>
+                        <Loader2 size={42} />
+                    </div>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 8px 0', color: '#ffffff' }}>
+                        Verificando enlace de acción...
+                    </h2>
+                    <p style={{ fontSize: '0.85rem', color: '#94a3b8', margin: 0, lineHeight: 1.5 }}>
+                        Comprobando token criptográfico seguro con los servidores de Don Yeyo S.A.
+                    </p>
+                    <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
                 </div>
             </div>
         );
     }
 
+    // 2. Estado de Error
     if (error) {
         return (
-            <div className="min-h-screen bg-dy-bg flex flex-col items-center justify-center p-4">
-                <div className="p-8 rounded-2xl bg-dy-card border border-red-500/40 max-w-md w-full text-center space-y-4">
-                    <ShieldAlert className="w-12 h-12 text-red-400 mx-auto" />
-                    <h2 className="text-lg font-bold text-white">Enlace no disponible</h2>
-                    <p className="text-sm text-red-200">{error}</p>
-                    <div className="pt-4 border-t border-dy-border text-xs text-dy-muted">
+            <div style={pageContainerStyle}>
+                <div style={{ ...cardStyle, maxWidth: '460px', textAlign: 'center', border: '1px solid rgba(239, 68, 68, 0.4)' }}>
+                    <div style={{
+                        width: '64px',
+                        height: '64px',
+                        borderRadius: '50%',
+                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                        color: '#ef4444',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 16px auto'
+                    }}>
+                        <ShieldAlert size={34} />
+                    </div>
+                    <h2 style={{ fontSize: '1.3rem', fontWeight: 700, margin: '0 0 10px 0', color: '#ffffff' }}>
+                        Enlace no disponible
+                    </h2>
+                    <p style={{ fontSize: '0.9rem', color: '#fca5a5', margin: '0 0 20px 0', lineHeight: 1.5 }}>
+                        {error}
+                    </p>
+                    <div style={{ borderTop: '1px solid #1e2e50', paddingTop: '16px', fontSize: '0.78rem', color: '#64748b' }}>
                         Don Yeyo S.A. &bull; Sistema de Gestión de Reclamos
                     </div>
                 </div>
@@ -109,19 +166,34 @@ export const ImposibilidadPublic = () => {
         );
     }
 
+    // 3. Estado de Éxito tras Enviar
     if (submittedSuccess) {
         return (
-            <div className="min-h-screen bg-dy-bg flex flex-col items-center justify-center p-4">
-                <div className="p-8 rounded-2xl bg-dy-card border border-emerald-500/40 max-w-md w-full text-center space-y-4">
-                    <CheckCircle2 className="w-14 h-14 text-emerald-400 mx-auto" />
-                    <h2 className="text-xl font-bold text-white">Imposibilidad Registrada</h2>
-                    <p className="text-sm text-dy-text">
-                        Hemos registrado correctamente la imposibilidad de entrega para el reclamo <strong>#{tokenData?.reclamoId}</strong>.
+            <div style={pageContainerStyle}>
+                <div style={{ ...cardStyle, maxWidth: '480px', textAlign: 'center', border: '1px solid rgba(16, 185, 129, 0.4)' }}>
+                    <div style={{
+                        width: '64px',
+                        height: '64px',
+                        borderRadius: '50%',
+                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                        color: '#10b981',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 16px auto'
+                    }}>
+                        <CheckCircle2 size={36} />
+                    </div>
+                    <h2 style={{ fontSize: '1.35rem', fontWeight: 700, margin: '0 0 10px 0', color: '#ffffff' }}>
+                        Imposibilidad Registrada
+                    </h2>
+                    <p style={{ fontSize: '0.92rem', color: '#cbd5e1', margin: '0 0 10px 0', lineHeight: 1.5 }}>
+                        Hemos registrado correctamente la imposibilidad de entrega para el reclamo <strong>#{tokenData?.claimId}</strong>.
                     </p>
-                    <p className="text-xs text-dy-muted">
-                        La administración de Don Yeyo ha sido notificada para revisar el caso y coordinar una solución alternativa.
+                    <p style={{ fontSize: '0.82rem', color: '#94a3b8', margin: '0 0 24px 0', lineHeight: 1.5 }}>
+                        La administración de Don Yeyo ha sido notificada para coordinar una vía alternativa de atención.
                     </p>
-                    <div className="pt-4 border-t border-dy-border text-xs text-dy-muted">
+                    <div style={{ borderTop: '1px solid #1e2e50', paddingTop: '16px', fontSize: '0.8rem', color: '#64748b' }}>
                         Podés cerrar esta ventana de forma segura.
                     </div>
                 </div>
@@ -129,34 +201,82 @@ export const ImposibilidadPublic = () => {
         );
     }
 
+    const claim = tokenData?.claim || {};
+
+    // 4. Formulario Principal de Imposibilidad
     return (
-        <div className="min-h-screen bg-dy-bg flex flex-col items-center justify-center p-4 py-8">
-            <div className="max-w-xl w-full rounded-2xl bg-dy-card border border-dy-border p-6 md:p-8 space-y-6 shadow-2xl">
-                {/* Cabecera */}
-                <div className="border-b border-dy-border pb-4">
-                    <div className="text-xs uppercase tracking-wider text-dy-gold font-bold mb-1">
-                        Don Yeyo S.A. &bull; Portal de Supervisión
+        <div style={pageContainerStyle}>
+            <div style={cardStyle}>
+                {/* Header Institucional */}
+                <div style={{ borderBottom: '1px solid #1e2e50', paddingBottom: '16px', marginBottom: '20px' }}>
+                    <div style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        color: '#f59e0b',
+                        letterSpacing: '1px',
+                        textTransform: 'uppercase',
+                        marginBottom: '6px'
+                    }}>
+                        Don Yeyo S.A. &bull; Portal de Supervisión Comercial
                     </div>
-                    <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                        <AlertTriangle className="w-7 h-7 text-amber-400 flex-shrink-0" />
-                        Informar Imposibilidad de Entrega
+                    <h1 style={{
+                        fontSize: '1.45rem',
+                        fontWeight: 700,
+                        margin: '0 0 6px 0',
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
+                    }}>
+                        <AlertTriangle size={26} color="#f59e0b" style={{ flexShrink: 0 }} />
+                        <span>Informar Imposibilidad de Entrega</span>
                     </h1>
-                    <p className="text-xs text-dy-muted mt-1">
-                        Reclamo número <span className="font-bold text-dy-gold">#{tokenData?.reclamoId}</span>
+                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8' }}>
+                        Reclamo número <strong style={{ color: '#f59e0b' }}>#{tokenData?.claimId}</strong>
                     </p>
                 </div>
 
+                {/* Ficha Resumida del Caso */}
+                {claim.consumidor && (
+                    <div style={{
+                        backgroundColor: '#16233f',
+                        border: '1px solid #233454',
+                        borderRadius: '10px',
+                        padding: '14px 16px',
+                        marginBottom: '22px',
+                        fontSize: '0.85rem',
+                        lineHeight: 1.6
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f8fafc', marginBottom: '4px' }}>
+                            <User size={15} color="#60a5fa" />
+                            <span><strong>Consumidor:</strong> {claim.consumidor}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#cbd5e1', marginBottom: '4px' }}>
+                            <MapPin size={15} color="#f59e0b" />
+                            <span><strong>Domicilio:</strong> {claim.domicilio || 'No especificado'}, {claim.localidad || ''}</span>
+                        </div>
+                        {claim.supervisor && (
+                            <div style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '6px', borderTop: '1px dashed #233454', paddingTop: '6px' }}>
+                                Supervisor a cargo: <strong>{claim.supervisor}</strong>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Formulario */}
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                     <div>
-                        <label className="block text-sm font-semibold text-white mb-2">
-                            Seleccioná el motivo principal de la imposibilidad: <span className="text-amber-400">*</span>
+                        <label style={labelStyle}>
+                            Seleccioná el motivo principal de la imposibilidad: <span style={{ color: '#ef4444' }}>*</span>
                         </label>
                         <select
                             value={motivoOpcion}
                             onChange={(e) => setMotivoOpcion(e.target.value)}
                             required
-                            className="w-full px-3 py-2.5 rounded-lg bg-dy-surface border border-dy-border text-white text-sm focus:border-dy-gold focus:outline-none"
+                            style={{
+                                ...inputStyle,
+                                cursor: 'pointer'
+                            }}
                         >
                             <option value="">-- Seleccionar motivo --</option>
                             <option value="Falta de stock del producto cortesía">Falta de stock del producto de cortesía</option>
@@ -169,53 +289,76 @@ export const ImposibilidadPublic = () => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-semibold text-white mb-2">
-                            Observaciones adicionales o detalle:
+                        <label style={labelStyle}>
+                            Observaciones adicionales o detalle operativo:
                         </label>
                         <textarea
                             rows={4}
                             value={observaciones}
                             onChange={(e) => setObservaciones(e.target.value)}
-                            placeholder="Describí brevemente lo sucedido para que administración pueda contactar al consumidor..."
-                            className="w-full px-3 py-2 rounded-lg bg-dy-surface border border-dy-border text-white text-sm placeholder-dy-muted focus:border-dy-gold focus:outline-none"
+                            placeholder="Describí brevemente lo sucedido para que administración pueda contactar al consumidor y buscar otra solución..."
+                            style={{
+                                ...inputStyle,
+                                resize: 'vertical'
+                            }}
                         />
                     </div>
 
-                    <div className="pt-2">
+                    <div style={{ paddingTop: '8px' }}>
                         <button
                             type="submit"
                             disabled={submitting || !motivoOpcion}
-                            className="w-full py-3 rounded-lg bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{
+                                width: '100%',
+                                padding: '14px',
+                                borderRadius: '8px',
+                                border: 'none',
+                                background: submitting || !motivoOpcion
+                                    ? '#2a3b60'
+                                    : 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
+                                color: submitting || !motivoOpcion ? '#64748b' : '#ffffff',
+                                fontSize: '0.95rem',
+                                fontWeight: 700,
+                                cursor: submitting || !motivoOpcion ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                transition: 'all 0.2s',
+                                boxShadow: submitting || !motivoOpcion ? 'none' : '0 4px 14px rgba(217, 119, 6, 0.4)'
+                            }}
                         >
                             {submitting ? (
                                 <>
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                    Registrando...
+                                    <div style={{ animation: 'spin 1s linear infinite', display: 'flex' }}>
+                                        <Loader2 size={18} />
+                                    </div>
+                                    <span>Registrando imposibilidad...</span>
                                 </>
                             ) : (
                                 <>
-                                    Confirmar Imposibilidad
-                                    <ArrowRight className="w-4 h-4" />
+                                    <span>Confirmar Imposibilidad</span>
+                                    <ArrowRight size={18} />
                                 </>
                             )}
                         </button>
                     </div>
                 </form>
 
-                <div className="text-[11px] text-center text-dy-muted border-t border-dy-border pt-3">
-                    Acción validada criptográficamente para el supervisor asignado.
+                <div style={{
+                    marginTop: '20px',
+                    paddingTop: '14px',
+                    borderTop: '1px solid #1e2e50',
+                    textAlign: 'center',
+                    fontSize: '0.74rem',
+                    color: '#64748b'
+                }}>
+                    Acción validada criptográficamente para el supervisor asignado &bull; Don Yeyo S.A.
                 </div>
             </div>
-
-            {/* Modal de alerta para validaciones o errores */}
-            <ConfirmModal
-                isOpen={alertDialog.isOpen}
-                onClose={() => setAlertDialog(prev => ({ ...prev, isOpen: false }))}
-                title={alertDialog.title}
-                message={alertDialog.message}
-                type="alert"
-                variant={alertDialog.variant}
-            />
+            <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
         </div>
     );
 };
+
+export default ImposibilidadPublic;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { logsApi } from '../services/api';
 import {
     History,
@@ -24,13 +25,21 @@ import {
 import { formatFechaHoraSutil } from '../utils/dateUtils';
 
 export const LogsList = () => {
+    const { categoria: routeCategoria, id: routeLogId } = useParams();
+    const navigate = useNavigate();
+
     const [logs, setLogs] = useState([]);
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     // Filtros
-    const [categoriaTab, setCategoriaTab] = useState('all'); // 'all', 'emails', 'configuracion'
+    const [categoriaTab, setCategoriaTab] = useState(() => {
+        if (!routeCategoria && (routeLogId === 'emails' || routeLogId === 'configuracion')) {
+            return routeLogId;
+        }
+        return 'all';
+    }); // 'all', 'emails', 'configuracion'
     const [searchQuery, setSearchQuery] = useState('');
     const [tipoDisparoFilter, setTipoDisparoFilter] = useState('all'); // 'all', 'automatico', 'manual'
     const [estadoFilter, setEstadoFilter] = useState('all'); // 'all', 'enviado', 'fallido'
@@ -42,6 +51,60 @@ export const LogsList = () => {
     // Modal de Detalle
     const [selectedLog, setSelectedLog] = useState(null);
     const [previewMode, setPreviewMode] = useState('resumen'); // 'resumen', 'html'
+
+    // Sincronizar pestaña y modal de detalle con URL (/logs, /logs/emails, /logs/configuracion, /logs/:categoria/:id, /logs/:id)
+    useEffect(() => {
+        if (!routeCategoria && (routeLogId === 'emails' || routeLogId === 'configuracion')) {
+            if (categoriaTab !== routeLogId) {
+                setCategoriaTab(routeLogId);
+            }
+            setSelectedLog(null);
+            return;
+        }
+
+        if (!routeCategoria && !routeLogId) {
+            setSelectedLog(null);
+            return;
+        }
+
+        if (logs.length > 0) {
+            const found = logs.find(l => {
+                if (routeCategoria) {
+                    const catNorm = routeCategoria === 'emails' ? 'email' : routeCategoria;
+                    return l.categoria_log === catNorm && String(l.id) === String(routeLogId);
+                }
+                return `${l.categoria_log}-${l.id}` === String(routeLogId) || String(l.id) === String(routeLogId);
+            });
+            if (found) {
+                setSelectedLog(found);
+            }
+        }
+    }, [routeCategoria, routeLogId, logs]);
+
+    const handleChangeCategoriaTab = (tab) => {
+        setCategoriaTab(tab);
+        if (tab === 'all') {
+            navigate('/logs');
+        } else {
+            navigate(`/logs/${tab}`);
+        }
+    };
+
+    const handleOpenLogDetail = (log) => {
+        setSelectedLog(log);
+        navigate(`/logs/${encodeURIComponent(log.categoria_log || 'email')}/${encodeURIComponent(log.id)}`);
+    };
+
+    const handleCloseLogDetail = () => {
+        setSelectedLog(null);
+        if (routeCategoria || (routeLogId && routeLogId !== 'emails' && routeLogId !== 'configuracion')) {
+            if (categoriaTab === 'emails' || categoriaTab === 'configuracion') {
+                navigate(`/logs/${categoriaTab}`);
+            } else {
+                navigate('/logs');
+            }
+        }
+    };
 
     const fetchLogsAndStats = async () => {
         setLoading(true);
@@ -191,7 +254,7 @@ export const LogsList = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <button
-                            onClick={() => setCategoriaTab('all')}
+                            onClick={() => handleChangeCategoriaTab('all')}
                             className={`btn ${categoriaTab === 'all' ? 'btn-primary' : 'btn-secondary'}`}
                             style={{
                                 padding: '6px 16px',
@@ -204,7 +267,7 @@ export const LogsList = () => {
                             <span>Todos los Registros</span>
                         </button>
                         <button
-                            onClick={() => setCategoriaTab('emails')}
+                            onClick={() => handleChangeCategoriaTab('emails')}
                             className={`btn ${categoriaTab === 'emails' ? 'btn-primary' : 'btn-secondary'}`}
                             style={{
                                 padding: '6px 16px',
@@ -220,7 +283,7 @@ export const LogsList = () => {
                             <span>Envíos de Email</span>
                         </button>
                         <button
-                            onClick={() => setCategoriaTab('configuracion')}
+                            onClick={() => handleChangeCategoriaTab('configuracion')}
                             className={`btn ${categoriaTab === 'configuracion' ? 'btn-primary' : 'btn-secondary'}`}
                             style={{
                                 padding: '6px 16px',
@@ -356,7 +419,7 @@ export const LogsList = () => {
                                     return (
                                         <tr
                                             key={`${log.categoria_log}-${log.id}`}
-                                            onClick={() => setSelectedLog(log)}
+                                            onClick={() => handleOpenLogDetail(log)}
                                             style={{ cursor: 'pointer' }}
                                         >
                                             {/* FECHA */}
@@ -524,7 +587,7 @@ export const LogsList = () => {
                                             {/* ACCIÓN DETALLE */}
                                             <td style={{ textAlign: 'center' }}>
                                                 <button
-                                                    onClick={(e) => { e.stopPropagation(); setSelectedLog(log); }}
+                                                    onClick={(e) => { e.stopPropagation(); handleOpenLogDetail(log); }}
                                                     className="btn-icon"
                                                     title="Ver Detalle Completo"
                                                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--primary)' }}
@@ -577,7 +640,7 @@ export const LogsList = () => {
             {selectedLog && (
                 <div
                     className="modal-overlay"
-                    onClick={() => setSelectedLog(null)}
+                    onClick={handleCloseLogDetail}
                     style={{
                         position: 'fixed',
                         top: 0,
@@ -641,7 +704,7 @@ export const LogsList = () => {
                                 </div>
                             </div>
                             <button
-                                onClick={() => setSelectedLog(null)}
+                                onClick={handleCloseLogDetail}
                                 className="btn-icon"
                                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
                             >
@@ -809,7 +872,7 @@ export const LogsList = () => {
                             }}
                         >
                             <button
-                                onClick={() => setSelectedLog(null)}
+                                onClick={handleCloseLogDetail}
                                 className="btn-secondary"
                                 style={{ padding: '8px 20px', borderRadius: 8, cursor: 'pointer' }}
                             >

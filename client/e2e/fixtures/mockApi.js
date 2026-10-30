@@ -107,6 +107,10 @@ export async function setupMockApi(page, customReclamos = null) {
                 }
                 if (body.estado === 'Desaprobado') {
                     r.admin_motivo_desaprobado = body.motivo_desaprobado || 'Motivo de prueba';
+                    r.tipo_desaprobacion = body.tipo_desaprobacion || '';
+                    r.estado_supervisor = 'Sin acciones';
+                    r.estado_inocuidad = 'Sin acciones';
+                    r.estado_consumidor = 'Cerrado';
                 }
             }
             await route.fulfill({
@@ -177,8 +181,12 @@ export async function setupMockApi(page, customReclamos = null) {
         await route.continue();
     });
 
-    // Mock Portal Público de Imposibilidad
+    // Mock Portal Público de Imposibilidad y Encuesta Consumidor
     await page.route('**/api/public/actions/verify*', async route => {
+        const reqUrl = new URL(route.request().url());
+        const tokenParam = reqUrl.searchParams.get('token') || '';
+        const actionType = tokenParam.includes('no_resuelto') ? 'no_resuelto' : 'resuelto';
+
         const payloadData = {
             reclamoId: 'REC-2026-003',
             id_reclamo: 'REC-2026-003',
@@ -188,6 +196,7 @@ export async function setupMockApi(page, customReclamos = null) {
             cliente: 'María Clara Sosa',
             producto: 'Bollos de Salvado Don Yeyo',
             localidad: 'Tigre',
+            domicilio: 'Cazón 800',
             direccion: 'Cazón 800',
             supervisor: 'Gustavo Orgaz'
         };
@@ -196,6 +205,10 @@ export async function setupMockApi(page, customReclamos = null) {
             contentType: 'application/json',
             body: JSON.stringify({
                 success: true,
+                claimId: 'REC-2026-003',
+                actor: tokenParam.includes('consumidor') ? 'consumidor' : 'supervisor',
+                action: actionType,
+                claim: payloadData,
                 payload: payloadData,
                 data: payloadData
             })
@@ -209,6 +222,105 @@ export async function setupMockApi(page, customReclamos = null) {
             body: JSON.stringify({
                 success: true,
                 message: 'Imposibilidad de compensación registrada exitosamente.'
+            })
+        });
+    });
+
+    await page.route('**/api/public/actions/consumidor-encuesta', async route => {
+        const body = route.request().postDataJSON() || {};
+        const isResuelto = body.resultado === 'resuelto';
+        const estadoFinal = isResuelto
+            ? 'Resuelto conforme'
+            : (body.tipo_problema === 'No recibí reposición' ? 'No resuelto' : 'Resuelto disconforme');
+
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                success: true,
+                estado_consumidor: estadoFinal,
+                puntuacion: body.puntuacion || null,
+                tipo_problema: body.tipo_problema || '',
+                comentario: body.comentario || '',
+                message: '¡Muchas gracias! Tu respuesta ha sido registrada correctamente.'
+            })
+        });
+    });
+
+    // Mock Simulador Temporal
+    await page.route('**/api/simulador/reclamo/*/estado', async route => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                success: true,
+                claim: {
+                    id: 'REC-2026-003',
+                    nombre: 'María Clara',
+                    apellido: 'Sosa',
+                    estado_admin: 'En curso',
+                    estado_supervisor: 'Pendiente',
+                    estado_consumidor: 'Pendiente',
+                    prioridad: 10,
+                    prioridad_nombre: 'Alta',
+                    supervisor: 'Gustavo Orgaz',
+                    supervisor_email: 'gustavoeo@donyeyo.com.ar',
+                    fecha_carga: new Date(Date.now() - 86400000).toISOString(),
+                    dias_transcurridos_reales: 1
+                },
+                notificaciones: {
+                    supervisor: {
+                        enviadas: 0,
+                        max_repeticiones: 3,
+                        disparo_inicial_dias: 1,
+                        intervalo_n_dias: 1,
+                        ultima_notificacion: null
+                    },
+                    consumidor: {
+                        enviadas: 0,
+                        max_repeticiones: 2,
+                        disparo_inicial_dias: 3,
+                        intervalo_n_dias: 2,
+                        ultima_notificacion: null
+                    }
+                },
+                test_recipient: 'gabrielt@donyeyo.com.ar'
+            })
+        });
+    });
+
+    await page.route('**/api/simulador/reclamo/*/avanzar', async route => {
+        const body = route.request().postDataJSON() || {};
+        const dias = Number(body.diasAvanzar) || 1;
+        const syncSheets = Boolean(body.syncGoogleSheets);
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+                success: true,
+                claimId: 'REC-2026-003',
+                diasAvanzados: dias,
+                fechaVirtual: new Date(Date.now() + dias * 86400000).toISOString(),
+                syncGoogleSheets: syncSheets,
+                eventos: [
+                    {
+                        tipo: 'disparo',
+                        mensaje: `Disparo ejecutado: Recordatorio al Supervisor #1 de 3 enviado exitosamente a gabrielt@donyeyo.com.ar.`
+                    }
+                ],
+                emailsDespachados: [
+                    {
+                        tipo: 'recordatorio_supervisor',
+                        destinatario: 'gabrielt@donyeyo.com.ar',
+                        asunto: '[Acción Requerida] Reclamo #REC-2026-003 - María Clara Sosa',
+                        reintento: 1
+                    }
+                ],
+                estados: {
+                    admin: 'En curso',
+                    supervisor: 'Pendiente',
+                    consumidor: 'Pendiente'
+                }
             })
         });
     });
@@ -253,28 +365,37 @@ export async function setupMockApi(page, customReclamos = null) {
         }
     });
 
-    // Mock de prioridades
+    // Mock de prioridades (ahora maneja ítems en reglas_cortesia)
     let mockPrioridades = [
         {
             codigo: 10,
             nombre: 'Alta',
             descripcion: 'Casos críticos y graves que implican reconocer el error rápidamente',
             sla: 3,
-            reglas_cortesia: [{ codigo: 'codigo1', descripcion: ' 1 reemplazo + 2 productos a elección + 2 de kg' }]
+            reglas_cortesia: [
+                { codigo: 'codigo1', descripcion: '1 reemplazo' },
+                { codigo: 'codigo10_2', descripcion: '2 productos a elección' },
+                { codigo: 'codigo10_3', descripcion: '2 de kg' }
+            ]
         },
         {
             codigo: 20,
             nombre: 'Media',
             descripcion: 'Casos leves que no representan un daño importante para el consumidor',
             sla: 7,
-            reglas_cortesia: [{ codigo: 'codigo2', descripcion: ' 1 reemplazo' }]
+            reglas_cortesia: [
+                { codigo: 'codigo2', descripcion: '1 reemplazo' },
+                { codigo: 'codigo20_2', descripcion: '1 de kg' }
+            ]
         },
         {
             codigo: 30,
             nombre: 'Baja',
             descripcion: 'Casos donde es notorio que el problema se debió a cuestiones agenas a la empresa',
             sla: 14,
-            reglas_cortesia: [{ codigo: 'codigo3', descripcion: ' 1 reemplazo + 1 de kg' }]
+            reglas_cortesia: [
+                { codigo: 'codigo3', descripcion: '1 reemplazo' }
+            ]
         }
     ];
 

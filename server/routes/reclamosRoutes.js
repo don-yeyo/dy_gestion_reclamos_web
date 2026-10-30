@@ -144,7 +144,25 @@ router.patch('/:id/estado-admin', requireRole(['admin', 'sysadmin']), async (req
             }
 
             const fechaLimiteSla = new Date(Date.now() + prioridadObj.sla * 24 * 60 * 60 * 1000);
-            reglaCortesiaAplicada = regla_cortesia || (prioridadObj.reglas_cortesia && prioridadObj.reglas_cortesia[0] ? prioridadObj.reglas_cortesia[0].descripcion : '1 reemplazo');
+
+            // Formatear la regla de cortesía uniendo todos los ítems configurados en la prioridad
+            let reglaDesdePrioridad = '1 reemplazo';
+            let reglasLista = prioridadObj.reglas_cortesia;
+            if (typeof reglasLista === 'string') {
+                try { reglasLista = JSON.parse(reglasLista); } catch { reglasLista = []; }
+            }
+            if (Array.isArray(reglasLista) && reglasLista.length > 0) {
+                const descripciones = reglasLista
+                    .map(r => (typeof r === 'string' ? r : (r?.descripcion || '')).trim())
+                    .filter(Boolean);
+                if (descripciones.length > 0) {
+                    reglaDesdePrioridad = descripciones.join(' + ');
+                }
+            }
+
+            reglaCortesiaAplicada = (regla_cortesia && String(regla_cortesia).trim()) 
+                ? String(regla_cortesia).trim() 
+                : reglaDesdePrioridad;
         }
 
         const updates = { 'AO': estado };

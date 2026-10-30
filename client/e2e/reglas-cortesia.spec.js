@@ -47,8 +47,8 @@ test.describe('Reglas de Cortesía por Nivel de Prioridad', () => {
         const btnAgregarRegla = page.locator('button:has-text("Agregar regla")').first();
         await btnAgregarRegla.click();
 
-        // Llenar la nueva regla agregada
-        const nuevoInputRegla = page.locator('input[placeholder*="Texto descriptivo de cortesía"]').nth(1);
+        // Llenar la nueva regla agregada en la tarjeta de Alta (índice 3 tras las 3 existentes)
+        const nuevoInputRegla = page.locator('input[placeholder*="Texto descriptivo de cortesía"]').nth(3);
         await nuevoInputRegla.fill('2 reemplazos especiales');
 
         // Guardar cambios

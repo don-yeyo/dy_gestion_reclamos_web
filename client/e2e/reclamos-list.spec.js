@@ -81,13 +81,22 @@ test.describe('CU-04: Listado General y Filtros de Reclamos', () => {
         await expect(page.locator('.badge', { hasText: 'Resuelto sin confirmar' })).toBeVisible();
     });
 
-    test('debe abrir el modal de detalle al hacer click en un reclamo de la grilla', async ({ page }) => {
+    test('debe abrir el modal de detalle al hacer click en un reclamo de la grilla y actualizar la URL', async ({ page }) => {
         await page.goto('/reclamos');
 
         // Click en la fila de REC-2026-002
         await page.locator('tr', { hasText: 'REC-2026-002' }).click();
 
-        // Verificar modal
+        // Verificar URL dedicada y modal
+        await expect(page).toHaveURL(/.*\/reclamos\/REC-2026-002/);
+        await expect(page.locator('.modal-overlay')).toBeVisible();
+        await expect(page.locator('.modal-header')).toContainText('REC-2026-002');
+    });
+
+    test('debe abrir directamente la grilla con el modal abierto al ingresar por enlace directo /reclamos/:id', async ({ page }) => {
+        await page.goto('/reclamos/REC-2026-002');
+
+        await expect(page.locator('h1')).toContainText('Listado de Reclamos');
         await expect(page.locator('.modal-overlay')).toBeVisible();
         await expect(page.locator('.modal-header')).toContainText('REC-2026-002');
     });

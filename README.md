@@ -215,18 +215,24 @@ Este sistema implementa un modelo de seguridad estricto para evitar elevación d
    - El reclamo nace con `estado_admin: Pendiente`, `estado_supervisor: Pendiente`, `estado_inocuidad: Pendiente`, `estado_consumidor: Pendiente`.
    - Se envía un correo interno a administración con un **enlace único y seguro (Webhook Anti-tampering con JWT/HMAC)** para iniciar la gestión con un solo clic.
 
-2. **Aprobación del Reclamo ("En curso") y Notificación Dual:**
-   - El administrador aprueba el reclamo mediante el botón **"Aprobar Reclamo"** (en el Gestor Web) o desde el correo inicial (`/api/public/actions/admin-quick`).
-   - **Regla Estricta de Negocio:** **Bajo ninguna circunstancia un reclamo puede avanzar a "En curso" si no tiene supervisor asignado.**
-     - Si el reclamo carece de supervisor (o figura como "Sin asignar"), el webhook/modal detiene el avance y exige **asignar el supervisor comercial responsable** antes de proceder.
-   - **Efectos automáticos al Aprobar:**
-     - `estado_admin` pasa a **"En curso"** (Aprobado) y registra su fecha/hora exacta.
-     - `estado_consumidor` se sincroniza a **"En curso"** con su respectivo timestamp.
-     - `estado_supervisor` se coloca en **"Pendiente"** con su timestamp.
-     - `estado_inocuidad` se coloca en **"Pendiente"** con su timestamp.
-     - **Doble despacho de notificaciones por email:**
-       1. **Supervisor Comercial:** Correo detallado con los datos de entrega y las instrucciones de reposición/cortesía.
-       2. **Calidad & Inocuidad:** Expediente técnico integral (lotes, vencimientos, defectos, envase, descripciones y ZIP) para iniciar la investigación y registro de caso.
+2. **Aprobación o Desaprobación del Reclamo en Recepción:**
+   - **Aprobación ("En curso") con Submodal Interactivo:**
+     - El administrador aprueba el reclamo mediante el botón **"Aprobar Reclamo"** (en el Gestor Web) o desde el correo inicial (`/api/public/actions/admin-quick`).
+     - Se despliega un submodal emergente independiente (montado vía React Portal a `document.body`) que exige seleccionar el **Nivel de Prioridad** (Alta, Media o Baja) con su SLA y actualiza en tiempo real los ítems de regalo de cortesía configurados.
+     - **Regla Estricta de Negocio:** **Bajo ninguna circunstancia un reclamo puede avanzar a "En curso" si no tiene supervisor asignado.**
+       - Si el reclamo carece de supervisor (o figura como "Sin asignar"), el webhook/modal detiene el avance y exige **asignar el supervisor comercial responsable** antes de proceder.
+     - **Efectos automáticos al Aprobar:**
+       - `estado_admin` pasa a **"En curso"** (Aprobado) y registra su fecha/hora exacta.
+       - `estado_consumidor` se sincroniza a **"En curso"** con su respectivo timestamp.
+       - `estado_supervisor` se coloca en **"Pendiente"** con su timestamp.
+       - `estado_inocuidad` se coloca en **"Pendiente"** con su timestamp.
+       - **Doble despacho de notificaciones por email:**
+         1. **Supervisor Comercial:** Correo detallado con datos del consumidor, nivel de prioridad, SLA y desglose de los ítems de cortesía a entregar.
+         2. **Calidad & Inocuidad:** Expediente técnico integral (lotes, vencimientos, defectos, envase, descripciones y ZIP) para investigación.
+   - **Desaprobación con Submodal Interactivo:**
+     - Siguiendo la misma coherencia visual y de usabilidad que la aprobación, al presionar **"Desaprobar"** en la Card 1 (Ingreso), se abre un submodal emergente vía Portal.
+     - Requiere tipificar el **Tipo de Desaprobación** formal (visible al consumidor, ej.: "No se constata defecto atribuible a elaboración o envasado", "Producto vencido al comprar", etc.) y una **Observación Interna** obligatoria (🔒 visible solo para auditoría del personal).
+     - Al confirmar, el `estado_admin` pasa a **"Desaprobado"**, el consumidor a **"Cerrado"** y se cancelan las ramas de Inocuidad y Compensación ("Sin acciones").
    - **Reenvío Manual de Correos:** En el modal de detalle, las cards de Inocuidad y Supervisor disponen de un botón interactivo sutil en la esquina inferior derecha para reenviar los correos ante cualquier contingencia.
 
 3. **Ciclo de Vida y Ramas de Decisión:**
@@ -234,12 +240,12 @@ Este sistema implementa un modelo de seguridad estricto para evitar elevación d
      - **Desaprobar:** Válido únicamente en Recepción. Requiere motivo de rechazo; pasa los estados derivados a *"Sin acciones"*.
      - **Aprobar Reclamo:** Requiere tener supervisor asignado. Deriva simultáneamente al flujo de compensación en campo y a Calidad & Inocuidad.
    - **Acción de Compensación (Supervisor):**
-     - El supervisor recibe el correo inicial y los recordatorios automáticos del cron (`CRON_SUPERVISOR_DIAS_CONSULTA`) para informar si pudo resolver la entrega o si existe una imposibilidad.
+     - El supervisor recibe el correo inicial y los recordatorios automáticos del cron según los plazos y periodicidades configuradas en la matriz de **Reglas de Seguimiento** (`workflow_seguimientos`) para informar si pudo resolver la entrega o si existe una imposibilidad.
    - **Control de Calidad e Inocuidad:**
-     - Calidad & Inocuidad recibe el expediente técnico para investigación técnica, dictaminando de forma independiente en el sistema.
+     - Calidad & Inocuidad recibe el expediente técnico para investigación técnica, despachándose al grupo de emails que corresponda según la categoría de los productos reclamados.
    - **Validación del Consumidor y Regla FSR:**
-     - Tras la entrega de la compensación, el cron consulta automáticamente al consumidor sobre su conformidad (`CRON_CONSUMIDOR_DIAS_CONSULTA`).
-     - Si transcurren `J` días (`CRON_CONSUMIDOR_DIAS_FIN_SIN_RESPUESTA`) sin que el consumidor responda a la encuesta, su estado pasa automáticamente a **Finalizado Sin Respuesta (FSR)**.
+     - Tras la entrega de la compensación, el cron consulta automáticamente al consumidor sobre su conformidad según los días estipulados en la matriz de seguimiento.
+     - Si transcurren los días máximos configurados sin que el consumidor responda a la encuesta, su estado pasa automáticamente a **Finalizado Sin Respuesta (FSR)**.
    - **Transición Automática a "Finalizado":**
      - Cuando concurren simultáneamente:
        1. Calidad & Inocuidad dictaminó un estado distinto de *Pendiente*.
@@ -421,6 +427,132 @@ El módulo consolida dos grandes fuentes de eventos:
 - **Filtro por Estado:** Filtrado instantáneo por envíos *Enviados*, *Simulados* o *Fallidos*.
 - **Buscador en Vivo:** Búsqueda libre por destinatario, asunto, motivo, reclamo ID, actor, módulo o descripción.
 - **Modal Flotante de Inspección:** Ventana emergente con fondo opaco que despliega la ficha completa del log, con renderizado visual del correo enviado y comparativa de valores antes/después en configuraciones.
+
+---
+
+## ⚙️ Pantalla de Configuración del Sistema (`/configuracion`)
+
+Se incorporó una sección integral de administración del sistema orientada a parametrizar el comportamiento general de la plataforma, evitando valores hardcodeados y persistiendo toda la configuración en la tabla `config_sistema` de la base de datos MySQL, con soporte pleno para modo claro y modo oscuro.
+
+### 1. Pestañas y Capacidades
+
+1. **📧 Plantillas & Botones de Email:**
+   - **Editor Dinámico por Tipo de Correo:** Permite personalizar asuntos, títulos, introducciones, bloques de instrucción/advertencia y los textos de los botones interactivos para:
+     - Supervisor Comercial (resolución e imposibilidad).
+     - Encuesta de satisfacción al Consumidor (conforme, disconforme, no resuelto).
+     - Notificación de cierre y agradecimiento al Consumidor.
+     - Derivación técnica a Inocuidad & Calidad.
+     - Alerta de escalación y elevación a Gerencia.
+     - Alerta de posible fraude comercial / discrepancias graves.
+   - **Comodines Soportados:** Sustitución automática de `{claim_id}`, `{consumidor_nombre}`, `{localidad}` y `{supervisor}`.
+   - **Live Preview (Vista Previa en Vivo):** Renderiza en tiempo real cómo se visualizará el correo con los estilos institucionales Don Yeyo y los botones configurados.
+   - **Botón "Enviar Email de Muestra":** Herramienta de testeo interactiva que permite especificar el email de destino (por defecto el configurado en `EMAIL_TEST_RECIPIENT`) y el número de reclamo para poblar la plantilla con datos reales y despachar una muestra en vivo.
+   - **Restablecer Valores de Fábrica:** Botón de un solo clic que recupera todos los textos predeterminados de fábrica de la compañía almacenados en `valor_defecto`.
+
+2. **🏷️ Categorías & Grupos de Inocuidad:**
+   - **Mapeo por Categoría:** Cada reclamo involucra productos clasificados en categorías (ej. *Pastas Frescas*, *Tapas y Masas*, *Panificados y Secos*).
+   - **Asignación de Casillas:** Define a qué conjunto de correos electrónicos de laboratorio e inocuidad debe enviarse el expediente técnico según los productos del reclamo. Si un reclamo incluye productos de múltiples categorías, el sistema unifica y deduplica los destinatarios automáticamente.
+   - **Gestión:** Alta, edición de casillas y baja lógica (`activo`).
+
+3. **📦 Catálogo de Productos y Empaques:**
+   - **Autocompletado Predictivo:** Alimenta el buscador del formulario web público para consumidores (`GET /api/public/productos?q=...`), ordenado alfabéticamente por `nombre_empaque` ascendente.
+   - **Mapeo Interno:** Vincula el nombre comercial de empaque buscado por el consumidor con el `nombre_interno` requerido por Google Sheets y con la categoría correspondiente.
+   - **Compatibilidad Sheets:** Se continúa guardando el string textual en `reclamo_items` sin requerir migraciones destructivas ni almacenamiento forzado de IDs numéricos.
+
+4. **⚙️ Parámetros Generales:**
+   - Casillas de respaldo por defecto para Inocuidad y Elevación cuando no aplique una categoría específica.
+   - Mensaje estándar para consumidores recomendando la conservación de muestra física para peritaje.
+   - Pie de firma institucional unificado para todos los correos.
+
+---
+
+## 🔗 Enrutamiento Directo (Deep-Linking y Favoritos)
+
+Todas las secciones, grillas, pestañas y fichas/formularios (modales) cuentan con su propia URL dedicada para que el usuario pueda compartir enlaces directos (incluyendo los links enviados por correo electrónico) o guardarlos en los favoritos del navegador:
+
+| Sección / Funcionalidad | URL de Grilla / Vista | URL de Ficha / Formulario / Sub-vista |
+| :--- | :--- | :--- |
+| **Dashboard Ejecutivo** | `/` | — |
+| **Bandeja de Reclamos** | `/reclamos` | `/reclamos/:id` *(ej. `/reclamos/20233364` abre la grilla con el modal del reclamo desplegado)* |
+| **Reglas de Cortesía** | `/reglas-cortesia` | Modal de configuración de SLA y reglas de cortesía por prioridad |
+| **Cobertura Supervisores** | `/cobertura-supervisores` | Modal de mapa GeoJSON, probador de coordenadas e importación/exportación |
+| **Catálogo de Estados** | `/estados` | `/estados/:id` *(abre el modal de edición de color y descripción del estado)* |
+| **Reglas de Seguimientos** | `/seguimientos` | `/seguimientos/nuevo` *(crear regla)* y `/seguimientos/:id` *(editar regla existente)* |
+| **Logs y Auditoría** | `/logs`, `/logs/emails`, `/logs/configuracion` | `/logs/:categoria/:id` *(ej. `/logs/email/101` o `/logs/configuracion/501` abre la ficha del evento)* |
+| **Configuración - Emails** | `/configuracion` o `/configuracion/emails` | `/configuracion/emails/:tipo` *(ej. `/configuracion/emails/inocuidad`)* |
+| **Configuración - Categorías** | `/configuracion/categorias` | `/configuracion/categorias/nueva` y `/configuracion/categorias/:id` |
+| **Configuración - Productos** | `/configuracion/productos` | `/configuracion/productos/nuevo` y `/configuracion/productos/:id` |
+| **Configuración - Parámetros** | `/configuracion/parametros` | Formulario de parámetros globales |
+| **Portal Imposibilidad** | `/imposibilidad?token=...` | Formulario público firmado para supervisores |
+| **Encuesta Consumidor** | `/encuesta-consumidor?token=...` | Portal público con escala de satisfacción de 5 emojis o reporte de problema para consumidores |
+
+---
+
+## ⭐ Encuesta Interactiva de Seguimiento al Consumidor (`/encuesta-consumidor`)
+
+El correo electrónico de seguimiento que recibe el consumidor (`sendConsumerFollowupEmail`) presenta dos botones principales de acción rápida (**`✓ Resuelto`** y **`✕ No Resuelto`**), los cuales abren la página web pública `/encuesta-consumidor?token=...` preseleccionando el modo correspondiente con una interfaz minimalista, limpia y de alto contraste:
+
+1. **Cuando el consumidor hace clic en "✓ Resuelto":**
+   - Entra directamente al flujo de calificación sin redundancias (no vuelve a preguntar si se resolvió).
+   - Muestra una **escala de 5 emojis de satisfacción**:
+     - 😡 Muy insatisfecho (1)
+     - 🙁 Insatisfecho (2)
+     - 😐 Neutral (3)
+     - 🙂 Satisfecho (4)
+     - 😄 Muy satisfecho (5)
+   - Dispone de un área de texto con placeholder directo: *"Escribe aquí cualquier comentario adicional que quieras hacernos llegar."* (sin labels innecesarios).
+   - Muestra de forma concisa el encabezado: *"Seguimiento de tu Reclamo #<nro>"* y el logotipo corporativo.
+   - Al enviar, el estado del consumidor pasa a **`Resuelto conforme`**, se guardan en MySQL `consumidor_puntuacion` y `consumidor_comentario`, se notifica a los administradores y se evalúa el cierre automático del reclamo (`checkAndFinalizeAdminState`).
+
+2. **Cuando el consumidor hace clic en "✕ No Resuelto":**
+   - Se abre el selector visual del **tipo de problema**:
+     - **`No recibí reposición`**: Establece el estado del consumidor en **`No resuelto`**. Si el supervisor comercial había declarado previamente el caso como `Resuelto`, el sistema dispara automáticamente la **detección de conflicto / posible fraude** (`marcarConflicto` + `sendFraudAlertToAdmins`).
+     - **`No estoy satisfecho con lo recibido`**: Establece el estado del consumidor en **`Resuelto disconforme`**.
+   - Incluye el mismo campo limpio de comentarios adicionales (`consumidor_comentario`).
+
+3. **Visibilidad en el Gestor Web:**
+   - En el modal de detalle del reclamo ([ReclamoDetailModal.jsx](file:///c:/Users/gabrielt/Documents/Proyectos/GestionReclamosWeb/dy_gestion_reclamos_web/client/src/pages/ReclamoDetailModal.jsx), Card 4 *"Consumidor"*), se exhibe la calificación con estrellas/emojis, el tipo de problema informado y el comentario textual del consumidor.
+
+---
+
+## 🎨 Logotipo Institucional en Correos y Vistas Públicas
+
+Todas las plantillas de correo salientes (`emailWorkflowService.js`), las páginas públicas (`EncuestaConsumidorPublic.jsx`, `ImposibilidadPublic.jsx`) y el simulador de correos en el panel de configuración renderizan el logotipo institucional de **Don Yeyo**:
+- **Parametrización en `/configuracion/parametros`:** Se configura y edita directamente desde la pestaña de **Parámetros Globales** en el panel de gestión web (clave: `email_logo_url` en la base de datos MySQL `config_sistema` o variable de entorno `EMAIL_LOGO_URL`).
+- **Inserción Directa de URL Pública HTTPS:** En el cuerpo HTML de todos los correos salientes se inserta la URL pública configurada directamente en la etiqueta `<img src="..." />`, permitiendo a los clientes de correo descargar la imagen corporativa limpia sin necesidad de adjuntar archivos ni mecanismos complejos.
+- **Previsualización en Tiempo Real:** El panel de configuración cuenta con un visor en tiempo real que valida si la imagen responde y carga correctamente desde la URL ingresada antes de guardar los cambios.
+- **Fallback Automático:** Si no se define una URL o el campo se deja en blanco, las cabeceras muestran automáticamente el nombre institucional corporativo *"DON YEYO"* en formato tipográfico.
+
+---
+
+## ✉️ Herramienta de Testeo de Emails de Muestra
+
+En el panel de Configuración de Correos ([ConfiguracionPage.jsx](file:///c:/Users/gabrielt/Documents/Proyectos/GestionReclamosWeb/dy_gestion_reclamos_web/client/src/pages/ConfiguracionPage.jsx)), cada plantilla cuenta con el botón **"Enviar Email de Muestra"**:
+- Permite especificar la dirección de email de destino (por defecto toma `EMAIL_TEST_RECIPIENT` o el correo del administrador conectado).
+- Permite ingresar el número de reclamo cuyos datos se utilizarán para poblar las variables dinámicas de la plantilla (`{nombre}`, `{apellido}`, `{id}`, `{supervisor}`, etc.).
+- Valida la existencia del reclamo en la base de datos y despacha el correo real utilizando el servicio de notificaciones con feedback inmediato.
+
+---
+
+## ⏱️ Simulador Temporal de Seguimiento y Cron por Reclamo
+
+En el modal de detalle de cualquier reclamo ([ReclamoDetailModal.jsx](file:///c:/Users/gabrielt/Documents/Proyectos/GestionReclamosWeb/dy_gestion_reclamos_web/client/src/pages/ReclamoDetailModal.jsx)), los administradores disponen del botón **"⏱️ Simular Avance Temporal (Cron)"**:
+- **Avance en el Tiempo (T+N días):** Permite proyectar el comportamiento de las reglas de seguimiento avanzando `+1`, `+2`, `+3`, `+5`, `+7` o `+N` días hacia una fecha virtual futura.
+- **Protección Preventiva de Google Sheets:** Dispone de un control interactivo `[ ] Sincronizar en Google Sheets` (desactivado por defecto). Al estar desactivado, el cron evalúa y actualiza localmente en MySQL para ver los resultados en pantalla sin alterar la planilla de Google Sheets de producción ni disparar las acciones operativas del equipo interno.
+- **Envíos Redirigidos a Casilla de Pruebas:** Todos los correos disparados por el cron simulado son interceptados y enviados a la casilla configurada en `EMAIL_TEST_RECIPIENT` con un banner explicativo del destinatario y rol original.
+- **Visor de Eventos en Tiempo Real:** Exhibe el cálculo de días transcurridos, las reglas aplicadas, el incremento de repeticiones y el detalle de los correos emitidos, con la posibilidad de reiniciar el contador de notificaciones de prueba para volver a testear desde cero.
+
+---
+
+## 🎁 Reglas de Cortesía Dinámicas por Ítems y Aprobación de Reclamos
+
+La gestión de compensaciones por reclamo vincula el nivel de gravedad y el SLA establecido con una definición granular de cortesía basada en **ítems individuales** configurables por los administradores:
+- **Gestión por Ítems en Configuración (`workflow_prioridades`):** Cada nivel de prioridad (**Alta**, **Media**, **Baja**) admite la definición de uno o más ítems de compensación (ej: Ítem 1: *"1 reemplazo"*, Ítem 2: *"2 productos a elección"*, Ítem 3: *"2 de kg"*).
+- **Actualización Reactiva en el Modal de Aprobación:** En el flujo de aprobación del reclamo ([ReclamoDetailModal.jsx](file:///c:/Users/gabrielt/Documents/Proyectos/GestionReclamosWeb/dy_gestion_reclamos_web/client/src/pages/ReclamoDetailModal.jsx)), al cambiar la selección en el desplegable de prioridades, se actualiza inmediatamente la tarjeta visual exhibiendo la cantidad de días del SLA y el desglose de cada ítem de cortesía con su correspondiente identificador numérico y color de acento según la severidad.
+- **Instrucciones Claras en el Email al Supervisor:** El correo despachado automáticamente al supervisor comercial ([emailWorkflowService.js](file:///c:/Users/gabrielt/Documents/Proyectos/GestionReclamosWeb/dy_gestion_reclamos_web/server/services/emailWorkflowService.js)) incluye un bloque destacado superior con el nivel de prioridad, el SLA en días corridos y la lista numerada de ítems de cortesía a entregar, replicando además la compensación completa en cada producto reclamado.
+- **Montaje Independiente por Portales:** Tanto el modal de aprobación como el simulador temporal se renderizan directamente en `document.body` mediante `createPortal`, evitando el anidamiento dentro del modal del expediente, previniendo recortes visuales o desbordes en altura con cabeceras y pies de acción fijas y cuerpo scrollable.
+- **Adaptabilidad Responsiva Mobile:** El modal de detalle ([ReclamoDetailModal.jsx](file:///c:/Users/gabrielt/Documents/Proyectos/GestionReclamosWeb/dy_gestion_reclamos_web/client/src/pages/ReclamoDetailModal.jsx)) y la tabla de productos reclamados incorporan contención con scroll horizontal táctil (`.claim-products-table-container`), cuadrícula fluida de 1 a 2 columnas para información de contacto y botones de acción apilables adaptados para pantallas táctiles de dispositivos móviles.
+- **Sincronización Transaccional:** La regla unificada se persiste en `reclamos.regla_cortesia_aplicada`, en `reclamo_items.producto_cortesia` y en la columna `S` de la planilla de Google Sheets.
 
 ---
 

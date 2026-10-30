@@ -5,8 +5,29 @@ const reclamosDatabaseService = require('../services/reclamosDatabaseService');
 const emailWorkflowService = require('../services/emailWorkflowService');
 const supervisorLookupService = require('../services/supervisorLookupService');
 const prioridadesService = require('../services/prioridadesService');
+const productosService = require('../services/productosService');
 
 const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:5173';
+
+/**
+ * GET /productos o /api/public/productos?q={busqueda}
+ * Endpoint público con búsqueda predictiva por nombre de empaque ( packaging )
+ * Orden alfabético ASC para selección ágil en formulario web de consumidores
+ */
+router.get('/productos', async (req, res) => {
+    try {
+        const query = req.query.q || '';
+        const productos = await productosService.searchPublic(query);
+        res.json({
+            success: true,
+            total: productos.length,
+            data: productos
+        });
+    } catch (err) {
+        console.error('[PUBLIC API] Error en búsqueda predictiva de productos:', err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
 
 const SUPERVISORES_OFICIALES = [
     { nombre: 'Hugo Basile', email: 'hugob@donyeyo.com.ar' },
@@ -326,8 +347,14 @@ router.post('/admin-confirm-approval', async (req, res) => {
 
         const slaDias = prioridadObj.sla;
         const fechaLimiteSla = new Date(Date.now() + slaDias * 24 * 60 * 60 * 1000);
-        const reglas = Array.isArray(prioridadObj.reglas_cortesia) ? prioridadObj.reglas_cortesia : [];
-        const reglaDesc = reglas.length > 0 ? (reglas[0].descripcion || '') : null;
+        let reglas = prioridadObj.reglas_cortesia;
+        if (typeof reglas === 'string') {
+            try { reglas = JSON.parse(reglas); } catch { reglas = []; }
+        }
+        const descripciones = Array.isArray(reglas)
+            ? reglas.map(r => (typeof r === 'string' ? r : (r?.descripcion || '')).trim()).filter(Boolean)
+            : [];
+        const reglaDesc = descripciones.length > 0 ? descripciones.join(' + ') : '1 reemplazo';
 
         const updates = {
             'AO': 'En curso',
@@ -469,13 +496,20 @@ router.get('/verify', async (req, res) => {
             claimId: payload.claimId,
             actor: payload.actor,
             action: payload.action,
+            logo_url: await require('../services/configuracionService').get('email_logo_url', ''),
             claim: {
                 id: claim.id,
                 consumidor: `${claim.nombre} ${claim.apellido}`,
+                nombre: claim.nombre,
+                apellido: claim.apellido,
                 domicilio: claim.domicilio,
                 localidad: claim.localidad,
                 supervisor: claim.supervisor,
                 estado_supervisor: claim.estado_supervisor,
+                estado_consumidor: claim.estado_consumidor,
+                consumidor_puntuacion: claim.consumidor_puntuacion || null,
+                consumidor_tipo_problema: claim.consumidor_tipo_problema || '',
+                consumidor_comentario: claim.consumidor_comentario || '',
                 items: claim.items
             }
         });
@@ -486,28 +520,291 @@ router.get('/verify', async (req, res) => {
 
 /**
  * GET /api/public/actions/supervisor-quick
- * Endpoint directo al picar en "Pude Resolver la Acción" desde el email
+/**
+ * GET /api/public/actions/supervisor-quick
+ * Endpoint al hacer clic en "Pude Resolver la Acción" desde el email.
+ * Muestra primero una pantalla de confirmación advirtiendo que se notificará al consumidor.
  */
 router.get('/supervisor-quick', async (req, res) => {
-    const { token } = req.query;
+    const { token, confirm } = req.query;
     const payload = emailWorkflowService.verifyToken(token);
 
     if (!payload || payload.actor !== 'supervisor' || payload.action !== 'resuelto') {
         return res.status(401).send(`
-            <div style="font-family:sans-serif; text-align:center; padding:50px;">
-                <h2 style="color:#ef4444;">Enlace inválido o expirado</h2>
-                <p>El enlace que utilizaste ya no es válido o ha caducado.</p>
-            </div>
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Enlace Inválido - Don Yeyo</title>
+                <style>
+                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f1535; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; color: #f8fafc; }
+                    .card { background: #18224b; padding: 40px; border-radius: 16px; text-align: center; max-width: 440px; border: 1px solid rgba(239, 68, 68, 0.4); }
+                    .icon { font-size: 48px; color: #ef4444; margin-bottom: 16px; }
+                    h2 { margin: 0 0 10px 0; color: #ffffff; }
+                    p { color: #94a3b8; font-size: 0.9rem; line-height: 1.5; margin: 0; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <div class="icon">✕</div>
+                    <h2>Enlace inválido o expirado</h2>
+                    <p>El enlace que utilizaste ya no es válido o ha caducado. Por favor comunicate con la administración.</p>
+                </div>
+            </body>
+            </html>
         `);
     }
 
     try {
+        const claim = await googleSheetsService.getReclamoById(payload.claimId);
+        if (!claim) {
+            return res.status(404).send(`
+                <div style="font-family:sans-serif; text-align:center; padding:50px; background:#0f1535; color:#fff; min-height:100vh;">
+                    <h2>Reclamo #${payload.claimId} no encontrado</h2>
+                </div>
+            `);
+        }
+
+        // Si ya fue resuelto previamente, informar
+        if (claim.estado_supervisor === 'Resuelto') {
+            return res.send(`
+                <!DOCTYPE html>
+                <html lang="es">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Reclamo ya Resuelto - Don Yeyo</title>
+                    <style>
+                        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+                        .card { background: #ffffff; padding: 36px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); text-align: center; max-width: 480px; width: 100%; border: 1px solid #e2e8f0; }
+                        .icon { font-size: 46px; color: #10b981; margin-bottom: 12px; }
+                        h2 { color: #0d2c5c; margin: 0 0 8px 0; }
+                        p { color: #64748b; font-size: 0.92rem; line-height: 1.5; margin: 0 0 20px 0; }
+                        .btn-close { background: #0d2c5c; color: #ffffff; border: none; padding: 10px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.9rem; }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <div class="icon">✓</div>
+                        <h2>Reclamo ya Resuelto</h2>
+                        <p>El Reclamo <strong>#${payload.claimId}</strong> ya había sido confirmado previamente como <strong>Resuelto</strong> en el sistema corporativo.</p>
+                        <button class="btn-close" onclick="window.close()">Cerrar Ventana</button>
+                    </div>
+                </body>
+                </html>
+            `);
+        }
+
+        // Si NO confirmó aún, mostrar pantalla de confirmación previa
+        if (confirm !== '1') {
+            const consumidorNombre = `${claim.nombre || ''} ${claim.apellido || ''}`.trim() || 'el consumidor';
+            return res.send(`
+                <!DOCTYPE html>
+                <html lang="es">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Confirmar Resolución - Don Yeyo</title>
+                    <style>
+                        body {
+                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                            background: #090e1a;
+                            background-image: radial-gradient(circle at 50% 10%, #152238 0%, #090e1a 100%);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            min-height: 100vh;
+                            margin: 0;
+                            padding: 24px 16px;
+                            color: #f8fafc;
+                            box-sizing: border-box;
+                        }
+                        .card {
+                            background: #10192e;
+                            border: 1px solid #1e2e50;
+                            padding: 32px;
+                            border-radius: 16px;
+                            box-shadow: 0 20px 40px rgba(0,0,0,0.45);
+                            max-width: 520px;
+                            width: 100%;
+                            box-sizing: border-box;
+                        }
+                        .header-tag {
+                            font-size: 0.75rem;
+                            font-weight: 700;
+                            color: #f59e0b;
+                            letter-spacing: 1px;
+                            text-transform: uppercase;
+                            margin-bottom: 6px;
+                        }
+                        h2 {
+                            color: #ffffff;
+                            margin: 0 0 14px 0;
+                            font-size: 1.45rem;
+                            display: flex;
+                            align-items: center;
+                            gap: 10px;
+                        }
+                        .info-box {
+                            background: #16233f;
+                            border: 1px solid #233454;
+                            border-radius: 10px;
+                            padding: 16px;
+                            margin-bottom: 20px;
+                            font-size: 0.88rem;
+                            line-height: 1.6;
+                        }
+                        .info-item {
+                            display: flex;
+                            margin-bottom: 6px;
+                        }
+                        .info-label {
+                            color: #94a3b8;
+                            width: 120px;
+                            flex-shrink: 0;
+                        }
+                        .info-val {
+                            color: #f8fafc;
+                            font-weight: 600;
+                        }
+                        .warning-box {
+                            background: rgba(245, 158, 11, 0.12);
+                            border: 1px solid #f59e0b;
+                            border-radius: 10px;
+                            padding: 16px;
+                            margin-bottom: 24px;
+                            color: #fef3c7;
+                            font-size: 0.86rem;
+                            line-height: 1.5;
+                        }
+                        .warning-title {
+                            display: flex;
+                            align-items: center;
+                            gap: 6px;
+                            font-weight: 700;
+                            color: #fbbf24;
+                            margin-bottom: 6px;
+                            font-size: 0.92rem;
+                        }
+                        .actions {
+                            display: flex;
+                            gap: 12px;
+                            justify-content: flex-end;
+                            flex-wrap: wrap;
+                        }
+                        .btn-cancel {
+                            background: transparent;
+                            border: 1px solid #334155;
+                            color: #94a3b8;
+                            padding: 12px 20px;
+                            border-radius: 8px;
+                            font-size: 0.9rem;
+                            font-weight: 600;
+                            cursor: pointer;
+                            transition: all 0.2s;
+                        }
+                        .btn-cancel:hover {
+                            background: #1e293b;
+                            color: #f8fafc;
+                        }
+                        .btn-confirm {
+                            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                            border: none;
+                            color: #ffffff;
+                            padding: 12px 24px;
+                            border-radius: 8px;
+                            font-size: 0.92rem;
+                            font-weight: 700;
+                            cursor: pointer;
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+                            transition: all 0.2s;
+                            text-decoration: none;
+                        }
+                        .btn-confirm:hover {
+                            transform: translateY(-1px);
+                            box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
+                        }
+                        .cancel-notice {
+                            display: none;
+                            margin-top: 16px;
+                            padding: 12px;
+                            background: #1e293b;
+                            border-radius: 8px;
+                            text-align: center;
+                            font-size: 0.84rem;
+                            color: #94a3b8;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <div class="header-tag">Don Yeyo S.A. &bull; Portal de Supervisión</div>
+                        <h2>Confirmar Entrega de Solución</h2>
+                        
+                        <div class="info-box">
+                            <div class="info-item">
+                                <span class="info-label">Reclamo:</span>
+                                <span class="info-val">#${escapeHtml(payload.claimId)}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Consumidor:</span>
+                                <span class="info-val">${escapeHtml(consumidorNombre)}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Localidad:</span>
+                                <span class="info-val">${escapeHtml(claim.localidad || 'No indicada')}, ${escapeHtml(claim.provincia || '')}</span>
+                            </div>
+                            <div class="info-item" style="margin-bottom:0;">
+                                <span class="info-label">Supervisor:</span>
+                                <span class="info-val">${escapeHtml(claim.supervisor || 'Comercial')}</span>
+                            </div>
+                        </div>
+
+                        <div class="warning-box">
+                            <div class="warning-title">
+                                <span>⚠️</span>
+                                <span>Aviso Importante</span>
+                            </div>
+                            Al presionar <strong>"Sí, Confirmar y Notificar"</strong>, el estado del reclamo se registrará como <strong>Resuelto</strong> en el sistema y se enviará automáticamente un correo electrónico a <strong>${escapeHtml(consumidorNombre)}</strong> para consultar su conformidad con la entrega realizada.
+                        </div>
+
+                        <div class="actions">
+                            <button type="button" class="btn-cancel" onclick="handleCancel()">
+                                Cancelar / Cerrar
+                            </button>
+                            <a href="${API_BASE_URL}/api/public/actions/supervisor-quick?token=${encodeURIComponent(token)}&confirm=1" class="btn-confirm">
+                                ✓ Sí, Confirmar y Notificar
+                            </a>
+                        </div>
+
+                        <div id="cancel-notice" class="cancel-notice">
+                            Operación cancelada. No se modificó el estado del reclamo. Ya podés cerrar esta pestaña.
+                        </div>
+                    </div>
+
+                    <script>
+                        function handleCancel() {
+                            document.getElementById('cancel-notice').style.display = 'block';
+                            try { window.close(); } catch(e) {}
+                        }
+                    </script>
+                </body>
+                </html>
+            `);
+        }
+
+        // Si YA CONFIRMÓ (confirm === '1') -> Proceder a actualizar
         await googleSheetsService.updateReclamo(payload.claimId, {
             'AQ': 'Resuelto',
             'AS': 'Resuelto sin confirmar'
         }, {
             actor: 'supervisor_link',
-            motivo: 'Supervisor confirmó resolución/entrega de producto desde email'
+            actorEmail: claim.supervisor_email || '',
+            motivo: 'Supervisor confirmó resolución/entrega de producto desde enlace con confirmación previa'
         });
 
         // Evaluar cierre automatico del reclamo si se cumplieron todas las condiciones
@@ -518,26 +815,77 @@ router.get('/supervisor-quick', async (req, res) => {
             <html lang="es">
             <head>
                 <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Acción Registrada - Don Yeyo</title>
                 <style>
-                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-                    .card { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.06); text-align: center; max-width: 480px; }
-                    .icon { font-size: 50px; color: #10b981; margin-bottom: 16px; }
-                    h2 { color: #151C5B; margin-top: 0; }
-                    p { color: #64748b; line-height: 1.5; }
+                    body {
+                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                        background: #090e1a;
+                        background-image: radial-gradient(circle at 50% 10%, #152238 0%, #090e1a 100%);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        min-height: 100vh;
+                        margin: 0;
+                        padding: 24px 16px;
+                        color: #f8fafc;
+                        box-sizing: border-box;
+                    }
+                    .card {
+                        background: #10192e;
+                        border: 1px solid rgba(16, 185, 129, 0.4);
+                        padding: 40px 32px;
+                        border-radius: 16px;
+                        box-shadow: 0 20px 40px rgba(0,0,0,0.45);
+                        text-align: center;
+                        max-width: 480px;
+                        width: 100%;
+                        box-sizing: border-box;
+                    }
+                    .icon {
+                        width: 64px;
+                        height: 64px;
+                        border-radius: 50%;
+                        background: rgba(16, 185, 129, 0.15);
+                        color: #10b981;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 32px;
+                        margin: 0 auto 16px auto;
+                    }
+                    h2 { color: #ffffff; margin: 0 0 10px 0; font-size: 1.4rem; }
+                    p { color: #cbd5e1; font-size: 0.92rem; line-height: 1.5; margin: 0 0 10px 0; }
+                    .subtext { color: #94a3b8; font-size: 0.82rem; margin: 0 0 24px 0; }
+                    .btn-close {
+                        background: #1e293b;
+                        color: #ffffff;
+                        border: 1px solid #334155;
+                        padding: 10px 24px;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        font-size: 0.88rem;
+                        cursor: pointer;
+                        transition: background 0.2s;
+                    }
+                    .btn-close:hover {
+                        background: #334155;
+                    }
                 </style>
             </head>
             <body>
                 <div class="card">
                     <div class="icon">✓</div>
                     <h2>¡Acción Registrada con Éxito!</h2>
-                    <p>Muchas gracias por gestionar la entrega del Reclamo <strong>#${payload.claimId}</strong>.</p>
-                    <p>El estado se ha actualizado a <strong>Resuelto</strong> en el sistema corporativo.</p>
+                    <p>Muchas gracias por gestionar la entrega del Reclamo <strong>#${escapeHtml(payload.claimId)}</strong>.</p>
+                    <p class="subtext">El estado se actualizó a <strong>Resuelto</strong> en el sistema corporativo y se enviará la encuesta de conformidad al consumidor.</p>
+                    <button class="btn-close" onclick="window.close()">Cerrar Ventana</button>
                 </div>
             </body>
             </html>
         `);
     } catch (err) {
+        console.error('Error en supervisor-quick:', err);
         res.status(500).send(`Error al registrar la acción: ${err.message}`);
     }
 });
@@ -598,8 +946,118 @@ router.post('/supervisor-imposibilidad', async (req, res) => {
 });
 
 /**
+ * POST /api/public/actions/consumidor-encuesta
+ * Recibe la encuesta del consumidor (5 estrellas + comentario si fue Resuelto,
+ * o tipo de problema + comentario si fue No Resuelto)
+ */
+router.post('/consumidor-encuesta', async (req, res) => {
+    const { token, resultado, puntuacion, tipo_problema, comentario } = req.body;
+    const payload = emailWorkflowService.verifyToken(token);
+
+    if (!payload || payload.actor !== 'consumidor') {
+        return res.status(401).json({ success: false, error: 'El enlace de la encuesta es inválido o ha expirado.' });
+    }
+
+    const modo = resultado || (payload.action === 'no_resuelto' || payload.action === 'disconforme' ? 'no_resuelto' : 'resuelto');
+
+    let estadoFinal = 'Resuelto conforme';
+    let puntuacionFinal = null;
+    let tipoProblemaFinal = '';
+    const comentarioFinal = comentario ? String(comentario).trim() : '';
+
+    if (modo === 'resuelto') {
+        const numStars = parseInt(puntuacion, 10);
+        if (isNaN(numStars) || numStars < 1 || numStars > 5) {
+            return res.status(400).json({ success: false, error: 'Por favor seleccioná una puntuación de 1 a 5 estrellas.' });
+        }
+        puntuacionFinal = numStars;
+        estadoFinal = 'Resuelto conforme';
+    } else if (modo === 'no_resuelto') {
+        const tiposValidos = ['No recibí reposición', 'No estoy satisfecho con lo recibido'];
+        if (!tipo_problema || !tiposValidos.includes(tipo_problema)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Por favor seleccioná el tipo de problema (No recibí reposición / No estoy satisfecho con lo recibido).'
+            });
+        }
+        tipoProblemaFinal = tipo_problema;
+        if (tipo_problema === 'No recibí reposición') {
+            estadoFinal = 'No resuelto';
+        } else {
+            estadoFinal = 'Resuelto disconforme';
+        }
+    } else {
+        return res.status(400).json({ success: false, error: 'Opción de respuesta no válida.' });
+    }
+
+    try {
+        const claim = await googleSheetsService.getReclamoById(payload.claimId);
+        if (!claim) {
+            return res.status(404).json({ success: false, error: 'El reclamo no fue encontrado.' });
+        }
+
+        const motivoAuditoria = modo === 'resuelto'
+            ? `Encuesta consumidor: Resuelto (${puntuacionFinal}/5 estrellas)${comentarioFinal ? ` - "${comentarioFinal}"` : ''}`
+            : `Encuesta consumidor: No Resuelto (${tipoProblemaFinal})${comentarioFinal ? ` - "${comentarioFinal}"` : ''}`;
+
+        // Persistir estado_consumidor en Google Sheets y datos de encuesta en MySQL
+        await googleSheetsService.updateReclamo(payload.claimId, {
+            'AS': estadoFinal,
+            'consumidor_puntuacion': puntuacionFinal,
+            'consumidor_tipo_problema': tipoProblemaFinal,
+            'consumidor_comentario': comentarioFinal
+        }, {
+            actor: 'consumidor_link',
+            actorEmail: claim.email || '',
+            motivo: motivoAuditoria,
+            metadata: {
+                modo,
+                estado_final: estadoFinal,
+                puntuacion: puntuacionFinal,
+                tipo_problema: tipoProblemaFinal,
+                comentario: comentarioFinal
+            }
+        });
+
+        // Detección de conflicto / posible fraude:
+        // Si el supervisor informó "Resuelto" y el consumidor responde "No recibí reposición" -> estadoFinal === 'No resuelto'
+        if (estadoFinal === 'No resuelto' && claim.estado_supervisor === 'Resuelto') {
+            const motivoConflicto = `Discrepancia crítica: El supervisor ${claim.supervisor || ''} declaró haber entregado la reposición ("Resuelto"), pero el consumidor informó "${tipoProblemaFinal}"${comentarioFinal ? ` (${comentarioFinal})` : ''}. Posible engaño o fraude.`;
+            await reclamosDatabaseService.marcarConflicto(payload.claimId, motivoConflicto);
+            emailWorkflowService.sendFraudAlertToAdmins(claim, motivoConflicto).catch(err => {
+                console.error('[FRAUDE/CONFLICTO] Error enviando alerta a administradores:', err.message);
+            });
+        }
+
+        // Notificar a los administradores con los detalles de la encuesta
+        emailWorkflowService.sendConsumerFeedbackAlertToAdmins(claim, estadoFinal, {
+            puntuacion: puntuacionFinal,
+            tipo_problema: tipoProblemaFinal,
+            comentario: comentarioFinal
+        }).catch(err => {
+            console.error('Error notificando respuesta a admins:', err.message);
+        });
+
+        // Evaluar cierre automático del reclamo si se cumplieron todas las condiciones
+        reclamosDatabaseService.checkAndFinalizeAdminState(payload.claimId).catch(console.error);
+
+        res.json({
+            success: true,
+            estado_consumidor: estadoFinal,
+            puntuacion: puntuacionFinal,
+            tipo_problema: tipoProblemaFinal,
+            comentario: comentarioFinal,
+            message: '¡Muchas gracias! Tu respuesta ha sido registrada correctamente.'
+        });
+    } catch (err) {
+        console.error('Error en consumidor-encuesta:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+/**
  * GET /api/public/actions/consumidor-response
- * Endpoint al que llega el consumidor al hacer clic en uno de los 3 botones de su correo
+ * Redirige enlaces de correos de seguimiento hacia la página web interactiva de encuesta del consumidor
  */
 router.get('/consumidor-response', async (req, res) => {
     const { token } = req.query;
@@ -613,71 +1071,7 @@ router.get('/consumidor-response', async (req, res) => {
         `);
     }
 
-    const feedbackMap = {
-        'conforme': 'Resuelto conforme',
-        'disconforme': 'Resuelto disconforme',
-        'no_resuelto': 'No resuelto'
-    };
-
-    const estadoFinal = feedbackMap[payload.action] || 'Resuelto conforme';
-
-    try {
-        const claim = await googleSheetsService.getReclamoById(payload.claimId);
-
-        // Persistir estado_consumidor en Google Sheets y MySQL con auditoría
-        await googleSheetsService.updateReclamo(payload.claimId, {
-            'AS': estadoFinal
-        }, {
-            actor: 'consumidor_link',
-            actorEmail: claim ? claim.email : '',
-            motivo: `Consumidor respondió encuesta: ${payload.action}`
-        });
-
-        // Detección de conflicto / posible fraude:
-        // Si el supervisor informó "Resuelto" y el consumidor responde "No resuelto"
-        if (payload.action === 'no_resuelto' && claim && claim.estado_supervisor === 'Resuelto') {
-            const motivoConflicto = `Discrepancia crítica: El supervisor ${claim.supervisor || ''} declaró haber entregado la reposición ("Resuelto"), pero el consumidor informó NO haberla recibido ("No resuelto"). Posible engaño o fraude.`;
-            await reclamosDatabaseService.marcarConflicto(payload.claimId, motivoConflicto);
-            emailWorkflowService.sendFraudAlertToAdmins(claim, motivoConflicto).catch(err => {
-                console.error('[FRAUDE/CONFLICTO] Error enviando alerta a administradores:', err.message);
-            });
-        }
-
-        // Notificar a los administradores
-        if (claim) {
-            emailWorkflowService.sendConsumerFeedbackAlertToAdmins(claim, estadoFinal).catch(err => {
-                console.error('Error notificando respuesta a admins:', err.message);
-            });
-        }
-
-        // Evaluar cierre automatico del reclamo si se cumplieron todas las condiciones
-        reclamosDatabaseService.checkAndFinalizeAdminState(payload.claimId).catch(console.error);
-
-        res.send(`
-            <!DOCTYPE html>
-            <html lang="es">
-            <head>
-                <meta charset="UTF-8">
-                <title>Gracias por tu respuesta - Don Yeyo</title>
-                <style>
-                    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
-                    .card { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.06); text-align: center; max-width: 480px; }
-                    h2 { color: #151C5B; }
-                    p { color: #64748b; line-height: 1.5; }
-                </style>
-            </head>
-            <body>
-                <div class="card">
-                    <h2>¡Muchas gracias por tu respuesta!</h2>
-                    <p>Tu opinión sobre el Reclamo <strong>#${payload.claimId}</strong> ha sido registrada: <strong>${estadoFinal}</strong>.</p>
-                    <p>Nos ayuda a seguir mejorando día a día la calidad de nuestros productos y atención.</p>
-                </div>
-            </body>
-            </html>
-        `);
-    } catch (err) {
-        res.status(500).send(`Error al procesar: ${err.message}`);
-    }
+    return res.redirect(`${APP_BASE_URL}/encuesta-consumidor?token=${encodeURIComponent(token)}`);
 });
 
 module.exports = router;

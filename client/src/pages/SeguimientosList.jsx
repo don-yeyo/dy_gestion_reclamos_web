@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import {
     Clock, RefreshCw, Search, Plus, Pencil, Trash2, CheckCircle2,
     AlertCircle, X, Save, UserCheck, ShieldAlert, Gift, User,
@@ -16,6 +17,10 @@ const ROLES_INFO = {
 };
 
 export const SeguimientosList = () => {
+    const { id: routeReglaId } = useParams();
+    const location = useLocation();
+    const navigate = useNavigate();
+
     const [seguimientos, setSeguimientos] = useState([]);
     const [estados, setEstados] = useState([]);
     const [prioridades, setPrioridades] = useState([]);
@@ -146,6 +151,67 @@ export const SeguimientosList = () => {
         return { dias, horas, esValido: true, remanente };
     }, [slaActualForm, formData.repeticiones, formData.disparo_dias]);
 
+    // Sincronizar modal con URL (/seguimientos/nuevo o /seguimientos/:id)
+    const isNuevoRoute = location.pathname.endsWith('/seguimientos/nuevo');
+
+    useEffect(() => {
+        if (isNuevoRoute) {
+            if (!isModalOpen || editingRegla) {
+                setEditingRegla(null);
+                setFormError(null);
+                const rolPorDefecto = selectedRol !== 'all' ? selectedRol : 'supervisor';
+                const estadosDisponibles = estados.filter(e => e.actor === rolPorDefecto);
+                const primerEstado = estadosDisponibles.length > 0 ? estadosDisponibles[0].codigo : 'Pendiente';
+                setFormData({
+                    rol: rolPorDefecto,
+                    estado_codigo: primerEstado,
+                    prioridad_codigo: 10,
+                    disparo_dias: 3,
+                    repeticiones: 3,
+                    emails_elevacion: '',
+                    activo: true
+                });
+                setIsModalOpen(true);
+            }
+            return;
+        }
+
+        if (routeReglaId && routeReglaId !== 'nuevo') {
+            if (seguimientos.length > 0) {
+                const found = seguimientos.find(s => String(s.id) === String(routeReglaId));
+                if (found && (!isModalOpen || !editingRegla || String(editingRegla.id) !== String(found.id))) {
+                    setEditingRegla(found);
+                    setFormError(null);
+                    setFormData({
+                        rol: found.rol,
+                        estado_codigo: found.estado_codigo,
+                        prioridad_codigo: found.prioridad_codigo,
+                        disparo_dias: found.disparo_dias,
+                        repeticiones: found.repeticiones,
+                        emails_elevacion: found.emails_elevacion || '',
+                        activo: Boolean(found.activo)
+                    });
+                    setIsModalOpen(true);
+                }
+            }
+            return;
+        }
+
+        if (!isNuevoRoute && !routeReglaId) {
+            setIsModalOpen(false);
+            setEditingRegla(null);
+        }
+    }, [isNuevoRoute, routeReglaId, seguimientos, estados.length]);
+
+    const handleCloseModal = () => {
+        if (formSaving) return;
+        setIsModalOpen(false);
+        setEditingRegla(null);
+        if (isNuevoRoute || routeReglaId) {
+            navigate('/seguimientos');
+        }
+    };
+
     // Abrir Modal de Creación
     const handleOpenCreate = () => {
         setEditingRegla(null);
@@ -164,6 +230,7 @@ export const SeguimientosList = () => {
             activo: true
         });
         setIsModalOpen(true);
+        navigate('/seguimientos/nuevo');
     };
 
     // Abrir Modal de Edición
@@ -180,6 +247,7 @@ export const SeguimientosList = () => {
             activo: Boolean(regla.activo)
         });
         setIsModalOpen(true);
+        navigate(`/seguimientos/${encodeURIComponent(regla.id)}`);
     };
 
     // Manejo de cambio de rol en el formulario (reajusta estado por defecto)
@@ -249,6 +317,9 @@ export const SeguimientosList = () => {
                         message: 'Regla de seguimiento actualizada correctamente.'
                     });
                     setIsModalOpen(false);
+                    if (isNuevoRoute || routeReglaId) {
+                        navigate('/seguimientos');
+                    }
                     await fetchData();
                 } else {
                     setFormError(res.data?.error || 'Error al actualizar la regla.');
@@ -265,6 +336,9 @@ export const SeguimientosList = () => {
                         message: 'Nueva regla de seguimiento creada exitosamente.'
                     });
                     setIsModalOpen(false);
+                    if (isNuevoRoute || routeReglaId) {
+                        navigate('/seguimientos');
+                    }
                     await fetchData();
                 } else {
                     setFormError(res.data?.error || 'Error al crear la regla.');
@@ -774,7 +848,7 @@ export const SeguimientosList = () => {
                         justifyContent: 'center',
                         padding: 16
                     }}
-                    onClick={() => !formSaving && setIsModalOpen(false)}
+                    onClick={handleCloseModal}
                 >
                     <div
                         className="modal-content-card modal-content"
@@ -811,7 +885,7 @@ export const SeguimientosList = () => {
                             </div>
                             <button
                                 className="modal-close-btn"
-                                onClick={() => !formSaving && setIsModalOpen(false)}
+                                onClick={handleCloseModal}
                                 disabled={formSaving}
                                 style={{
                                     background: 'transparent',
@@ -1081,7 +1155,7 @@ export const SeguimientosList = () => {
                                 <button
                                     type="button"
                                     className="btn btn-secondary"
-                                    onClick={() => setIsModalOpen(false)}
+                                    onClick={handleCloseModal}
                                     disabled={formSaving}
                                 >
                                     Cancelar

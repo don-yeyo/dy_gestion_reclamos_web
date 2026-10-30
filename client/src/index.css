@@ -1637,17 +1637,79 @@ body {
     gap: 10px !important;
   }
 
+  /* Adaptabilidad Móvil Don Yeyo para Modales y Expediente de Reclamos */
   .modal-overlay {
-    padding: 10px !important;
+    padding: 6px !important;
   }
 
   .modal-content-card {
     max-height: 96vh !important;
+    width: 100% !important;
     border-radius: var(--radius-md) !important;
   }
 
-  .modal-header, .modal-body, .modal-footer {
-    padding: 16px !important;
+  .modal-header {
+    padding: 12px 14px !important;
+  }
+
+  .modal-body {
+    padding: 12px 14px !important;
+    max-height: calc(96vh - 90px) !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modal-footer {
+    padding: 10px 14px !important;
+  }
+
+  .workflow-diagram-card {
+    padding: 10px 12px !important;
+    margin-bottom: 14px !important;
+  }
+
+  .workflow-top-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+
+  .workflow-top-bar button {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 7px 10px !important;
+  }
+
+  .wf-branch-card {
+    padding: 10px 12px !important;
+  }
+
+  .wf-select-action-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+  }
+
+  .wf-select-action-row button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .claim-summary-card {
+    padding: 10px 12px !important;
+    margin-bottom: 14px !important;
+  }
+
+  .claim-info-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px 10px !important;
+  }
+
+  .claim-products-table-container {
+    margin-top: 6px !important;
+  }
+
+  .mobile-only-hint {
+    display: inline-block !important;
   }
 
   .geo-stats-row {
@@ -1672,6 +1734,19 @@ body {
   }
 }
 
+@media (max-width: 480px) {
+  .claim-info-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .modal-header h3 {
+    font-size: 1.02rem !important;
+  }
+}
+
+.mobile-only-hint {
+  display: none;
+}
+
 /* Animación de Spinner para carga asíncrona */
 @keyframes spin {
   from {
@@ -1683,5 +1758,9 @@ body {
 }
 
 .animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.spin {
   animation: spin 1s linear infinite;
 }

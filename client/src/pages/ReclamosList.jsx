@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
 import {
     Search, Filter, RefreshCw, AlertCircle,
     CheckCircle2, Clock, MapPin, Package, UserCheck, ShieldAlert,
@@ -10,6 +10,8 @@ import { StatusBadge } from '../components/StatusBadge';
 import { ReclamoDetailModal } from './ReclamoDetailModal';
 
 export const ReclamosList = () => {
+    const { id: routeId } = useParams();
+    const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const [reclamos, setReclamos] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -28,25 +30,67 @@ export const ReclamosList = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 15;
 
-    // Sincronizar filtro e ID desde query params (ej: Drawer: ?filtro=admin_pendiente, Dashboard: ?id=REC-001)
+    // Sincronizar filtro e ID desde ruta (/reclamos/:id) o query params (ej: Drawer: ?filtro=admin_pendiente, ?id=REC-001)
     useEffect(() => {
         const filtro = searchParams.get('filtro');
         if (filtro === 'admin_pendiente') {
             setFilterAdmin('Pendiente');
+            setFilterSupervisor('ALL');
+            setFilterInocuidad('ALL');
         } else if (filtro === 'supervisor_pendiente') {
             setFilterSupervisor('Pendiente');
-        } else if (filtro === 'inocuidad_pendiente') {
+            setFilterAdmin('ALL');
+            setFilterInocuidad('ALL');
+        } else if (filtro === 'inocuidad_pendiente' || filtro === 'inocuidad') {
             setFilterInocuidad('Pendiente');
+            setFilterAdmin('ALL');
+            setFilterSupervisor('ALL');
         }
 
-        const idParam = searchParams.get('id');
-        if (idParam && reclamos.length > 0) {
-            const found = reclamos.find(r => String(r.id) === String(idParam) || String(r.nro_reclamo) === String(idParam));
+        const targetId = routeId || searchParams.get('id');
+        if (!targetId) {
+            setSelectedReclamo(null);
+            return;
+        }
+
+        if (reclamos.length > 0) {
+            const found = reclamos.find(
+                r => String(r.id) === String(targetId) || String(r.nro_reclamo) === String(targetId)
+            );
             if (found) {
                 setSelectedReclamo(found);
+                return;
             }
         }
-    }, [searchParams, reclamos]);
+
+        if (!loading) {
+            reclamosApi.getById(targetId)
+                .then(res => {
+                    if (res.data?.success && res.data?.data) {
+                        setSelectedReclamo(res.data.data);
+                    }
+                })
+                .catch(() => {
+                    // Si no se encuentra por ID individual, mantener grilla visible
+                });
+        }
+    }, [routeId, searchParams, reclamos, loading]);
+
+    const handleOpenReclamo = (reclamo) => {
+        setSelectedReclamo(reclamo);
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('id');
+        const qs = nextParams.toString();
+        navigate(`/reclamos/${encodeURIComponent(reclamo.id)}${qs ? `?${qs}` : ''}`);
+    };
+
+    const handleCloseReclamo = () => {
+        setSelectedReclamo(null);
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete('id');
+        const qs = nextParams.toString();
+        navigate(`/reclamos${qs ? `?${qs}` : ''}`);
+    };
 
     const fetchReclamos = async () => {
         setLoading(true);
@@ -463,7 +507,7 @@ export const ReclamosList = () => {
                                         <tr
                                             key={r.id}
                                             className={r.en_conflicto ? 'claim-row-conflicto' : ''}
-                                            onClick={() => setSelectedReclamo(r)}
+                                            onClick={() => handleOpenReclamo(r)}
                                             title={r.en_conflicto ? "⚠️ RECLAMO EN CONFLICTO (posible fraude/discrepancia): Clic para ver auditoría" : "Clic para ver detalle y gestionar acciones"}
                                         >
                                             {/* ID y Fecha */}
@@ -595,7 +639,7 @@ export const ReclamosList = () => {
                 <ReclamoDetailModal
                     claim={selectedReclamo}
                     isOpen={!!selectedReclamo}
-                    onClose={() => setSelectedReclamo(null)}
+                    onClose={handleCloseReclamo}
                     onRefresh={handleReclamoUpdated}
                 />
             )}
