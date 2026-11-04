@@ -556,6 +556,27 @@ La gestión de compensaciones por reclamo vincula el nivel de gravedad y el SLA 
 
 ---
 
+## 🛡️ Protección contra Acciones Duplicadas en Enlaces Firmados (Anti-Replay / Doble Clic)
+
+Para garantizar la integridad del flujo de negocio y prevenir estados inconsistentes ocasionados por múltiples clics en enlaces de correos electrónicos o navegación repetida:
+
+1. **Protección y Pantalla Informativa para el Consumidor:**
+   - Si el consumidor ya respondió la encuesta (estado en `Resuelto conforme`, `Resuelto disconforme`, `No resuelto`, `Cerrado` o con calificación registrada), al abrir el enlace del correo o reenviar el formulario público ([EncuestaConsumidorPublic.jsx](file:///c:/Users/gabrielt/Documents/Proyectos/GestionReclamosWeb/dy_gestion_reclamos_web/client/src/pages/EncuestaConsumidorPublic.jsx)) el backend responde con los datos históricos y el endpoint `POST /api/public/actions/consumidor-encuesta` rechaza con HTTP 409.
+   - La interfaz oculta el formulario de votación y renderiza una tarjeta de alta visibilidad informando que la respuesta ya fue procesada, detallando:
+     - Estado registrado (ej. *Resuelto conforme*).
+     - Fecha y hora exacta de registro (en formato de hora local argentina).
+     - Calificación brindada (estrellas) o tipo de inconveniente seleccionado.
+     - Comentario adicional oportunamente enviado.
+
+2. **Protección y Orientación de Reapertura para Supervisores y Personal Interno:**
+   - En las acciones rápidas del supervisor por correo ([publicActionRoutes.js](file:///c:/Users/gabrielt/Documents/Proyectos/GestionReclamosWeb/dy_gestion_reclamos_web/server/routes/publicActionRoutes.js)) y en el formulario público de imposibilidad ([ImposibilidadPublic.jsx](file:///c:/Users/gabrielt/Documents/Proyectos/GestionReclamosWeb/dy_gestion_reclamos_web/client/src/pages/ImposibilidadPublic.jsx)), se valida que el reclamo se encuentre en `estado_supervisor === 'Pendiente'`.
+   - Si el supervisor ya confirmó resolución, reportó imposibilidad o el reclamo está cerrado, se bloquean las peticiones y se renderiza una pantalla institucional con:
+     - El estado registrado previamente y la fecha y hora de la acción.
+     - Un bloque destacado con instrucciones sobre cómo proceder si necesita reconsiderar su decisión o reabrir el caso.
+   - **Texto de Reapertura Parametrizable:** El mensaje instructivo no se encuentra hardcodeado; se almacena bajo la clave `mensaje_reapertura_personal` en la tabla `config_sistema` y puede ser editado y restablecido a fábrica por los administradores desde `/configuracion/parametros`.
+
+---
+
 ## 📄 Licencia y Confidencialidad
 Propiedad exclusiva de **Don Yeyo S.A.** Prohibida su reproducción, divulgación o distribución sin autorización previa.
 

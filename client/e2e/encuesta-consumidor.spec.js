@@ -54,4 +54,15 @@ test.describe('CU-10: Encuesta Interactiva de Seguimiento al Consumidor (/encues
         await expect(page.getByTestId('encuesta-success')).toBeVisible();
         await expect(page.locator('text=¡Muchas gracias por tu respuesta!')).toBeVisible();
     });
+
+    test('debe mostrar pantalla informativa de acción previa si el consumidor ya respondió', async ({ page }) => {
+        await page.goto('/encuesta-consumidor?token=token_consumidor_duplicado_123');
+
+        await expect(page.getByTestId('encuesta-ya-registrada')).toBeVisible();
+        await expect(page.locator('text=Tu respuesta ya fue recibida')).toBeVisible();
+        await expect(page.locator('text=Resuelto conforme')).toBeVisible();
+        await expect(page.locator('text=Atención excelente')).toBeVisible();
+        // El formulario de envío no debe estar disponible
+        await expect(page.getByTestId('encuesta-submit-btn')).not.toBeVisible();
+    });
 });

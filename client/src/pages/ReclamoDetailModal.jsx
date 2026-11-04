@@ -1222,14 +1222,15 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                                                     borderRadius: '50%',
                                                                     background: accentColor,
                                                                     color: '#ffffff',
-                                                                    fontSize: '0.68rem',
+                                                                    fontSize: '0.85rem',
                                                                     fontWeight: 700,
                                                                     display: 'inline-flex',
                                                                     alignItems: 'center',
                                                                     justifyContent: 'center',
-                                                                    flexShrink: 0
+                                                                    flexShrink: 0,
+                                                                    lineHeight: '17px'
                                                                 }}>
-                                                                    {idx + 1}
+                                                                    &bull;
                                                                 </span>
                                                                 <span style={{ color: 'var(--text-main)', fontWeight: 600, fontSize: '0.8rem' }}>
                                                                     {itemTexto}

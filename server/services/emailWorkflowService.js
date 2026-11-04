@@ -272,10 +272,10 @@ class EmailWorkflowService {
         const badgeColor = prioridadNombre.toLowerCase().includes('alta') ? '#b91c1c' : prioridadNombre.toLowerCase().includes('media') ? '#b45309' : '#1d4ed8';
         const badgeBg = prioridadNombre.toLowerCase().includes('alta') ? '#fee2e2' : prioridadNombre.toLowerCase().includes('media') ? '#fef3c7' : '#dbeafe';
 
-        const cortesiaItemsHtml = cortesiaItems.map((itemDesc, idx) => `
-            <li style="margin-bottom:6px; color:#065f46; font-size:0.92rem; list-style-type:none; display:flex; align-items:baseline; gap:8px;">
-                <span style="display:inline-block; min-width:20px; height:20px; border-radius:50%; background:#10b981; color:#ffffff; font-size:0.75rem; font-weight:bold; text-align:center; line-height:20px;">${idx + 1}</span>
-                <span style="font-weight:600;">${itemDesc}</span>
+        const cortesiaItemsHtml = cortesiaItems.map(itemDesc => `
+            <li style="margin-bottom:6px; color:#065f46; font-size:0.92rem; list-style-type:none; display:flex; align-items:center; gap:8px;">
+                <span style="display:inline-block; width:18px; height:18px; border-radius:50%; background:#10b981; color:#ffffff; font-size:0.95rem; font-weight:bold; text-align:center; line-height:18px; vertical-align:middle; flex-shrink:0;">&bull;</span>
+                <span style="font-weight:600; vertical-align:middle;">${itemDesc}</span>
             </li>
         `).join('');
 
@@ -310,14 +310,6 @@ class EmailWorkflowService {
                 </div>
                 <div style="color:#334155; font-size:0.9rem; margin-bottom:8px;">
                     Defecto reportado: <strong style="color:#b91c1c;">${item.defecto || 'No especificado'}</strong>
-                </div>
-                <div style="margin-top:8px; padding:10px 14px; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:6px; color:#065f46;">
-                    <div style="font-size:0.8rem; text-transform:uppercase; letter-spacing:0.5px; font-weight:bold; color:#047857; margin-bottom:2px;">
-                        🎁 Compensación / Producto de Cortesía a Entregar:
-                    </div>
-                    <div style="font-size:1.02rem; font-weight:800; color:#065f46;">
-                        ${item.producto_cortesia || cortesiaTextoCompleto}
-                    </div>
                 </div>
                 <div style="font-size:0.8rem; color:#94a3b8; margin-top:6px;">
                     Lote: ${item.lote || 'N/A'} | Vencimiento: ${item.vto || 'N/A'}

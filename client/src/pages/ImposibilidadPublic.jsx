@@ -166,7 +166,107 @@ export const ImposibilidadPublic = () => {
         );
     }
 
-    // 3. Estado de Éxito tras Enviar
+    // 3. Estado de Acción Previa ya Registrada (Supervisión)
+    if (tokenData?.ya_acciono_supervisor) {
+        const estadoActual = tokenData.claim?.estado_supervisor || 'Gestionado';
+        const fechaReg = tokenData.claim?.fecha_estado_supervisor ? new Date(tokenData.claim.fecha_estado_supervisor).toLocaleString('es-AR') : null;
+        return (
+            <div style={pageContainerStyle}>
+                <div style={{ ...cardStyle, maxWidth: '480px', textAlign: 'center', border: '1px solid rgba(59, 130, 246, 0.4)' }}>
+                    <div style={{
+                        width: '64px',
+                        height: '64px',
+                        borderRadius: '50%',
+                        backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                        color: '#60a5fa',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 16px auto'
+                    }}>
+                        <Info size={36} />
+                    </div>
+                    <div style={{
+                        display: 'inline-block',
+                        background: 'rgba(59, 130, 246, 0.15)',
+                        color: '#60a5fa',
+                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                        padding: '4px 12px',
+                        borderRadius: 20,
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        letterSpacing: '0.5px',
+                        textTransform: 'uppercase',
+                        marginBottom: 12
+                    }}>
+                        Acción Ya Registrada
+                    </div>
+                    <h2 style={{ fontSize: '1.35rem', fontWeight: 700, margin: '0 0 10px 0', color: '#ffffff' }}>
+                        Reclamo #{tokenData?.claimId} ya gestionado
+                    </h2>
+                    <p style={{ fontSize: '0.92rem', color: '#cbd5e1', margin: '0 0 16px 0', lineHeight: 1.55 }}>
+                        Ya se cuenta con una acción registrada previamente para este reclamo en el circuito de supervisión.
+                    </p>
+
+                    <div style={{
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: 10,
+                        padding: '14px 16px',
+                        marginBottom: 18,
+                        textAlign: 'left',
+                        fontSize: '0.86rem',
+                        lineHeight: 1.6
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <span style={{ color: '#94a3b8' }}>Estado registrado:</span>
+                            <span style={{ color: '#f8fafc', fontWeight: 700 }}>{estadoActual}</span>
+                        </div>
+                        {fechaReg && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: '#94a3b8' }}>Fecha de registro:</span>
+                                <span style={{ color: '#cbd5e1' }}>{fechaReg} hs</span>
+                            </div>
+                        )}
+                    </div>
+
+                    <div style={{
+                        background: 'rgba(245, 158, 11, 0.1)',
+                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                        borderRadius: 10,
+                        padding: '14px',
+                        marginBottom: 20,
+                        textAlign: 'left',
+                        fontSize: '0.84rem',
+                        color: '#fbbf24',
+                        lineHeight: 1.5
+                    }}>
+                        <strong style={{ display: 'block', marginBottom: 4 }}>📌 ¿Necesitás modificar tu decisión o reabrir el caso?</strong>
+                        {tokenData?.mensaje_reapertura || 'Si necesitás reconsiderar tu decisión o reabrir el expediente de este reclamo, por favor contactate con la Administración de Don Yeyo S.A. indicando el número de caso.'}
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => window.close()}
+                        style={{
+                            background: '#1e293b',
+                            color: '#f8fafc',
+                            border: '1px solid #334155',
+                            padding: '10px 24px',
+                            borderRadius: 8,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            fontSize: '0.88rem'
+                        }}
+                    >
+                        Cerrar Ventana
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    // 4. Estado de Éxito tras Enviar
     if (submittedSuccess) {
         return (
             <div style={pageContainerStyle}>

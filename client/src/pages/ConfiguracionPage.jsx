@@ -1658,6 +1658,22 @@ export const ConfiguracionPage = () => {
 
                         <div style={{ gridColumn: '1 / -1' }}>
                             <label style={labelStyle}>
+                                Mensaje de Reabrir Caso (Personal Interno / Supervisión / Inocuidad)
+                            </label>
+                            <textarea
+                                rows={2}
+                                value={configs['mensaje_reapertura_personal'] || ''}
+                                onChange={(e) => handleConfigChange('mensaje_reapertura_personal', e.target.value)}
+                                style={inputStyle}
+                                placeholder="Si necesitás reconsiderar tu decisión o reabrir el expediente de este reclamo, por favor contactate con la Administración de Don Yeyo S.A. indicando el número de caso."
+                            />
+                            <p style={subtextStyle}>
+                                Texto mostrado a supervisores o inspectores cuando intentan presionar un botón de email sobre un reclamo que ya fue procesado o cambió de estado.
+                            </p>
+                        </div>
+
+                        <div style={{ gridColumn: '1 / -1' }}>
+                            <label style={labelStyle}>
                                 Pie de Firma Institucional (Footer en todos los correos)
                             </label>
                             <input

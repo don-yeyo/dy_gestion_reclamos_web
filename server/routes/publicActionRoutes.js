@@ -8,6 +8,7 @@ const prioridadesService = require('../services/prioridadesService');
 const productosService = require('../services/productosService');
 
 const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:5173';
+const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3001';
 
 /**
  * GET /productos o /api/public/productos?q={busqueda}
@@ -50,6 +51,24 @@ function escapeHtml(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+}
+
+function formatFechaHora(dateVal) {
+    if (!dateVal) return null;
+    try {
+        const d = new Date(dateVal);
+        if (isNaN(d.getTime())) return null;
+        return d.toLocaleString('es-AR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'America/Argentina/Buenos_Aires'
+        }) + ' hs';
+    } catch {
+        return null;
+    }
 }
 
 function hasSupervisorValido(claim) {
@@ -491,11 +510,26 @@ router.get('/verify', async (req, res) => {
             return res.status(404).json({ success: false, error: 'El reclamo ya no existe.' });
         }
 
+        const yaRespondioConsumidor = (
+            claim.estado_consumidor &&
+            claim.estado_consumidor !== 'Pendiente' &&
+            claim.estado_consumidor !== 'En curso' &&
+            claim.estado_consumidor !== 'Resuelto sin confirmar'
+        ) || Boolean(claim.consumidor_puntuacion || claim.consumidor_tipo_problema);
+
+        const yaAccionoSupervisor = (
+            claim.estado_supervisor &&
+            claim.estado_supervisor !== 'Pendiente'
+        );
+
         res.json({
             success: true,
             claimId: payload.claimId,
             actor: payload.actor,
             action: payload.action,
+            ya_respondio_consumidor: yaRespondioConsumidor,
+            ya_acciono_supervisor: yaAccionoSupervisor,
+            mensaje_reapertura: await require('../services/configuracionService').get('mensaje_reapertura_personal', 'Si necesitás reconsiderar tu decisión o reabrir el expediente de este reclamo, por favor contactate con la Administración de Don Yeyo S.A. indicando el número de caso.'),
             logo_url: await require('../services/configuracionService').get('email_logo_url', ''),
             claim: {
                 id: claim.id,
@@ -506,7 +540,9 @@ router.get('/verify', async (req, res) => {
                 localidad: claim.localidad,
                 supervisor: claim.supervisor,
                 estado_supervisor: claim.estado_supervisor,
+                fecha_estado_supervisor: claim.fecha_estado_supervisor || null,
                 estado_consumidor: claim.estado_consumidor,
+                fecha_estado_consumidor: claim.fecha_estado_consumidor || null,
                 consumidor_puntuacion: claim.consumidor_puntuacion || null,
                 consumidor_tipo_problema: claim.consumidor_tipo_problema || '',
                 consumidor_comentario: claim.consumidor_comentario || '',
@@ -566,29 +602,152 @@ router.get('/supervisor-quick', async (req, res) => {
             `);
         }
 
-        // Si ya fue resuelto previamente, informar
-        if (claim.estado_supervisor === 'Resuelto') {
+        // Si el supervisor ya accionó previamente sobre el reclamo (ej: Resuelto, Imposibilidad, etc.), no permitir continuar
+        const estadoSupervisorActual = claim.estado_supervisor;
+        const yaAcciono = estadoSupervisorActual && estadoSupervisorActual !== 'Pendiente';
+
+        const configuracionService = require('../services/configuracionService');
+        const logoUrl = await configuracionService.get('email_logo_url', '');
+
+        if (yaAcciono) {
+            const mensajeReapertura = await configuracionService.get(
+                'mensaje_reapertura_personal',
+                'Si necesitás reconsiderar tu decisión o reabrir el expediente de este reclamo, por favor contactate con la Administración de Don Yeyo S.A. indicando el número de caso.'
+            );
+            const fechaStr = formatFechaHora(claim.fecha_estado_supervisor);
+
             return res.send(`
                 <!DOCTYPE html>
                 <html lang="es">
                 <head>
                     <meta charset="UTF-8">
                     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>Reclamo ya Resuelto - Don Yeyo</title>
+                    <title>Acción Ya Registrada - Don Yeyo</title>
                     <style>
-                        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
-                        .card { background: #ffffff; padding: 36px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); text-align: center; max-width: 480px; width: 100%; border: 1px solid #e2e8f0; }
-                        .icon { font-size: 46px; color: #10b981; margin-bottom: 12px; }
-                        h2 { color: #0d2c5c; margin: 0 0 8px 0; }
-                        p { color: #64748b; font-size: 0.92rem; line-height: 1.5; margin: 0 0 20px 0; }
-                        .btn-close { background: #0d2c5c; color: #ffffff; border: none; padding: 10px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.9rem; }
+                        body {
+                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                            background: #090e1a;
+                            background-image: radial-gradient(circle at 50% 10%, #152238 0%, #090e1a 100%);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            min-height: 100vh;
+                            margin: 0;
+                            padding: 24px 16px;
+                            color: #f8fafc;
+                            box-sizing: border-box;
+                        }
+                        .card {
+                            background: #10192e;
+                            border: 1px solid #1e2e50;
+                            padding: 36px 30px;
+                            border-radius: 16px;
+                            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+                            text-align: center;
+                            max-width: 520px;
+                            width: 100%;
+                            box-sizing: border-box;
+                        }
+                        .badge {
+                            display: inline-block;
+                            background: rgba(59, 130, 246, 0.15);
+                            color: #60a5fa;
+                            border: 1px solid rgba(59, 130, 246, 0.3);
+                            padding: 4px 12px;
+                            border-radius: 20px;
+                            font-size: 0.78rem;
+                            font-weight: 700;
+                            letter-spacing: 0.5px;
+                            text-transform: uppercase;
+                            margin-bottom: 16px;
+                        }
+                        .icon {
+                            width: 60px;
+                            height: 60px;
+                            border-radius: 50%;
+                            background: rgba(59, 130, 246, 0.12);
+                            color: #60a5fa;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 30px;
+                            margin: 0 auto 16px auto;
+                        }
+                        h2 { color: #ffffff; margin: 0 0 10px 0; font-size: 1.35rem; }
+                        p { color: #cbd5e1; font-size: 0.92rem; line-height: 1.55; margin: 0 0 16px 0; }
+                        .info-box {
+                            background: rgba(255, 255, 255, 0.04);
+                            border: 1px solid rgba(255, 255, 255, 0.08);
+                            border-radius: 10px;
+                            padding: 14px 16px;
+                            margin: 18px 0;
+                            text-align: left;
+                            font-size: 0.86rem;
+                            line-height: 1.6;
+                        }
+                        .info-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+                        .info-label { color: #94a3b8; }
+                        .info-val { color: #f8fafc; font-weight: 600; }
+                        .reopen-box {
+                            background: rgba(245, 158, 11, 0.1);
+                            border: 1px solid rgba(245, 158, 11, 0.3);
+                            border-radius: 10px;
+                            padding: 14px;
+                            margin: 20px 0;
+                            text-align: left;
+                            font-size: 0.85rem;
+                            color: #fbbf24;
+                            line-height: 1.5;
+                        }
+                        .reopen-title { font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+                        .btn-close {
+                            background: #1e293b;
+                            color: #f8fafc;
+                            border: 1px solid #334155;
+                            padding: 10px 24px;
+                            border-radius: 8px;
+                            font-weight: 600;
+                            cursor: pointer;
+                            font-size: 0.88rem;
+                            transition: all 0.2s;
+                        }
+                        .btn-close:hover { background: #334155; }
                     </style>
                 </head>
                 <body>
                     <div class="card">
-                        <div class="icon">✓</div>
-                        <h2>Reclamo ya Resuelto</h2>
-                        <p>El Reclamo <strong>#${payload.claimId}</strong> ya había sido confirmado previamente como <strong>Resuelto</strong> en el sistema corporativo.</p>
+                        ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="Don Yeyo" style="max-height:44px; margin-bottom:14px;" />` : ''}
+                        <div class="icon">ℹ️</div>
+                        <div class="badge">Acción Registrada Previamente</div>
+                        <h2>Reclamo #${escapeHtml(payload.claimId)} ya gestionado</h2>
+                        <p>Ya se cuenta con una acción registrada para este reclamo en el circuito de supervisión comercial.</p>
+                        
+                        <div class="info-box">
+                            <div class="info-row">
+                                <span class="info-label">Estado actual registrado:</span>
+                                <span class="info-val">${escapeHtml(estadoSupervisorActual)}</span>
+                            </div>
+                            ${fechaStr ? `
+                            <div class="info-row" style="margin-bottom:0;">
+                                <span class="info-label">Fecha y hora de registro:</span>
+                                <span class="info-val">${escapeHtml(fechaStr)}</span>
+                            </div>
+                            ` : ''}
+                            ${claim.supervisor_motivo_imposibilidad ? `
+                            <div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); font-size:0.82rem; color:#cbd5e1;">
+                                <strong>Motivo informado:</strong> ${escapeHtml(claim.supervisor_motivo_imposibilidad)}
+                            </div>
+                            ` : ''}
+                        </div>
+
+                        <div class="reopen-box">
+                            <div class="reopen-title">
+                                <span>📌</span>
+                                <span>¿Necesitás modificar tu decisión o reabrir el caso?</span>
+                            </div>
+                            <div>${escapeHtml(mensajeReapertura)}</div>
+                        </div>
+
                         <button class="btn-close" onclick="window.close()">Cerrar Ventana</button>
                     </div>
                 </body>
@@ -742,6 +901,7 @@ router.get('/supervisor-quick', async (req, res) => {
                 </head>
                 <body>
                     <div class="card">
+                        ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="Don Yeyo" style="max-height:44px; margin-bottom:14px;" />` : ''}
                         <div class="header-tag">Don Yeyo S.A. &bull; Portal de Supervisión</div>
                         <h2>Confirmar Entrega de Solución</h2>
                         
@@ -776,7 +936,7 @@ router.get('/supervisor-quick', async (req, res) => {
                             <button type="button" class="btn-cancel" onclick="handleCancel()">
                                 Cancelar / Cerrar
                             </button>
-                            <a href="${API_BASE_URL}/api/public/actions/supervisor-quick?token=${encodeURIComponent(token)}&confirm=1" class="btn-confirm">
+                            <a href="?token=${encodeURIComponent(token)}&confirm=1" class="btn-confirm">
                                 ✓ Sí, Confirmar y Notificar
                             </a>
                         </div>
@@ -875,6 +1035,7 @@ router.get('/supervisor-quick', async (req, res) => {
             </head>
             <body>
                 <div class="card">
+                    ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="Don Yeyo" style="max-height:44px; margin-bottom:14px;" />` : ''}
                     <div class="icon">✓</div>
                     <h2>¡Acción Registrada con Éxito!</h2>
                     <p>Muchas gracias por gestionar la entrega del Reclamo <strong>#${escapeHtml(payload.claimId)}</strong>.</p>
@@ -910,6 +1071,23 @@ router.post('/supervisor-imposibilidad', async (req, res) => {
         const claim = await googleSheetsService.getReclamoById(payload.claimId);
         if (!claim) {
             return res.status(404).json({ success: false, error: 'Reclamo no encontrado.' });
+        }
+
+        // Si el supervisor ya accionó previamente, bloquear y devolver mensaje orientativo configurable
+        const estadoSupervisorActual = claim.estado_supervisor;
+        if (estadoSupervisorActual && estadoSupervisorActual !== 'Pendiente') {
+            const configuracionService = require('../services/configuracionService');
+            const mensajeReapertura = await configuracionService.get(
+                'mensaje_reapertura_personal',
+                'Si necesitás reconsiderar tu decisión o reabrir el expediente de este reclamo, por favor contactate con la Administración de Don Yeyo S.A. indicando el número de caso.'
+            );
+            return res.status(409).json({
+                success: false,
+                ya_accionado: true,
+                estado_actual: estadoSupervisorActual,
+                fecha_estado: claim.fecha_estado_supervisor || null,
+                error: `Este reclamo ya cuenta con una acción previa registrada ("${estadoSupervisorActual}"). ${mensajeReapertura}`
+            });
         }
 
         const tipoFinal = tipo_imposibilidad || 'Imposibilidad de entrega en domicilio';
@@ -994,6 +1172,29 @@ router.post('/consumidor-encuesta', async (req, res) => {
         const claim = await googleSheetsService.getReclamoById(payload.claimId);
         if (!claim) {
             return res.status(404).json({ success: false, error: 'El reclamo no fue encontrado.' });
+        }
+
+        // Si el consumidor ya respondió previamente (o el reclamo ya se encuentra en un estado final de consumidor), bloquear acción duplicada
+        const estadoConsumidorActual = claim.estado_consumidor;
+        const yaRespondioConsumidor = (
+            estadoConsumidorActual &&
+            estadoConsumidorActual !== 'Pendiente' &&
+            estadoConsumidorActual !== 'En curso' &&
+            estadoConsumidorActual !== 'Resuelto sin confirmar'
+        ) || Boolean(claim.consumidor_puntuacion || claim.consumidor_tipo_problema);
+
+        if (yaRespondioConsumidor) {
+            const fechaStr = formatFechaHora(claim.fecha_estado_consumidor);
+            return res.status(409).json({
+                success: false,
+                ya_respondio: true,
+                estado_actual: estadoConsumidorActual,
+                fecha_registro: claim.fecha_estado_consumidor || null,
+                puntuacion: claim.consumidor_puntuacion || null,
+                tipo_problema: claim.consumidor_tipo_problema || '',
+                comentario: claim.consumidor_comentario || '',
+                error: `Ya se cuenta con una acción anterior registrada para este reclamo ("${estadoConsumidorActual}"${fechaStr ? ` el ${fechaStr}` : ''}). No es posible modificar la respuesta.`
+            });
         }
 
         const motivoAuditoria = modo === 'resuelto'

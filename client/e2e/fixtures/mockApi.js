@@ -186,6 +186,7 @@ export async function setupMockApi(page, customReclamos = null) {
         const reqUrl = new URL(route.request().url());
         const tokenParam = reqUrl.searchParams.get('token') || '';
         const actionType = tokenParam.includes('no_resuelto') ? 'no_resuelto' : 'resuelto';
+        const isDuplicado = tokenParam.includes('duplicado');
 
         const payloadData = {
             reclamoId: 'REC-2026-003',
@@ -198,7 +199,13 @@ export async function setupMockApi(page, customReclamos = null) {
             localidad: 'Tigre',
             domicilio: 'Cazón 800',
             direccion: 'Cazón 800',
-            supervisor: 'Gustavo Orgaz'
+            supervisor: 'Gustavo Orgaz',
+            estado_supervisor: isDuplicado ? 'Resuelto' : 'Pendiente',
+            fecha_estado_supervisor: isDuplicado ? '2026-10-29T15:30:00.000Z' : null,
+            estado_consumidor: isDuplicado ? 'Resuelto conforme' : 'Resuelto sin confirmar',
+            fecha_estado_consumidor: isDuplicado ? '2026-10-29T16:00:00.000Z' : null,
+            consumidor_puntuacion: isDuplicado ? 5 : null,
+            consumidor_comentario: isDuplicado ? 'Atención excelente' : ''
         };
         await route.fulfill({
             status: 200,
@@ -208,6 +215,9 @@ export async function setupMockApi(page, customReclamos = null) {
                 claimId: 'REC-2026-003',
                 actor: tokenParam.includes('consumidor') ? 'consumidor' : 'supervisor',
                 action: actionType,
+                ya_respondio_consumidor: isDuplicado && tokenParam.includes('consumidor'),
+                ya_acciono_supervisor: isDuplicado && !tokenParam.includes('consumidor'),
+                mensaje_reapertura: 'Si necesitás reconsiderar tu decisión o reabrir el expediente de este reclamo, por favor contactate con la Administración de Don Yeyo S.A. indicando el número de caso.',
                 claim: payloadData,
                 payload: payloadData,
                 data: payloadData

@@ -1,7 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { publicApi } from '../services/api';
-import { CheckCircle2, AlertTriangle, Send, PackageX, ThumbsDown } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Send, PackageX, ThumbsDown, Info, Calendar } from 'lucide-react';
+
+function formatFechaLegible(fechaIso) {
+    if (!fechaIso) return null;
+    try {
+        const d = new Date(fechaIso);
+        if (isNaN(d.getTime())) return null;
+        return d.toLocaleString('es-AR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }) + ' hs';
+    } catch {
+        return null;
+    }
+}
 
 // Escala de emojis de satisfacción (del 1 al 5)
 const EMOJI_OPTIONS = [
@@ -174,6 +191,102 @@ export const EncuestaConsumidorPublic = () => {
                 {loading ? (
                     <div style={{ padding: '30px 0', color: '#64748b', fontSize: '0.92rem' }}>
                         Cargando encuesta...
+                    </div>
+                ) : tokenData?.ya_respondio_consumidor ? (
+                    /* PANTALLA DE ACCIÓN ANTERIORMENTE REGISTRADA PARA EL CONSUMIDOR */
+                    <div data-testid="encuesta-ya-registrada" style={{ padding: '20px 0', textAlign: 'center' }}>
+                        <div style={{
+                            width: 60,
+                            height: 60,
+                            background: '#eff6ff',
+                            color: '#2563eb',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            margin: '0 auto 16px auto',
+                            border: '1px solid #bfdbfe'
+                        }}>
+                            <Info size={32} />
+                        </div>
+
+                        <div style={{
+                            display: 'inline-block',
+                            background: '#dbeafe',
+                            color: '#1e40af',
+                            padding: '4px 12px',
+                            borderRadius: 20,
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            letterSpacing: '0.5px',
+                            textTransform: 'uppercase',
+                            marginBottom: 10
+                        }}>
+                            Respuesta ya registrada
+                        </div>
+
+                        <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#0f172a', margin: '0 0 10px 0' }}>
+                            Tu respuesta ya fue recibida
+                        </h2>
+
+                        <p style={{ color: '#475569', fontSize: '0.9rem', lineHeight: 1.55, margin: '0 0 20px 0' }}>
+                            Ya contamos con una acción registrada previamente para el Reclamo <strong>#{claimId}</strong>.
+                        </p>
+
+                        <div style={{
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: 12,
+                            padding: '16px',
+                            textAlign: 'left',
+                            fontSize: '0.88rem',
+                            lineHeight: 1.6,
+                            marginBottom: 20
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, borderBottom: '1px solid #e2e8f0', paddingBottom: 6 }}>
+                                <span style={{ color: '#64748b' }}>Estado registrado:</span>
+                                <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                                    {tokenData.claim?.estado_consumidor || 'Cerrado'}
+                                </span>
+                            </div>
+
+                            {tokenData.claim?.fecha_estado_consumidor && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                                    <span style={{ color: '#64748b' }}>Fecha de registro:</span>
+                                    <span style={{ fontWeight: 600, color: '#334155' }}>
+                                        {formatFechaLegible(tokenData.claim.fecha_estado_consumidor)}
+                                    </span>
+                                </div>
+                            )}
+
+                            {tokenData.claim?.consumidor_puntuacion && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                                    <span style={{ color: '#64748b' }}>Calificación brindada:</span>
+                                    <span style={{ fontWeight: 700, color: '#eab308' }}>
+                                        {'⭐'.repeat(tokenData.claim.consumidor_puntuacion)} ({tokenData.claim.consumidor_puntuacion}/5)
+                                    </span>
+                                </div>
+                            )}
+
+                            {tokenData.claim?.consumidor_tipo_problema && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                                    <span style={{ color: '#64748b' }}>Inconveniente informado:</span>
+                                    <span style={{ fontWeight: 600, color: '#dc2626' }}>
+                                        {tokenData.claim.consumidor_tipo_problema}
+                                    </span>
+                                </div>
+                            )}
+
+                            {tokenData.claim?.consumidor_comentario && (
+                                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed #cbd5e1', fontSize: '0.84rem', color: '#475569', fontStyle: 'italic' }}>
+                                    "{tokenData.claim.consumidor_comentario}"
+                                </div>
+                            )}
+                        </div>
+
+                        <p style={{ color: '#64748b', fontSize: '0.82rem', margin: 0 }}>
+                            Por razones de seguridad y consistencia del expediente, cada enlace de encuesta solo permite un registro único.
+                        </p>
                     </div>
                 ) : submitted ? (
                     <div data-testid="encuesta-success" style={{ padding: '24px 0' }}>
