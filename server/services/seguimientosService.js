@@ -15,7 +15,7 @@ class SeguimientosService {
                 COALESCE(e.descripcion, '') AS estado_descripcion,
                 COALESCE(e.color, '#64748b') AS estado_color,
                 s.prioridad_codigo,
-                COALESCE(p.nombre, CONCAT('Prioridad ', s.prioridad_codigo)) AS prioridad_nombre,
+                COALESCE(p.nombre, CONCAT('Urgencia ', s.prioridad_codigo)) AS prioridad_nombre,
                 COALESCE(p.color, '#3b82f6') AS prioridad_color,
                 COALESCE(p.sla, 3) AS sla_dias,
                 CAST(s.disparo_dias AS DECIMAL(6,2)) AS disparo_dias,
@@ -107,7 +107,7 @@ class SeguimientosService {
         } = data;
 
         if (!rol || !estado_codigo || !prioridad_codigo) {
-            throw new Error('Debe especificar rol, estado y prioridad para la regla.');
+            throw new Error('Debe especificar rol, estado y urgencia para la regla.');
         }
 
         const disparoNum = parseFloat(disparo_dias);
@@ -124,7 +124,7 @@ class SeguimientosService {
         const [prioRows] = await pool.query('SELECT sla FROM workflow_prioridades WHERE codigo = ?', [Number(prioridad_codigo)]);
         const slaPrioridad = prioRows && prioRows.length > 0 ? Number(prioRows[0].sla) : null;
         if (slaPrioridad !== null && disparoNum > slaPrioridad) {
-            throw new Error(`El disparo inicial (${disparoNum} días) no puede ser superior al SLA de la prioridad seleccionada (${slaPrioridad} días).`);
+            throw new Error(`El disparo inicial (${disparoNum} días) no puede ser superior al SLA de la urgencia seleccionada (${slaPrioridad} días).`);
         }
 
         // Validar que no exista regla repetida para el mismo rol, estado y prioridad
@@ -133,7 +133,7 @@ class SeguimientosService {
             [rol.toLowerCase().trim(), estado_codigo.trim(), Number(prioridad_codigo)]
         );
         if (duplicados && duplicados.length > 0) {
-            throw new Error(`Ya existe una regla configurada para el Rol "${rol}", Estado "${estado_codigo}" y Prioridad ${prioridad_codigo}. No se permiten reglas repetidas.`);
+            throw new Error(`Ya existe una regla configurada para el Rol "${rol}", Estado "${estado_codigo}" y Urgencia ${prioridad_codigo}. No se permiten reglas repetidas.`);
         }
 
         try {
@@ -156,7 +156,7 @@ class SeguimientosService {
             return await this.getById(result.insertId);
         } catch (err) {
             if (err.code === 'ER_DUP_ENTRY') {
-                throw new Error(`Ya existe una regla configurada para el Rol "${rol}", Estado "${estado_codigo}" y Prioridad ${prioridad_codigo}. No se permiten reglas repetidas.`);
+                throw new Error(`Ya existe una regla configurada para el Rol "${rol}", Estado "${estado_codigo}" y Urgencia ${prioridad_codigo}. No se permiten reglas repetidas.`);
             }
             throw err;
         }
@@ -201,7 +201,7 @@ class SeguimientosService {
         const [prioRowsUpdate] = await pool.query('SELECT sla FROM workflow_prioridades WHERE codigo = ?', [prioridad_codigo]);
         const slaPrioridadUpdate = prioRowsUpdate && prioRowsUpdate.length > 0 ? Number(prioRowsUpdate[0].sla) : null;
         if (slaPrioridadUpdate !== null && disparoNum > slaPrioridadUpdate) {
-            throw new Error(`El disparo inicial (${disparoNum} días) no puede ser superior al SLA de la prioridad seleccionada (${slaPrioridadUpdate} días).`);
+            throw new Error(`El disparo inicial (${disparoNum} días) no puede ser superior al SLA de la urgencia seleccionada (${slaPrioridadUpdate} días).`);
         }
 
         // Validar que no exista otra regla repetida para el mismo rol, estado y prioridad
@@ -210,7 +210,7 @@ class SeguimientosService {
             [rol, estado_codigo, prioridad_codigo, id]
         );
         if (duplicados && duplicados.length > 0) {
-            throw new Error(`Ya existe otra regla configurada para el Rol "${rol}", Estado "${estado_codigo}" y Prioridad ${prioridad_codigo}. No se permiten reglas repetidas.`);
+            throw new Error(`Ya existe otra regla configurada para el Rol "${rol}", Estado "${estado_codigo}" y Urgencia ${prioridad_codigo}. No se permiten reglas repetidas.`);
         }
 
         try {
@@ -225,7 +225,7 @@ class SeguimientosService {
             return await this.getById(id);
         } catch (err) {
             if (err.code === 'ER_DUP_ENTRY') {
-                throw new Error(`Ya existe otra regla configurada para el Rol "${rol}", Estado "${estado_codigo}" y Prioridad ${prioridad_codigo}. No se permiten reglas repetidas.`);
+                throw new Error(`Ya existe otra regla configurada para el Rol "${rol}", Estado "${estado_codigo}" y Urgencia ${prioridad_codigo}. No se permiten reglas repetidas.`);
             }
             throw err;
         }

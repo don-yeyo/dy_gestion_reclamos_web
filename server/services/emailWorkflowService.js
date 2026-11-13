@@ -287,7 +287,7 @@ class EmailWorkflowService {
                     </div>
                     ${prioridadNombre ? `
                     <span style="background:${badgeBg}; color:${badgeColor}; font-weight:700; font-size:0.75rem; padding:3px 10px; border-radius:12px; text-transform:uppercase; letter-spacing:0.4px;">
-                        Prioridad ${prioridadNombre} &bull; SLA: ${slaDias} días
+                        Urgencia ${prioridadNombre} &bull; SLA: ${slaDias} días
                     </span>` : ''}
                 </div>
                 <div style="color:#065f46; font-size:0.85rem; margin-bottom:10px;">

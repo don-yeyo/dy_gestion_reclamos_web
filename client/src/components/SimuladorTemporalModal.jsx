@@ -284,7 +284,7 @@ export const SimuladorTemporalModal = ({ isOpen, onClose, claimId, onClaimUpdate
                                         </span>
                                     </div>
                                     <div>
-                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Prioridad / SLA</span>
+                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Urgencia / SLA</span>
                                         <strong>{claim?.prioridad_nombre || claim?.prioridad || 'Media'}</strong>
                                     </div>
                                 </div>

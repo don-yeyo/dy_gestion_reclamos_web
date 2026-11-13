@@ -175,7 +175,7 @@ router.get('/admin-quick', async (req, res) => {
                         <h2>El Reclamo Ya Se Encuentra En Curso</h2>
                         <p>Reclamo <strong>#${payload.claimId}</strong> correspondiente a <strong>${escapeHtml(claim.nombre)} ${escapeHtml(claim.apellido)}</strong>.</p>
                         <div class="info-box">
-                            • <strong>Prioridad Asignada:</strong> ${escapeHtml(claim.prioridad_nombre || 'No especificada')} (SLA: ${claim.sla_dias || 'N/A'} días)<br/>
+                            • <strong>Urgencia Asignada:</strong> ${escapeHtml(claim.prioridad_nombre || 'No especificada')} (SLA: ${claim.sla_dias || 'N/A'} días)<br/>
                             • <strong>Supervisor:</strong> ${escapeHtml(supervisorInfo)}<br/>
                             • <strong>Regla Cortesía:</strong> ${escapeHtml(claim.regla_cortesia_aplicada || 'Estándar')}
                         </div>
@@ -229,7 +229,7 @@ router.get('/admin-quick', async (req, res) => {
                     <h2>Aprobar Reclamo #${claim.id}</h2>
                     <p class="intro">
                         Para poner el reclamo <strong>En curso</strong> y habilitar las acciones de compensación e investigación,
-                        <strong>es obligatorio definir el nivel de prioridad según la gravedad del caso</strong>.
+                        <strong>es obligatorio definir el nivel de urgencia según la gravedad del caso</strong>.
                     </p>
 
                     <div class="claim-summary">
@@ -243,16 +243,16 @@ router.get('/admin-quick', async (req, res) => {
                         <input type="hidden" name="token" value="${escapeHtml(token)}" />
 
                         <div class="form-group">
-                            <label for="prioridadSelect">Nivel de Prioridad según gravedad <span class="required-star">*</span>:</label>
+                            <label for="prioridadSelect">Nivel de Urgencia según gravedad <span class="required-star">*</span>:</label>
                             <select id="prioridadSelect" name="prioridad" required>
-                                <option value="" disabled selected>-- Seleccionar nivel de prioridad (obligatorio) --</option>
+                                <option value="" disabled selected>-- Seleccionar nivel de urgencia (obligatorio) --</option>
                                 ${prioridades.map(p => `
                                     <option value="${p.codigo}">
                                         ${escapeHtml(p.nombre)} (SLA ${p.sla} días) — ${escapeHtml(p.descripcion)}
                                     </option>
                                 `).join('')}
                             </select>
-                            <div class="help-text">La prioridad define el SLA de respuesta y la regla de cortesía aplicable.</div>
+                            <div class="help-text">La urgencia define el SLA de respuesta y la regla de cortesía aplicable.</div>
                         </div>
 
                         ${needsSupervisor ? `
@@ -275,7 +275,7 @@ router.get('/admin-quick', async (req, res) => {
                         `}
 
                         <button type="submit" class="btn-submit">
-                            ✓ Confirmar Prioridad y Aprobar Reclamo
+                            ✓ Confirmar Urgencia y Aprobar Reclamo
                         </button>
                     </form>
 
@@ -313,8 +313,8 @@ router.post('/admin-confirm-approval', async (req, res) => {
     if (!prioridadNum || isNaN(prioridadNum)) {
         return res.status(400).send(`
             <div style="font-family:sans-serif; text-align:center; padding:50px; background:#0f1535; color:#fff; min-height:100vh;">
-                <h2>Error: Prioridad Obligatoria</h2>
-                <p>El nivel de prioridad es mandatorio para aprobar el reclamo. Por favor volvé atrás y seleccioná uno.</p>
+                <h2>Error: Urgencia Obligatoria</h2>
+                <p>El nivel de urgencia es mandatorio para aprobar el reclamo. Por favor volvé atrás y seleccioná uno.</p>
             </div>
         `);
     }
@@ -333,8 +333,8 @@ router.post('/admin-confirm-approval', async (req, res) => {
         if (!prioridadObj) {
             return res.status(400).send(`
                 <div style="font-family:sans-serif; text-align:center; padding:50px; background:#0f1535; color:#fff; min-height:100vh;">
-                    <h2>Error: Prioridad Inválida</h2>
-                    <p>El código de prioridad (${prioridadNum}) no existe.</p>
+                    <h2>Error: Urgencia Inválida</h2>
+                    <p>El código de urgencia (${prioridadNum}) no existe.</p>
                 </div>
             `);
         }
@@ -396,7 +396,7 @@ router.post('/admin-confirm-approval', async (req, res) => {
         await googleSheetsService.updateReclamo(payload.claimId, updates, {
             actor: 'admin_link',
             actorEmail: 'admin@donyeyo.com.ar',
-            motivo: `Aprobado con prioridad ${prioridadObj.nombre} (SLA: ${slaDias}d) desde enlace seguro de correo`
+            motivo: `Aprobado con urgencia ${prioridadObj.nombre} (SLA: ${slaDias}d) desde enlace seguro de correo`
         });
 
         // Aplicar producto de cortesía derivado de la prioridad
@@ -446,7 +446,7 @@ router.post('/admin-confirm-approval', async (req, res) => {
                     
                     <div class="info-box">
                         <strong>Detalles de Aprobación Registrados:</strong><br/>
-                        • <strong>Nivel de Prioridad:</strong> ${escapeHtml(prioridadObj.nombre)} (Código ${prioridadObj.codigo})<br/>
+                        • <strong>Nivel de Urgencia:</strong> ${escapeHtml(prioridadObj.nombre)} (Código ${prioridadObj.codigo})<br/>
                         • <strong>SLA Comprometido:</strong> ${slaDias} días corridos<br/>
                         • <strong>Regla de Cortesía:</strong> ${escapeHtml(reglaDesc || 'Sin cortesía')}<br/>
                         • <strong>Supervisor Responsable:</strong> ${escapeHtml(supervisorDisplay)}<br/>

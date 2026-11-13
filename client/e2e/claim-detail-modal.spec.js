@@ -71,14 +71,14 @@ test.describe('CU-05, CU-06, CU-08: Gestión de Expediente en Modal de Detalle',
         await btnConfirmar.click();
 
         // Verificar mensaje de éxito con la prioridad asignada
-        await expect(page.locator('text=Reclamo Aprobado con Prioridad Alta')).toBeVisible();
+        await expect(page.locator('text=Reclamo Aprobado con Urgencia Alta')).toBeVisible();
 
         // Las cards 2 y 3 pasan a estado Pendiente
         await expect(page.locator('.wf-branch-card', { hasText: '2. Calidad & Inocuidad' })).toContainText('Pendiente');
         await expect(page.locator('.wf-branch-card', { hasText: '3. Acción de Compensación' })).toContainText('Pendiente');
 
         // La card 1 debe exhibir la prioridad y SLA asignado
-        await expect(page.locator('.wf-branch-card', { hasText: '1. Ingreso' })).toContainText('Prioridad: Alta');
+        await expect(page.locator('.wf-branch-card', { hasText: '1. Ingreso' })).toContainText('Urgencia: Alta');
     });
 
     test('CU-08: debe mostrar botones de reenvío de email en las cards 2 y 3 cuando el reclamo está aprobado', async ({ page }) => {
@@ -125,7 +125,7 @@ test.describe('CU-05, CU-06, CU-08: Gestión de Expediente en Modal de Detalle',
 
         // 1. Seleccionar prioridad Alta (10): debe mostrar 3 ítems
         await selectPrioridad.selectOption('10');
-        await expect(page.locator('text=Prioridad Alta')).toBeVisible();
+        await expect(page.locator('text=Urgencia Alta')).toBeVisible();
         await expect(page.locator('text=SLA: 3 días corridos')).toBeVisible();
         await expect(page.locator('text=Regalo / Ítems de Cortesía (3):')).toBeVisible();
         await expect(page.locator('text=1 reemplazo')).toBeVisible();
@@ -134,7 +134,7 @@ test.describe('CU-05, CU-06, CU-08: Gestión de Expediente en Modal de Detalle',
 
         // 2. Cambiar a prioridad Media (20): debe actualizarse a 2 ítems y NO mostrar "2 productos a elección"
         await selectPrioridad.selectOption('20');
-        await expect(page.locator('text=Prioridad Media')).toBeVisible();
+        await expect(page.locator('text=Urgencia Media')).toBeVisible();
         await expect(page.locator('text=SLA: 7 días corridos')).toBeVisible();
         await expect(page.locator('text=Regalo / Ítems de Cortesía (2):')).toBeVisible();
         await expect(page.locator('text=1 de kg')).toBeVisible();
@@ -142,7 +142,7 @@ test.describe('CU-05, CU-06, CU-08: Gestión de Expediente en Modal de Detalle',
 
         // 3. Cambiar a prioridad Baja (30): debe actualizarse a 1 ítem y NO mostrar "1 de kg"
         await selectPrioridad.selectOption('30');
-        await expect(page.locator('text=Prioridad Baja')).toBeVisible();
+        await expect(page.locator('text=Urgencia Baja')).toBeVisible();
         await expect(page.locator('text=SLA: 14 días corridos')).toBeVisible();
         await expect(page.locator('text=Regalo / Ítems de Cortesía (1):')).toBeVisible();
         await expect(page.locator('text=1 de kg')).not.toBeVisible();
@@ -186,7 +186,7 @@ test.describe('CU-05, CU-06, CU-08: Gestión de Expediente en Modal de Detalle',
         await btnConfirmar.click();
 
         // Verificar mensaje de éxito
-        await expect(page.locator('text=Reclamo Aprobado con Prioridad Alta')).toBeVisible();
+        await expect(page.locator('text=Reclamo Aprobado con Urgencia Alta')).toBeVisible();
     });
 
     test('Desaprobación de reclamo mediante submodal interactivo con portal', async ({ page }) => {

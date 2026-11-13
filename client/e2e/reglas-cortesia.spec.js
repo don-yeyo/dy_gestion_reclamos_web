@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { setupMockApi } from './fixtures/mockApi.js';
 
-test.describe('Reglas de Cortesía por Nivel de Prioridad', () => {
+test.describe('Reglas de Cortesía por Nivel de Urgencia', () => {
     test.beforeEach(async ({ page }) => {
         await setupMockApi(page);
     });
@@ -23,7 +23,7 @@ test.describe('Reglas de Cortesía por Nivel de Prioridad', () => {
         await btnReglas.click();
 
         // Verificar que el modal de Reglas de Cortesía se abre
-        await expect(page.locator('h3:has-text("Reglas de Cortesía por Nivel de Prioridad")')).toBeVisible();
+        await expect(page.locator('h3:has-text("Reglas de Cortesía por Nivel de Urgencia")')).toBeVisible();
 
         // Verificar que se listan las 3 prioridades canónicas
         await expect(page.locator('text=Alta (Código 10)')).toBeVisible();
@@ -61,6 +61,6 @@ test.describe('Reglas de Cortesía por Nivel de Prioridad', () => {
 
         // Cerrar modal
         await page.locator('button:has-text("Cancelar")').click();
-        await expect(page.locator('h3:has-text("Reglas de Cortesía por Nivel de Prioridad")')).not.toBeVisible();
+        await expect(page.locator('h3:has-text("Reglas de Cortesía por Nivel de Urgencia")')).not.toBeVisible();
     });
 });

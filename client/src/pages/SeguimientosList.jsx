@@ -278,7 +278,7 @@ export const SeguimientosList = () => {
         }
 
         if (disparoNum > slaActualForm) {
-            setFormError(`El Disparo Inicial (${disparoNum} días) no puede ser superior al SLA de la prioridad seleccionada (${slaActualForm} días).`);
+            setFormError(`El Disparo Inicial (${disparoNum} días) no puede ser superior al SLA de la urgencia seleccionada (${slaActualForm} días).`);
             return;
         }
 
@@ -299,7 +299,7 @@ export const SeguimientosList = () => {
         if (reglaRepetida) {
             const rolLabel = ROLES_INFO[formData.rol]?.label || formData.rol;
             const prioNombre = formData.prioridad_codigo === 10 ? 'Alta' : (formData.prioridad_codigo === 20 ? 'Media' : 'Baja');
-            setFormError(`Ya existe una regla configurada para ${rolLabel}, estado "${formData.estado_codigo}" y prioridad ${prioNombre}. No se permiten reglas duplicadas.`);
+            setFormError(`Ya existe una regla configurada para ${rolLabel}, estado "${formData.estado_codigo}" y urgencia ${prioNombre}. No se permiten reglas duplicadas.`);
             return;
         }
 
@@ -407,7 +407,7 @@ export const SeguimientosList = () => {
                         Reglas de Seguimientos
                     </h1>
                     <p>
-                        Configuración de disparos automáticos, recordatorios periódicos (intervalo N) y emails de elevación por rol, estado y prioridad
+                        Configuración de disparos automáticos, recordatorios periódicos (intervalo N) y emails de elevación por rol, estado y urgencia
                     </p>
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>
@@ -495,7 +495,7 @@ export const SeguimientosList = () => {
                         <Search size={18} className="search-icon-svg" />
                         <input
                             type="text"
-                            placeholder="Buscar por rol, estado, prioridad o email de elevación..."
+                            placeholder="Buscar por rol, estado, urgencia o email de elevación..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
@@ -514,7 +514,7 @@ export const SeguimientosList = () => {
                                 fontSize: '0.85rem'
                             }}
                         >
-                            <option value="all">Todas las Prioridades</option>
+                            <option value="all">Todas las Urgencias</option>
                             <option value="10">Alta (SLA: 3d)</option>
                             <option value="20">Media (SLA: 7d)</option>
                             <option value="30">Baja (SLA: 14d)</option>
@@ -580,7 +580,7 @@ export const SeguimientosList = () => {
                             borderRadius: '4px',
                             fontFamily: 'monospace'
                         }}>
-                            N = (SLA de la Prioridad - Disparo Inicial) / Repeticiones
+                            N = (SLA de la Urgencia - Disparo Inicial) / Repeticiones
                         </span>
                     </div>
                     <div style={{ color: 'var(--text-muted)' }}>
@@ -599,7 +599,7 @@ export const SeguimientosList = () => {
                             <tr>
                                 <th style={{ width: '150px' }}>Rol</th>
                                 <th style={{ width: '180px' }}>Estado Condición</th>
-                                <th style={{ width: '160px' }}>Prioridad</th>
+                                <th style={{ width: '160px' }}>Urgencia</th>
                                 <th style={{ width: '130px', textAlign: 'center' }}>Disparo Inicial</th>
                                 <th style={{ width: '120px', textAlign: 'center' }}>Repeticiones</th>
                                 <th style={{ width: '180px', textAlign: 'center' }}>Intervalo N</th>
@@ -991,7 +991,7 @@ export const SeguimientosList = () => {
 
                                     <div>
                                         <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: 6 }}>
-                                            Prioridad del Caso
+                                            Urgencia del Caso
                                         </label>
                                         <select
                                             value={formData.prioridad_codigo}
@@ -1250,7 +1250,7 @@ export const SeguimientosList = () => {
                         </div>
                         <div className="modal-body">
                             <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--text)' }}>
-                                ¿Estás seguro de que deseás eliminar la regla de seguimiento para <strong>{ROLES_INFO[deleteConfirmRegla.rol]?.label || deleteConfirmRegla.rol}</strong> en estado <strong>"{deleteConfirmRegla.estado_codigo}"</strong> con prioridad <strong>{deleteConfirmRegla.prioridad_nombre}</strong>?
+                                ¿Estás seguro de que deseás eliminar la regla de seguimiento para <strong>{ROLES_INFO[deleteConfirmRegla.rol]?.label || deleteConfirmRegla.rol}</strong> en estado <strong>"{deleteConfirmRegla.estado_codigo}"</strong> con urgencia <strong>{deleteConfirmRegla.prioridad_nombre}</strong>?
                             </p>
                             <p style={{ margin: '8px 0 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                                 Esta acción detendrá los envíos automáticos de recordatorios y elevación para esta combinación.

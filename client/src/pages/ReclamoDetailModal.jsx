@@ -197,8 +197,8 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
     const handleConfirmAprobar = async () => {
         if (!selectedPrioridad) {
             showAlertModal(
-                'Prioridad Requerida',
-                'Debe seleccionar obligatoriamente un nivel de prioridad según la gravedad del caso para poder avanzar.',
+                'Urgencia Requerida',
+                'Es obligatorio seleccionar el nivel de urgencia según la gravedad del caso antes de aprobar el reclamo.',
                 'warning'
             );
             return;
@@ -246,7 +246,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
             }));
             setActionMsg({
                 type: 'success',
-                text: `Reclamo Aprobado con Prioridad ${pObj?.nombre || prioridadNum}. Se notificó al supervisor comercial y se derivó copia a Calidad & Inocuidad.`
+                text: `Reclamo Aprobado con Urgencia ${pObj?.nombre || prioridadNum}. Se notificó al supervisor comercial y se derivó copia a Calidad & Inocuidad.`
             });
             if (onRefresh) onRefresh();
         } catch (e) {
@@ -576,7 +576,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                         lineHeight: 1.35
                                     }}>
                                         <div style={{ fontWeight: 700, color: Number(activeClaim.prioridad) === 10 ? 'var(--error)' : Number(activeClaim.prioridad) === 20 ? 'var(--warning)' : 'var(--info)' }}>
-                                            Prioridad: {activeClaim.prioridad_nombre} (SLA: {activeClaim.sla_dias || 'N/A'} días)
+                                            Urgencia: {activeClaim.prioridad_nombre} (SLA: {activeClaim.sla_dias || 'N/A'} días)
                                         </div>
                                         {activeClaim.regla_cortesia_aplicada && (
                                             <div style={{ fontSize: '0.69rem', color: 'var(--text-muted)', marginTop: 2 }}>
@@ -1125,12 +1125,12 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                             }}>
                                 <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                                     Para poner el reclamo en estado <strong>En curso</strong> y derivar las notificaciones al supervisor comercial
-                                    y al sector de Calidad & Inocuidad, <strong>es mandatorio seleccionar el nivel de prioridad</strong> según la gravedad del caso.
+                                    y al sector de Calidad & Inocuidad, <strong>es mandatorio seleccionar el nivel de urgencia</strong> según la gravedad del caso.
                                 </p>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                     <label htmlFor="select-prioridad-modal" style={{ fontSize: '0.84rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                                        Nivel de Prioridad <span style={{ color: 'var(--error)' }}>*</span>
+                                        Nivel de Urgencia <span style={{ color: 'var(--error)' }}>*</span>
                                     </label>
                                     <select
                                         id="select-prioridad-modal"
@@ -1150,7 +1150,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                         }}
                                         required
                                     >
-                                        <option value="" disabled>-- Seleccionar nivel de prioridad (obligatorio) --</option>
+                                        <option value="" disabled>-- Seleccionar nivel de urgencia (obligatorio) --</option>
                                         {prioridades.map(p => (
                                             <option key={p.codigo} value={p.codigo}>
                                                 {p.nombre} (SLA: {p.sla} días) — {p.descripcion}
@@ -1183,7 +1183,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                         }}>
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                                                 <div style={{ fontWeight: 700, color: accentColor, textTransform: 'uppercase', fontSize: '0.84rem' }}>
-                                                    Prioridad {sel.nombre}
+                                                    Urgencia {sel.nombre}
                                                 </div>
                                                 <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontWeight: 600, background: 'rgba(0,0,0,0.2)', padding: '2px 8px', borderRadius: 4 }}>
                                                     SLA: {sel.sla} días corridos
@@ -1270,7 +1270,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                     data-testid="btn-confirmar-aprobacion"
                                     onClick={handleConfirmAprobar}
                                     disabled={!selectedPrioridad || updating}
-                                    title={!selectedPrioridad ? "Seleccione un nivel de prioridad para avanzar" : "Confirmar y Aprobar Reclamo"}
+                                    title={!selectedPrioridad ? "Seleccione un nivel de urgencia para avanzar" : "Confirmar y Aprobar Reclamo"}
                                     style={{
                                         opacity: !selectedPrioridad ? 0.5 : 1,
                                         cursor: !selectedPrioridad ? 'not-allowed' : 'pointer'

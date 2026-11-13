@@ -69,7 +69,7 @@ export const ReglasCortesiaModal = ({ isOpen, onClose }) => {
             }
         } catch (err) {
             console.error('Error cargando prioridades:', err);
-            setError(err.response?.data?.error || 'No se pudieron cargar las prioridades desde la base de datos.');
+            setError(err.response?.data?.error || 'No se pudieron cargar los niveles de urgencia desde la base de datos.');
             setPrioridades(REGLAS_CANONICAS);
         } finally {
             setLoading(false);
@@ -125,7 +125,7 @@ export const ReglasCortesiaModal = ({ isOpen, onClose }) => {
             if (p.codigo !== prioridadCodigo) return p;
             const updatedReglas = [...(p.reglas_cortesia || [])];
             if (updatedReglas.length <= 1) {
-                setError(`La prioridad "${p.nombre}" debe tener al menos una regla de cortesía.`);
+                setError(`La urgencia "${p.nombre}" debe tener al menos una regla de cortesía.`);
                 return p;
             }
             updatedReglas.splice(reglaIndex, 1);
@@ -137,22 +137,22 @@ export const ReglasCortesiaModal = ({ isOpen, onClose }) => {
         setError(null);
         setSuccessMessage(null);
 
-        // Validación mandatoria: SLA válido y al menos una regla por prioridad sin descripciones vacías
+        // Validación mandatoria: SLA válido y al menos una regla por urgencia sin descripciones vacías
         for (const p of prioridades) {
             const slaNum = parseInt(p.sla, 10);
             if (isNaN(slaNum) || slaNum <= 0) {
-                setError(`El SLA de la prioridad "${p.nombre}" debe ser un número entero mayor a 0 días.`);
+                setError(`El SLA de la urgencia "${p.nombre}" debe ser un número entero mayor a 0 días.`);
                 return;
             }
 
             const reglas = p.reglas_cortesia || [];
             if (reglas.length === 0) {
-                setError(`La prioridad "${p.nombre}" debe contener al menos una regla de cortesía.`);
+                setError(`La urgencia "${p.nombre}" debe contener al menos una regla de cortesía.`);
                 return;
             }
             for (let i = 0; i < reglas.length; i++) {
                 if (!reglas[i].descripcion || !reglas[i].descripcion.trim()) {
-                    setError(`La regla #${i + 1} de la prioridad "${p.nombre}" no puede tener una descripción vacía.`);
+                    setError(`La regla #${i + 1} de la urgencia "${p.nombre}" no puede tener una descripción vacía.`);
                     return;
                 }
             }
@@ -164,7 +164,7 @@ export const ReglasCortesiaModal = ({ isOpen, onClose }) => {
             for (const p of prioridades) {
                 await prioridadesApi.updateReglas(p.codigo, p.reglas_cortesia, p.sla);
             }
-            setSuccessMessage('¡Reglas de cortesía y SLA actualizados correctamente para todas las prioridades!');
+            setSuccessMessage('¡Reglas de cortesía y SLA actualizados correctamente para todos los niveles de urgencia!');
             setTimeout(() => setSuccessMessage(null), 4000);
         } catch (err) {
             console.error('Error al guardar configuración de prioridades:', err);
@@ -228,7 +228,7 @@ export const ReglasCortesiaModal = ({ isOpen, onClose }) => {
                             </div>
                             <div>
                                 <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#ffffff' }}>
-                                    Reglas de Cortesía por Nivel de Prioridad
+                                    Reglas de Cortesía por Nivel de Urgencia
                                 </h3>
                                 <p style={{ margin: 0, fontSize: '0.8rem', opacity: 0.85, color: '#cbd5e1' }}>
                                     Defina el texto de compensación aplicado automáticamente según la gravedad del caso
@@ -275,11 +275,11 @@ export const ReglasCortesiaModal = ({ isOpen, onClose }) => {
                         >
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>
                                 <HelpCircle size={16} color="#60a5fa" />
-                                <span>Configuración de Reglas por Prioridad</span>
+                                <span>Configuración de Reglas por Urgencia</span>
                             </div>
                             <p style={{ margin: 0, color: '#94a3b8', lineHeight: 1.45, fontSize: '0.8rem' }}>
-                                Por política de calidad, <strong>los nombres y descripciones de las prioridades (Alta, Media, Baja) son inmutables</strong>.
-                                Puede modificar la <strong>cantidad de días de SLA</strong> y definir una o más <strong>reglas de cortesía</strong> asociadas a cada nivel. Debe existir al menos una regla por prioridad.
+                                Por política de calidad, <strong>los nombres y descripciones de los niveles de urgencia (Alta, Media, Baja) son inmutables</strong>.
+                                Puede modificar la <strong>cantidad de días de SLA</strong> y definir una o más <strong>reglas de cortesía</strong> asociadas a cada nivel. Debe existir al menos una regla por nivel de urgencia.
                             </p>
                         </div>
 
@@ -300,7 +300,7 @@ export const ReglasCortesiaModal = ({ isOpen, onClose }) => {
                         {loading ? (
                             <div style={{ textAlign: 'center', padding: '30px 0', color: '#94a3b8' }}>
                                 <RefreshCw size={24} className="spin" style={{ marginBottom: 8 }} />
-                                <div>Cargando prioridades del sistema...</div>
+                                <div>Cargando niveles de urgencia del sistema...</div>
                             </div>
                         ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -453,7 +453,7 @@ export const ReglasCortesiaModal = ({ isOpen, onClose }) => {
                                                             type="button"
                                                             onClick={() => handleRemoveRegla(p.codigo, rIdx)}
                                                             disabled={reglas.length <= 1}
-                                                            title={reglas.length <= 1 ? "Debe haber al menos una regla por prioridad" : "Eliminar regla"}
+                                                            title={reglas.length <= 1 ? "Debe haber al menos una regla por nivel de urgencia" : "Eliminar regla"}
                                                             style={{
                                                                 background: 'transparent',
                                                                 border: 'none',

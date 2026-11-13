@@ -22,7 +22,7 @@ test.describe('CU-11: Reglas de Seguimientos de Workflow (Grilla, Disparos, Repe
         const thead = page.locator('.data-table thead');
         await expect(thead).toContainText('Rol');
         await expect(thead).toContainText('Estado Condición');
-        await expect(thead).toContainText('Prioridad');
+        await expect(thead).toContainText('Urgencia');
         await expect(thead).toContainText('Disparo Inicial');
         await expect(thead).toContainText('Repeticiones');
         await expect(thead).toContainText('Intervalo N');
