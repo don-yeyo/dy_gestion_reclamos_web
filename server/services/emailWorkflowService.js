@@ -6,8 +6,7 @@ const configuracionService = require('./configuracionService');
 const productosService = require('./productosService');
 
 const APP_SECRET = process.env.APP_SECRET || 'dy_secret_reclamos_super_seguro_2026_cambiar_en_produccion';
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3001';
-const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:5173';
+const { API_BASE_URL, APP_BASE_URL } = require('../config/urls');
 
 function formatTemplate(template = '', data = {}) {
     if (!template) return '';

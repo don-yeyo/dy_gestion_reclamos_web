@@ -6,9 +6,7 @@ const emailWorkflowService = require('../services/emailWorkflowService');
 const supervisorLookupService = require('../services/supervisorLookupService');
 const prioridadesService = require('../services/prioridadesService');
 const productosService = require('../services/productosService');
-
-const APP_BASE_URL = process.env.APP_BASE_URL || 'http://localhost:5173';
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3001';
+const { APP_BASE_URL, API_BASE_URL } = require('../config/urls');
 
 /**
  * GET /productos o /api/public/productos?q={busqueda}
