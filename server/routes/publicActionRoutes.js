@@ -95,17 +95,26 @@ async function getSupervisoresDisponibles() {
     return list;
 }
 
+const TIPOS_DESAPROBACION = [
+    'No se constata defecto atribuible a elaboración o envasado',
+    'Producto con fecha de vencimiento expirada al momento de la compra',
+    'Defecto originado por inadecuada conservación en punto de venta',
+    'Falta de evidencia probatoria o datos insuficientes de lote',
+    'Reclamo duplicado o previamente compensado',
+    'Otro motivo administrativo fundado'
+];
+
 /**
  * GET /api/public/actions/admin-quick
  * Endpoint webhook seguro para administradores desde el email de nuevo reclamo.
- * Muestra obligatoriamente la pantalla de aprobación para seleccionar la prioridad según gravedad
- * y el supervisor (si aún no estuviera asignado).
+ * Soporta tanto Aprobar el reclamo (seleccionando urgencia y supervisor) como
+ * Desaprobarlo/Rechazarlo (seleccionando motivo formal para el consumidor y observación interna).
  */
 router.get('/admin-quick', async (req, res) => {
-    const { token } = req.query;
+    const { token, mode } = req.query;
     const payload = emailWorkflowService.verifyToken(token);
 
-    if (!payload || payload.actor !== 'admin' || payload.action !== 'en_curso' || !payload.claimId) {
+    if (!payload || payload.actor !== 'admin' || !['en_curso', 'desaprobar'].includes(payload.action) || !payload.claimId) {
         return res.status(401).send(`
             <!DOCTYPE html>
             <html lang="es">
@@ -144,38 +153,58 @@ router.get('/admin-quick', async (req, res) => {
             `);
         }
 
-        const yaEstabaEnCurso = claim.estado_admin === 'En curso';
-        if (yaEstabaEnCurso) {
+        const estadoAdminActual = claim.estado_admin || 'Pendiente';
+        const yaGestionadoAdmin = estadoAdminActual !== 'Pendiente';
+        if (yaGestionadoAdmin) {
+            const configuracionService = require('../services/configuracionService');
+            const mensajeReapertura = await configuracionService.get(
+                'mensaje_reapertura_personal',
+                'Si necesitás reconsiderar tu decisión o reabrir el expediente de este reclamo, por favor contactate con la Administración de Don Yeyo S.A. indicando el número de caso.'
+            );
+            const fechaAdminStr = formatFechaHora(claim.fecha_estado_admin);
             const supervisorInfo = claim.supervisor ? `${claim.supervisor} (${claim.supervisor_email || 'Sin email registrado'})` : 'No asignado';
+            const isDesaprobado = estadoAdminActual === 'Desaprobado';
             return res.send(`
                 <!DOCTYPE html>
                 <html lang="es">
                 <head>
                     <meta charset="UTF-8">
                     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>Reclamo Ya En Curso - Don Yeyo</title>
+                    <title>Reclamo Ya Gestionado - Don Yeyo</title>
                     <style>
                         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0b0f24; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; color: #f8fafc; padding: 20px; }
                         .card { background: #151C5B; padding: 40px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); text-align: center; max-width: 520px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
-                        .icon { width: 64px; height: 64px; line-height: 64px; background: rgba(16, 185, 129, 0.15); border: 2px solid #10b981; border-radius: 50%; font-size: 32px; color: #10b981; margin: 0 auto 20px; }
-                        h2 { margin: 0 0 12px 0; color: #ffffff; font-size: 1.5rem; }
-                        .badge { display: inline-block; background: #2563eb; color: #ffffff; padding: 4px 12px; border-radius: 20px; font-size: 0.82rem; font-weight: bold; margin-bottom: 16px; }
+                        .icon { width: 64px; height: 64px; line-height: 64px; background: rgba(59, 130, 246, 0.15); border: 2px solid #3b82f6; border-radius: 50%; font-size: 30px; color: #60a5fa; margin: 0 auto 20px; }
+                        h2 { margin: 0 0 12px 0; color: #ffffff; font-size: 1.45rem; }
+                        .badge { display: inline-block; background: ${isDesaprobado ? '#dc2626' : '#2563eb'}; color: #ffffff; padding: 4px 12px; border-radius: 20px; font-size: 0.82rem; font-weight: bold; margin-bottom: 16px; }
                         p { color: #cbd5e1; line-height: 1.6; margin: 8px 0; font-size: 0.95rem; }
-                        .info-box { background: rgba(255,255,255,0.06); border-radius: 10px; padding: 16px; margin: 20px 0; text-align: left; font-size: 0.9rem; border-left: 4px solid #10b981; line-height: 1.6; }
-                        .btn { display: inline-block; background: #E5353B; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; margin-top: 16px; transition: background 0.2s; }
+                        .info-box { background: rgba(255,255,255,0.06); border-radius: 10px; padding: 16px; margin: 20px 0; text-align: left; font-size: 0.9rem; border-left: 4px solid ${isDesaprobado ? '#ef4444' : '#10b981'}; line-height: 1.6; }
+                        .reopen-box { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px; padding: 14px; margin: 16px 0; text-align: left; font-size: 0.85rem; color: #fbbf24; line-height: 1.5; }
+                        .btn { display: inline-block; background: #E5353B; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold; margin-top: 12px; transition: background 0.2s; }
                         .btn:hover { background: #b91c1c; }
                     </style>
                 </head>
                 <body>
                     <div class="card">
-                        <div class="icon">✓</div>
-                        <div class="badge">ESTADO: EN CURSO</div>
-                        <h2>El Reclamo Ya Se Encuentra En Curso</h2>
+                        <div class="icon">ℹ️</div>
+                        <div class="badge">ESTADO REGISTRADO: ${escapeHtml(estadoAdminActual.toUpperCase())}</div>
+                        <h2>El Reclamo Ya Fue Gestionado</h2>
                         <p>Reclamo <strong>#${payload.claimId}</strong> correspondiente a <strong>${escapeHtml(claim.nombre)} ${escapeHtml(claim.apellido)}</strong>.</p>
                         <div class="info-box">
-                            • <strong>Urgencia Asignada:</strong> ${escapeHtml(claim.prioridad_nombre || 'No especificada')} (SLA: ${claim.sla_dias || 'N/A'} días)<br/>
-                            • <strong>Supervisor:</strong> ${escapeHtml(supervisorInfo)}<br/>
-                            • <strong>Regla Cortesía:</strong> ${escapeHtml(claim.regla_cortesia_aplicada || 'Estándar')}
+                            • <strong>Estado actual:</strong> ${escapeHtml(estadoAdminActual)}<br/>
+                            ${fechaAdminStr ? `• <strong>Fecha y hora de registro:</strong> ${escapeHtml(fechaAdminStr)}<br/>` : ''}
+                            ${isDesaprobado ? `
+                                • <strong>Motivo Consumidor:</strong> ${escapeHtml(claim.tipo_desaprobacion || 'No especificado')}<br/>
+                                • <strong>Obs. Interna:</strong> ${escapeHtml(claim.admin_motivo_desaprobado || 'Sin detalle')}
+                            ` : `
+                                • <strong>Urgencia Asignada:</strong> ${escapeHtml(claim.prioridad_nombre || 'No especificada')} (SLA: ${claim.sla_dias || 'N/A'} días)<br/>
+                                • <strong>Supervisor:</strong> ${escapeHtml(supervisorInfo)}<br/>
+                                • <strong>Regla Cortesía:</strong> ${escapeHtml(claim.regla_cortesia_aplicada || 'Estándar')}
+                            `}
+                        </div>
+                        <div class="reopen-box">
+                            <strong>📌 ¿Necesitás modificar la decisión o reabrir el caso?</strong><br/>
+                            ${escapeHtml(mensajeReapertura)}
                         </div>
                         <a href="${APP_BASE_URL}/reclamos/${payload.claimId}" class="btn">Abrir en el Gestor Web</a>
                     </div>
@@ -190,6 +219,7 @@ router.get('/admin-quick', async (req, res) => {
         const productosResumen = claim.items && claim.items.length
             ? claim.items.map(it => `${it.cantidad || 1}x ${it.producto || it.marca || 'Producto'}`).join(', ')
             : (claim.defecto || 'Sin detalle de producto');
+        const initialReject = mode === 'desaprobar' || payload.action === 'desaprobar';
 
         return res.send(`
             <!DOCTYPE html>
@@ -197,90 +227,158 @@ router.get('/admin-quick', async (req, res) => {
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Aprobar Reclamo #${claim.id} - Don Yeyo</title>
+                <title>Evaluar Reclamo #${claim.id} - Don Yeyo</title>
                 <style>
                     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0b0f24; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; color: #f8fafc; padding: 20px; box-sizing: border-box; }
                     .card { background: #151C5B; padding: 36px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.15); text-align: left; max-width: 580px; width: 100%; box-shadow: 0 20px 45px rgba(0,0,0,0.5); }
-                    .badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); padding: 5px 12px; border-radius: 20px; font-size: 0.82rem; font-weight: 700; text-transform: uppercase; margin-bottom: 14px; }
-                    h2 { margin: 0 0 10px 0; color: #ffffff; font-size: 1.45rem; }
-                    p.intro { color: #cbd5e1; line-height: 1.5; margin: 0 0 18px 0; font-size: 0.92rem; }
+                    .mode-tabs { display: flex; gap: 8px; margin-bottom: 20px; background: rgba(0,0,0,0.25); padding: 5px; border-radius: 10px; }
+                    .mode-tab { flex: 1; text-align: center; padding: 10px 12px; border-radius: 7px; font-weight: 700; font-size: 0.88rem; cursor: pointer; border: none; background: transparent; color: #94a3b8; transition: all 0.2s; }
+                    .mode-tab.active-approve { background: #10b981; color: #ffffff; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35); }
+                    .mode-tab.active-reject { background: #dc2626; color: #ffffff; box-shadow: 0 2px 8px rgba(220, 38, 38, 0.35); }
+                    h2 { margin: 0 0 10px 0; color: #ffffff; font-size: 1.4rem; }
+                    p.intro { color: #cbd5e1; line-height: 1.5; margin: 0 0 18px 0; font-size: 0.9rem; }
                     .claim-summary { background: rgba(255, 255, 255, 0.05); border-radius: 10px; padding: 14px 16px; margin-bottom: 20px; font-size: 0.88rem; border-left: 4px solid #3b82f6; line-height: 1.6; }
                     .claim-summary strong { color: #f8fafc; }
                     .form-group { margin-bottom: 18px; }
                     label { display: block; font-weight: 600; margin-bottom: 6px; color: #e2e8f0; font-size: 0.92rem; }
                     .required-star { color: #ef4444; }
-                    select { width: 100%; padding: 12px 14px; background: #0b0f24; border: 1px solid #3b82f6; border-radius: 8px; color: #ffffff; font-size: 0.93rem; outline: none; transition: border-color 0.2s; box-sizing: border-box; }
-                    select:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3); }
+                    select, textarea { width: 100%; padding: 12px 14px; background: #0b0f24; border: 1px solid #3b82f6; border-radius: 8px; color: #ffffff; font-size: 0.92rem; outline: none; transition: border-color 0.2s; box-sizing: border-box; font-family: inherit; }
+                    select:focus, textarea:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3); }
                     select option { background: #0b0f24; color: #ffffff; }
                     .help-text { font-size: 0.78rem; color: #94a3b8; margin-top: 4px; }
                     .supervisor-box { background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 10px 14px; margin-bottom: 18px; font-size: 0.88rem; color: #6ee7b7; }
-                    .btn-submit { width: 100%; background: #E5353B; color: #ffffff; border: none; padding: 14px 20px; border-radius: 8px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: background 0.2s, transform 0.1s; box-shadow: 0 4px 14px rgba(229, 53, 59, 0.4); display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; }
-                    .btn-submit:hover { background: #b91c1c; }
-                    .btn-submit:active { transform: scale(0.99); }
+                    .btn-submit { width: 100%; background: #10b981; color: #ffffff; border: none; padding: 14px 20px; border-radius: 8px; font-weight: bold; font-size: 0.98rem; cursor: pointer; transition: background 0.2s, transform 0.1s; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35); display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; }
+                    .btn-submit:hover { background: #059669; }
+                    .btn-reject { width: 100%; background: #E5353B; color: #ffffff; border: none; padding: 14px 20px; border-radius: 8px; font-weight: bold; font-size: 0.98rem; cursor: pointer; transition: background 0.2s, transform 0.1s; box-shadow: 0 4px 14px rgba(229, 53, 59, 0.4); display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; }
+                    .btn-reject:hover { background: #b91c1c; }
                     .footer-link { text-align: center; margin-top: 18px; font-size: 0.84rem; }
                     .footer-link a { color: #93c5fd; text-decoration: underline; }
                 </style>
             </head>
             <body>
                 <div class="card">
-                    <div class="badge">Aprobación Mandatoria</div>
-                    <h2>Aprobar Reclamo #${claim.id}</h2>
-                    <p class="intro">
-                        Para poner el reclamo <strong>En curso</strong> y habilitar las acciones de compensación e investigación,
-                        <strong>es obligatorio definir el nivel de urgencia según la gravedad del caso</strong>.
-                    </p>
+                    <div class="mode-tabs">
+                        <button type="button" id="tabApprove" class="mode-tab ${!initialReject ? 'active-approve' : ''}" onclick="switchMode('approve')">
+                            ✓ Aprobar Reclamo
+                        </button>
+                        <button type="button" id="tabReject" class="mode-tab ${initialReject ? 'active-reject' : ''}" onclick="switchMode('reject')">
+                            ✕ Rechazar / Desaprobar
+                        </button>
+                    </div>
 
                     <div class="claim-summary">
+                        <div><strong>Reclamo:</strong> #${escapeHtml(claim.id)}</div>
                         <div><strong>Consumidor:</strong> ${escapeHtml(claim.nombre)} ${escapeHtml(claim.apellido)}</div>
                         <div><strong>Ubicación:</strong> ${escapeHtml(claim.localidad)}, ${escapeHtml(claim.provincia)}</div>
                         <div><strong>Producto(s):</strong> ${escapeHtml(productosResumen)}</div>
                         <div><strong>Defecto reportado:</strong> ${escapeHtml(claim.defecto || 'No especificado')}</div>
                     </div>
 
-                    <form method="POST" action="/api/public/actions/admin-confirm-approval">
-                        <input type="hidden" name="token" value="${escapeHtml(token)}" />
+                    <!-- SECCIÓN APROBAR -->
+                    <div id="sectionApprove" style="display: ${!initialReject ? 'block' : 'none'};">
+                        <h2>Aprobar Reclamo #${claim.id}</h2>
+                        <p class="intro">
+                            Para poner el reclamo <strong>En curso</strong> y habilitar las acciones de compensación e investigación,
+                            <strong>es obligatorio definir el nivel de urgencia según la gravedad del caso</strong>.
+                        </p>
 
-                        <div class="form-group">
-                            <label for="prioridadSelect">Nivel de Urgencia según gravedad <span class="required-star">*</span>:</label>
-                            <select id="prioridadSelect" name="prioridad" required>
-                                <option value="" disabled selected>-- Seleccionar nivel de urgencia (obligatorio) --</option>
-                                ${prioridades.map(p => `
-                                    <option value="${p.codigo}">
-                                        ${escapeHtml(p.nombre)} (SLA ${p.sla} días) — ${escapeHtml(p.descripcion)}
-                                    </option>
-                                `).join('')}
-                            </select>
-                            <div class="help-text">La urgencia define el SLA de respuesta y la regla de cortesía aplicable.</div>
-                        </div>
+                        <form method="POST" action="/api/public/actions/admin-confirm-approval">
+                            <input type="hidden" name="token" value="${escapeHtml(token)}" />
 
-                        ${needsSupervisor ? `
                             <div class="form-group">
-                                <label for="supervisorSelect">Asignar Supervisor Comercial Responsable <span class="required-star">*</span>:</label>
-                                <select id="supervisorSelect" name="supervisor" required>
-                                    <option value="" disabled selected>-- Seleccioná un supervisor comercial --</option>
-                                    ${supervisores.map(s => `
-                                        <option value="${escapeHtml(s.nombre)}|${escapeHtml(s.email)}">
-                                            ${escapeHtml(s.nombre)} (${escapeHtml(s.email || 'Sin correo')})
+                                <label for="prioridadSelect">Nivel de Urgencia según gravedad <span class="required-star">*</span>:</label>
+                                <select id="prioridadSelect" name="prioridad" required>
+                                    <option value="" disabled selected>-- Seleccionar nivel de urgencia (obligatorio) --</option>
+                                    ${prioridades.map(p => `
+                                        <option value="${p.codigo}">
+                                            ${escapeHtml(p.nombre)} (SLA ${p.sla} días) — ${escapeHtml(p.descripcion)}
                                         </option>
                                     `).join('')}
                                 </select>
-                                <div class="help-text">Requerido para coordinar la entrega o reposición en la zona.</div>
+                                <div class="help-text">La urgencia define el SLA de respuesta y la regla de cortesía aplicable.</div>
                             </div>
-                        ` : `
-                            <div class="supervisor-box">
-                                ✓ <strong>Supervisor comercial asignado:</strong> ${escapeHtml(claim.supervisor)} ${claim.supervisor_email ? `(${escapeHtml(claim.supervisor_email)})` : ''}
-                            </div>
-                        `}
 
-                        <button type="submit" class="btn-submit">
-                            ✓ Confirmar Urgencia y Aprobar Reclamo
-                        </button>
-                    </form>
+                            ${needsSupervisor ? `
+                                <div class="form-group">
+                                    <label for="supervisorSelect">Asignar Supervisor Comercial Responsable <span class="required-star">*</span>:</label>
+                                    <select id="supervisorSelect" name="supervisor" required>
+                                        <option value="" disabled selected>-- Seleccioná un supervisor comercial --</option>
+                                        ${supervisores.map(s => `
+                                            <option value="${escapeHtml(s.nombre)}|${escapeHtml(s.email)}">
+                                                ${escapeHtml(s.nombre)} (${escapeHtml(s.email || 'Sin correo')})
+                                            </option>
+                                        `).join('')}
+                                    </select>
+                                    <div class="help-text">Requerido para coordinar la entrega o reposición en la zona.</div>
+                                </div>
+                            ` : `
+                                <div class="supervisor-box">
+                                    ✓ <strong>Supervisor comercial asignado:</strong> ${escapeHtml(claim.supervisor)} ${claim.supervisor_email ? `(${escapeHtml(claim.supervisor_email)})` : ''}
+                                </div>
+                            `}
+
+                            <button type="submit" class="btn-submit">
+                                ✓ Confirmar Urgencia y Aprobar Reclamo
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- SECCIÓN RECHAZAR / DESAPROBAR -->
+                    <div id="sectionReject" style="display: ${initialReject ? 'block' : 'none'};">
+                        <h2>Desaprobar Reclamo #${claim.id}</h2>
+                        <p class="intro">
+                            Al desaprobar el reclamo, su estado para el consumidor pasará a <strong>Cerrado</strong> y se cancelarán las derivaciones a Supervisión e Inocuidad.
+                        </p>
+
+                        <form method="POST" action="/api/public/actions/admin-confirm-rejection">
+                            <input type="hidden" name="token" value="${escapeHtml(token)}" />
+
+                            <div class="form-group">
+                                <label for="tipoDesaprobacionSelect">Motivo Formal para el Consumidor <span class="required-star">*</span>:</label>
+                                <select id="tipoDesaprobacionSelect" name="tipo_desaprobacion" required>
+                                    ${TIPOS_DESAPROBACION.map(t => `
+                                        <option value="${escapeHtml(t)}">${escapeHtml(t)}</option>
+                                    `).join('')}
+                                </select>
+                                <div class="help-text">Este motivo podrá ser visualizado por el consumidor al consultar el estado de su reclamo.</div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="motivoDesaprobadoInput">🔒 Observación Interna Obligatoria <span class="required-star">*</span>:</label>
+                                <textarea id="motivoDesaprobadoInput" name="motivo_desaprobado" rows="3" placeholder="Detallá el fundamento interno del rechazo (confidencial para auditoría interna)..." required></textarea>
+                                <div class="help-text">Visible únicamente por el personal interno de Don Yeyo S.A.</div>
+                            </div>
+
+                            <button type="submit" class="btn-reject">
+                                ✕ Confirmar Rechazo / Desaprobación
+                            </button>
+                        </form>
+                    </div>
 
                     <div class="footer-link">
                         <a href="${APP_BASE_URL}/reclamos/${claim.id}">Abrir en el Gestor Web para consultar detalles completos</a>
                     </div>
                 </div>
+
+                <script>
+                    function switchMode(m) {
+                        var secApp = document.getElementById('sectionApprove');
+                        var secRej = document.getElementById('sectionReject');
+                        var tabApp = document.getElementById('tabApprove');
+                        var tabRej = document.getElementById('tabReject');
+                        if (m === 'reject') {
+                            secApp.style.display = 'none';
+                            secRej.style.display = 'block';
+                            tabApp.className = 'mode-tab';
+                            tabRej.className = 'mode-tab active-reject';
+                        } else {
+                            secApp.style.display = 'block';
+                            secRej.style.display = 'none';
+                            tabApp.className = 'mode-tab active-approve';
+                            tabRej.className = 'mode-tab';
+                        }
+                    }
+                </script>
             </body>
             </html>
         `);
@@ -298,7 +396,7 @@ router.post('/admin-confirm-approval', async (req, res) => {
     const { token, prioridad, supervisor } = req.body;
     const payload = emailWorkflowService.verifyToken(token);
 
-    if (!payload || payload.actor !== 'admin' || payload.action !== 'en_curso' || !payload.claimId) {
+    if (!payload || payload.actor !== 'admin' || !['en_curso', 'desaprobar'].includes(payload.action) || !payload.claimId) {
         return res.status(401).send(`
             <div style="font-family:sans-serif; text-align:center; padding:50px; background:#0f1535; color:#fff; min-height:100vh;">
                 <h2>Enlace Inválido o Expirado</h2>
@@ -325,6 +423,10 @@ router.post('/admin-confirm-approval', async (req, res) => {
                     <h2>Reclamo #${payload.claimId} no encontrado</h2>
                 </div>
             `);
+        }
+
+        if (claim.estado_admin && claim.estado_admin !== 'Pendiente') {
+            return res.redirect(`/api/public/actions/admin-quick?token=${encodeURIComponent(token)}`);
         }
 
         const prioridadObj = await prioridadesService.getPrioridadByCodigo(prioridadNum);
@@ -467,6 +569,172 @@ router.post('/admin-confirm-approval', async (req, res) => {
 });
 
 /**
+ * POST /api/public/actions/admin-confirm-rejection
+ * Rechaza / desaprueba el reclamo desde el enlace del correo del administrador
+ */
+router.post('/admin-confirm-rejection', async (req, res) => {
+    const { token, tipo_desaprobacion, motivo_desaprobado } = req.body;
+    if (!token) return res.status(400).send('Falta token de autorización.');
+
+    const payload = emailWorkflowService.verifyToken(token);
+    if (!payload || payload.actor !== 'admin') {
+        return res.status(401).send('Token inválido o expirado.');
+    }
+
+    const motivoInterno = (motivo_desaprobado || '').trim();
+    if (!motivoInterno) {
+        return res.status(400).send('La observación interna obligatoria es requerida para desaprobar el reclamo.');
+    }
+
+    try {
+        const claim = await googleSheetsService.getReclamoById(payload.claimId);
+        if (!claim) return res.status(404).send('Reclamo no encontrado.');
+
+        // Protección anti-replay: si el caso ya fue gestionado por Admin
+        if (claim.estado_admin && claim.estado_admin !== 'Pendiente') {
+            return res.status(409).send('Este reclamo ya fue procesado anteriormente (Estado actual: ' + escapeHtml(claim.estado_admin) + ').');
+        }
+
+        const tipoFormal = (tipo_desaprobacion && TIPOS_DESAPROBACION.includes(tipo_desaprobacion))
+            ? tipo_desaprobacion
+            : TIPOS_DESAPROBACION[0];
+
+        await googleSheetsService.updateReclamo(payload.claimId, {
+            'AO': 'Desaprobado',
+            'AP': motivoInterno,
+            'tipo_desaprobacion': tipoFormal,
+            'AQ': 'Sin acciones',
+            'AT': 'Sin acciones',
+            'AS': 'Cerrado'
+        }, {
+            actor: 'admin_link',
+            actorEmail: 'admin@donyeyo.com.ar',
+            motivo: `[${tipoFormal}] Desaprobado desde enlace de email Admin: ${motivoInterno}`
+        });
+
+        let headerLogoHtml = '';
+        try {
+            const configuracionService = require('../services/configuracionService');
+            const logoUrl = (await configuracionService.getParametro('logo_header_url', '')).trim();
+            if (logoUrl && logoUrl.startsWith('http')) {
+                headerLogoHtml = `<div style="margin-bottom: 16px;"><img src="${escapeHtml(logoUrl)}" alt="Don Yeyo" style="max-height: 52px; max-width: 200px; height: auto; width: auto;" /></div>`;
+            }
+        } catch (_) {}
+
+        res.send(`
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Reclamo Desaprobado — Don Yeyo</title>
+                <style>
+                    * { box-sizing: border-box; margin: 0; padding: 0; }
+                    body {
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                        background: linear-gradient(135deg, #1E1B18 0%, #2C2623 100%);
+                        min-height: 100vh;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        padding: 20px;
+                    }
+                    .card {
+                        background: #FFFFFF;
+                        max-width: 560px;
+                        width: 100%;
+                        padding: 36px 32px;
+                        border-radius: 16px;
+                        box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+                        text-align: center;
+                        border-top: 6px solid #dc2626;
+                    }
+                    .icon {
+                        width: 68px;
+                        height: 68px;
+                        border-radius: 50%;
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 32px;
+                        margin-bottom: 18px;
+                        background: #fef2f2;
+                        color: #dc2626;
+                    }
+                    h2 { color: #1E1B18; font-size: 23px; margin-bottom: 10px; font-weight: 800; }
+                    p { color: #57534E; font-size: 14px; line-height: 1.6; margin-bottom: 16px; }
+                    .badge {
+                        display: inline-block;
+                        padding: 6px 14px;
+                        border-radius: 999px;
+                        font-size: 12px;
+                        font-weight: 700;
+                        background: #fef2f2;
+                        color: #991b1b;
+                        margin-bottom: 16px;
+                    }
+                    .info-box {
+                        background: #fef2f2;
+                        border: 1px solid #fecaca;
+                        padding: 16px;
+                        border-radius: 10px;
+                        text-align: left;
+                        font-size: 13px;
+                        color: #7f1d1d;
+                        margin-bottom: 22px;
+                        line-height: 1.7;
+                    }
+                    .btn {
+                        display: inline-block;
+                        background: #1E1B18;
+                        color: #FFFFFF;
+                        text-decoration: none;
+                        padding: 13px 26px;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        font-size: 14px;
+                    }
+                    .footer {
+                        margin-top: 26px;
+                        padding-top: 16px;
+                        border-top: 1px solid #E7E5E4;
+                        font-size: 12px;
+                        color: #A8A29E;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    ${headerLogoHtml}
+                    <div class="icon">✕</div>
+                    <div class="badge">ESTADO: DESAPROBADO</div>
+                    <h2>Reclamo Desaprobado y Cerrado</h2>
+                    <p>El Reclamo <strong>#${payload.claimId}</strong> correspondiente a <strong>${escapeHtml(claim.nombre)} ${escapeHtml(claim.apellido)}</strong> ha sido marcado como desaprobado.</p>
+                    
+                    <div class="info-box">
+                        <strong>Detalles del Rechazo Registrados:</strong><br/>
+                        • <strong>Motivo Formal (visible al consumidor):</strong> ${escapeHtml(tipoFormal)}<br/>
+                        • <strong>Observación Interna (auditoría):</strong> ${escapeHtml(motivoInterno)}<br/>
+                        • <strong>Estado Consumidor:</strong> Cerrado<br/>
+                        • <strong>Ramas Operativas (Supervisor / Inocuidad):</strong> Sin acciones
+                    </div>
+
+                    <a href="${APP_BASE_URL}/reclamos/${payload.claimId}" class="btn">Ver en el Gestor Web</a>
+
+                    <div class="footer">
+                        Don Yeyo S.A. | Sistema de Gestión Automatizado de Reclamos
+                    </div>
+                </div>
+            </body>
+            </html>
+        `);
+    } catch (err) {
+        console.error('Error en admin-confirm-rejection webhook:', err);
+        res.status(500).send(`Error al procesar el rechazo: ${err.message}`);
+    }
+});
+
+/**
  * POST /api/public/actions/admin-assign-and-start (Retrocompatibilidad)
  */
 router.post('/admin-assign-and-start', async (req, res) => {
@@ -477,7 +745,7 @@ router.post('/admin-assign-and-start', async (req, res) => {
 
 /**
  * GET /api/public/actions/generate-admin-link
- * Endpoint para generar el enlace firmado seguro para un reclamo dado
+ * Endpoint para generar los enlaces firmados seguros (Aprobar y Rechazar) para un reclamo dado
  */
 router.get('/generate-admin-link', (req, res) => {
     const { claimId } = req.query;
@@ -486,7 +754,47 @@ router.get('/generate-admin-link', (req, res) => {
     }
     const token = emailWorkflowService.generateAdminActionToken(claimId);
     const url = emailWorkflowService.generateAdminActionUrl(claimId);
-    res.json({ success: true, claimId, token, url });
+    const token_rechazar = emailWorkflowService.generateAdminRejectToken(claimId);
+    const url_rechazar = emailWorkflowService.generateAdminRejectUrl(claimId);
+    res.json({
+        success: true,
+        claimId,
+        token,
+        url,
+        url_aprobar: url,
+        token_rechazar,
+        url_rechazar
+    });
+});
+
+/**
+ * POST /api/public/actions/notify-new-claim
+ * Envía el primer correo al Administrador con botones de Aprobar y Rechazar para un reclamo recién ingresado
+ */
+router.post('/notify-new-claim', async (req, res) => {
+    const { claimId } = req.body;
+    if (!claimId) {
+        return res.status(400).json({ success: false, error: 'claimId es requerido.' });
+    }
+    try {
+        const claim = await googleSheetsService.getReclamoById(claimId);
+        if (!claim) {
+            return res.status(404).json({ success: false, error: `Reclamo #${claimId} no encontrado.` });
+        }
+        await emailWorkflowService.sendAdminNewClaimEmail(claim, {
+            actor: 'sistema_web',
+            motivo: `Notificación de nuevo reclamo #${claimId} a Administradores (con botones Aprobar y Rechazar)`
+        });
+        res.json({
+            success: true,
+            claimId,
+            url_aprobar: emailWorkflowService.generateAdminActionUrl(claimId),
+            url_rechazar: emailWorkflowService.generateAdminRejectUrl(claimId)
+        });
+    } catch (err) {
+        console.error('[PUBLIC API] Error en notify-new-claim:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
 });
 
 /**

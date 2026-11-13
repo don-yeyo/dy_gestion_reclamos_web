@@ -225,6 +225,88 @@ class EmailWorkflowService {
     }
 
     /**
+     * Genera token y enlace directo único para Desaprobar/Rechazar reclamo desde el email del administrador
+     */
+    generateAdminRejectToken(claimId) {
+        return this.generateToken(claimId, 'admin', 'desaprobar');
+    }
+
+    generateAdminRejectUrl(claimId) {
+        const token = this.generateAdminRejectToken(claimId);
+        return `${API_BASE_URL}/api/public/actions/admin-quick?token=${encodeURIComponent(token)}&mode=desaprobar`;
+    }
+
+    /**
+     * Envía email de notificación inicial a Administradores cuando ingresa un nuevo reclamo,
+     * incluyendo botones para Aprobar o Rechazar/Desaprobar directamente desde el correo.
+     */
+    async sendAdminNewClaimEmail(claim, opts = {}) {
+        const adminEmails = (process.env.EMAILS_ADMINS || 'administracion@donyeyo.com.ar').replace(/"/g, '').trim();
+        const urlAprobar = this.generateAdminActionUrl(claim.id);
+        const urlRechazar = this.generateAdminRejectUrl(claim.id);
+        const urlGestor = `${APP_BASE_URL}/reclamos/${encodeURIComponent(claim.id)}`;
+        const footer = await configuracionService.get('email_pie_institucional', 'Sistema de Gestión de Reclamos Automatizado - Don Yeyo S.A.');
+        const headerLogoHtml = await this.getLogoHeaderHtml(`Nuevo Reclamo Ingresado #${claim.id}`, 'Recepción Administrativa de Reclamos');
+
+        const productosHtml = (claim.items || []).map(item => `
+            <div style="background:#f8fafc; border-left:4px solid #151C5B; padding:12px; margin-bottom:10px; border-radius:6px; font-size:0.9rem;">
+                <strong>${item.marca || 'Don Yeyo'} - ${item.producto || 'Producto'}</strong> (${item.categoria || 'General'})<br/>
+                <span>Cantidad: <strong>${item.cantidad || 1}</strong> | Defecto: <strong style="color:#b91c1c;">${item.defecto || 'No especificado'}</strong></span><br/>
+                <span style="color:#64748b; font-size:0.82rem;">Lote: ${item.lote || 'N/A'} | Vencimiento: ${item.vto || 'N/A'}</span>
+            </div>
+        `).join('');
+
+        const html = `
+        <div style="font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width:600px; margin:auto; background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden;">
+            ${headerLogoHtml}
+            <div style="padding:24px; color:#1e293b; line-height:1.5;">
+                <p>Se ha registrado un nuevo reclamo en el sistema pendiente de evaluación administrativa:</p>
+
+                <div style="background:#f1f5f9; padding:14px; border-radius:8px; margin:16px 0; font-size:0.92rem;">
+                    <h4 style="margin:0 0 8px 0; color:#151C5B;">Datos del Reclamo #${claim.id}</h4>
+                    <strong>Consumidor:</strong> ${claim.nombre || ''} ${claim.apellido || ''}<br/>
+                    <strong>Localidad:</strong> ${claim.domicilio || ''} (${claim.localidad || ''}, ${claim.provincia || ''})<br/>
+                    <strong>Teléfono:</strong> ${claim.telefono || 'No informado'} | <strong>Email:</strong> ${claim.email || 'No informado'}<br/>
+                    <strong>Supervisor sugerido:</strong> ${claim.supervisor || 'Sin asignar'}
+                </div>
+
+                <h4 style="color:#151C5B; margin-bottom:8px;">Productos Reclamados:</h4>
+                ${productosHtml}
+
+                <div style="margin-top:26px; text-align:center;">
+                    <p style="font-weight:600; margin-bottom:14px;">Seleccioná una acción para gestionar este reclamo:</p>
+                    <a href="${urlAprobar}" style="display:inline-block; background:#10b981; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:8px; font-weight:bold; margin:6px;">
+                        ✓ Aprobar Reclamo
+                    </a>
+                    <a href="${urlRechazar}" style="display:inline-block; background:#E5353B; color:#ffffff; text-decoration:none; padding:12px 24px; border-radius:8px; font-weight:bold; margin:6px;">
+                        ✕ Rechazar / Desaprobar Reclamo
+                    </a>
+                </div>
+
+                <div style="margin-top:16px; text-align:center; font-size:0.85rem;">
+                    <a href="${urlGestor}" style="color:#151C5B; text-decoration:underline;">Abrir ficha completa en el Gestor Web</a>
+                </div>
+            </div>
+            <div style="background:#f8fafc; padding:14px; text-align:center; font-size:0.8rem; color:#94a3b8; border-top:1px solid #e2e8f0;">
+                ${footer}
+            </div>
+        </div>
+        `;
+
+        return this.sendMail({
+            to: adminEmails,
+            subject: `[Nuevo Reclamo #${claim.id}] ${claim.nombre || ''} ${claim.apellido || ''} (${claim.localidad || 'Sin localidad'})`,
+            html
+        }, 'internal', {
+            reclamoId: claim.id,
+            destinatarioTipo: 'admin',
+            tipoDisparo: opts.manual ? 'manual' : 'automatico',
+            motivo: 'Notificación de ingreso de nuevo reclamo a administración con botones de aprobación y rechazo',
+            actor: opts.actor || 'sistema'
+        });
+    }
+
+    /**
      * Verifica la autenticidad de un token de acción
      */
     verifyToken(token) {

@@ -215,6 +215,14 @@ router.post('/enviar-muestra', async (req, res) => {
                     await emailWorkflowService.sendFraudAlertToAdmins(testClaim, 'Prueba de muestra de alerta crítica por discrepancia / sospecha de fraude comercial');
                     break;
 
+                case 'admin_nuevo':
+                    await emailWorkflowService.sendAdminNewClaimEmail(testClaim, {
+                        actor: 'admin_test',
+                        actorEmail: userEmail,
+                        motivo: `Envío de email de muestra (Nuevo Reclamo al Admin) a ${targetEmail}`
+                    });
+                    break;
+
                 default:
                     return res.status(400).json({ success: false, message: `Tipo de email no reconocido: ${email_tipo}` });
             }
