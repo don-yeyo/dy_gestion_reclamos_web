@@ -144,6 +144,22 @@ export async function setupMockApi(page, customReclamos = null) {
             return;
         }
 
+        // Actualizar estado inocuidad
+        if (url.includes('/estado-inocuidad') && method === 'PATCH') {
+            const body = route.request().postDataJSON();
+            const id = url.split('/api/reclamos/')[1].split('/estado-inocuidad')[0];
+            const r = reclamos.find(x => x.id === id || x.nro_reclamo === id);
+            if (r) {
+                r.estado_inocuidad = body.estado;
+            }
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ success: true, message: `Estado de inocuidad actualizado a "${body.estado}".` })
+            });
+            return;
+        }
+
         // Reenviar email a inocuidad
         if (url.includes('/reenviar-inocuidad') && method === 'POST') {
             await route.fulfill({

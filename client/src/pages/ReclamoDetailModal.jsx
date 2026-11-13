@@ -324,6 +324,49 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
         });
     };
 
+    const handleCambiarEstadoInocuidad = (nuevoEstado) => {
+        const esResuelto = nuevoEstado === 'Resuelto';
+        const esImposibilidad = nuevoEstado === 'Imposibilidad';
+        showConfirmModal({
+            title: esResuelto
+                ? 'Confirmar Dictamen de Calidad (Resuelto)'
+                : esImposibilidad
+                    ? 'Informar Imposibilidad Técnica en Calidad'
+                    : 'Reabrir Análisis de Calidad & Inocuidad',
+            message: esResuelto
+                ? `¿Confirmar que el análisis técnico de Calidad & Inocuidad para el reclamo #${activeClaim.id} fue completado satisfactoriamente ("Resuelto")?`
+                : esImposibilidad
+                    ? `¿Registrar "Imposibilidad" técnica o falta de muestras/datos para el análisis del reclamo #${activeClaim.id}?`
+                    : `¿Reabrir el expediente de Calidad & Inocuidad del reclamo #${activeClaim.id} volviendo su estado a "Pendiente"?`,
+            variant: esImposibilidad ? 'danger' : 'primary',
+            confirmText: esResuelto ? 'Confirmar Resuelto' : (esImposibilidad ? 'Registrar Imposibilidad' : 'Reabrir a Pendiente'),
+            onConfirm: async () => {
+                setLoadingTitle('Actualizando Estado de Calidad & Inocuidad...');
+                setLoadingMessage(`Registrando estado "${nuevoEstado}" en base de datos y Google Sheets...`);
+                setUpdating(true);
+                setActionMsg(null);
+                try {
+                    const res = await reclamosApi.updateEstadoInocuidad(activeClaim.id, nuevoEstado);
+                    const nowIso = new Date().toISOString();
+                    setCurrentClaim(prev => ({
+                        ...(prev || activeClaim),
+                        estado_inocuidad: nuevoEstado,
+                        fecha_estado_inocuidad: nowIso
+                    }));
+                    setActionMsg({
+                        type: 'success',
+                        text: res.data?.message || `Estado de Calidad & Inocuidad actualizado a "${nuevoEstado}".`
+                    });
+                    if (onRefresh) onRefresh();
+                } catch (e) {
+                    setActionMsg({ type: 'error', text: 'Error al actualizar estado de Inocuidad: ' + (e.response?.data?.error || e.message) });
+                } finally {
+                    setUpdating(false);
+                }
+            }
+        });
+    };
+
     const handleReenviarInocuidad = () => {
         showConfirmModal({
             title: `Reenviar a Calidad & Inocuidad`,
@@ -469,41 +512,43 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                 )}
 
                 {/* DIAGRAMA DE WORKFLOW EN RAMAS */}
-                {isAdmin && (
+                {(isAdmin || isInocuidad) && (
                     <div className="workflow-diagram-card">
-                        {/* Barra superior con botón de reinicio y simulador temporal */}
-                        <div className="workflow-top-bar" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12 }}>
-                            <button
-                                type="button"
-                                className="btn btn-secondary"
-                                data-testid="btn-abrir-simulador"
-                                onClick={() => setSimuladorOpen(true)}
-                                disabled={updating}
-                                style={{
-                                    padding: '4px 10px',
-                                    fontSize: '0.75rem',
-                                    gap: 5,
-                                    color: '#0d2c5c',
-                                    borderColor: '#bfdbfe',
-                                    background: '#eff6ff',
-                                    fontWeight: 600
-                                }}
-                                title="Simular el avance en el tiempo del cron y disparar recordatorios a la casilla de pruebas sin alterar Google Sheets."
-                            >
-                                <Clock size={12} color="#0d2c5c" />
-                                <span>⏱️ Simular Avance Temporal (Cron)</span>
-                            </button>
-                            <button
-                                className="btn btn-secondary"
-                                onClick={handleReiniciarFlujo}
-                                disabled={updating}
-                                style={{ padding: '4px 10px', fontSize: '0.75rem', gap: 4 }}
-                                title="Reiniciar flujo completo: Devuelve el reclamo al estado inicial de Recepción, permitiendo reasignar supervisor o reevaluar el reclamo."
-                            >
-                                <RotateCcw size={12} />
-                                <span>Reiniciar Flujo</span>
-                            </button>
-                        </div>
+                        {/* Barra superior con botón de reinicio y simulador temporal (Solo Administradores) */}
+                        {isAdmin && (
+                            <div className="workflow-top-bar" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 12 }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-secondary"
+                                    data-testid="btn-abrir-simulador"
+                                    onClick={() => setSimuladorOpen(true)}
+                                    disabled={updating}
+                                    style={{
+                                        padding: '4px 10px',
+                                        fontSize: '0.75rem',
+                                        gap: 5,
+                                        color: '#0d2c5c',
+                                        borderColor: '#bfdbfe',
+                                        background: '#eff6ff',
+                                        fontWeight: 600
+                                    }}
+                                    title="Simular el avance en el tiempo del cron y disparar recordatorios a la casilla de pruebas sin alterar Google Sheets."
+                                >
+                                    <Clock size={12} color="#0d2c5c" />
+                                    <span>⏱️ Simular Avance Temporal (Cron)</span>
+                                </button>
+                                <button
+                                    className="btn btn-secondary"
+                                    onClick={handleReiniciarFlujo}
+                                    disabled={updating}
+                                    style={{ padding: '4px 10px', fontSize: '0.75rem', gap: 4 }}
+                                    title="Reiniciar flujo completo: Devuelve el reclamo al estado inicial de Recepción, permitiendo reasignar supervisor o reevaluar el reclamo."
+                                >
+                                    <RotateCcw size={12} />
+                                    <span>Reiniciar Flujo</span>
+                                </button>
+                            </div>
+                        )}
 
                         {/* Grilla de 4 Ramas */}
                         <div className="workflow-tree-grid">
@@ -586,8 +631,8 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                     </div>
                                 )}
 
-                                {/* Botones de acción en recepción: Desaprobar primero, Aprobar por debajo */}
-                                {isEnRecepcion && (
+                                {/* Botones de acción en recepción (Solo Administradores): Desaprobar primero, Aprobar por debajo */}
+                                {isAdmin && isEnRecepcion && (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 'auto' }}>
                                         <button
                                             className="wf-node-btn wf-danger"
@@ -663,8 +708,53 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                     )}
                                 </div>
 
+                                {/* Acciones de Dictamen para Calidad & Inocuidad o Administradores */}
+                                {isReclamoAprobado && (isInocuidad || isAdmin) && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 'auto', paddingBottom: isAdmin ? 24 : 0 }}>
+                                        {(activeClaim.estado_inocuidad === 'Pendiente' || !activeClaim.estado_inocuidad) ? (
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    className="wf-node-btn wf-primary"
+                                                    data-testid="btn-inocuidad-resuelto"
+                                                    onClick={() => handleCambiarEstadoInocuidad('Resuelto')}
+                                                    disabled={updating}
+                                                    title="Marcar análisis técnico de Calidad & Inocuidad como Resuelto"
+                                                >
+                                                    <CheckCircle2 size={14} />
+                                                    <span>Dictamen Resuelto</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="wf-node-btn wf-danger"
+                                                    data-testid="btn-inocuidad-imposibilidad"
+                                                    onClick={() => handleCambiarEstadoInocuidad('Imposibilidad')}
+                                                    disabled={updating}
+                                                    title="Informar imposibilidad de verificación técnica o falta de muestra/datos"
+                                                >
+                                                    <X size={14} />
+                                                    <span>Imposibilidad Técnica</span>
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                className="btn btn-secondary"
+                                                data-testid="btn-inocuidad-reabrir"
+                                                onClick={() => handleCambiarEstadoInocuidad('Pendiente')}
+                                                disabled={updating}
+                                                style={{ fontSize: '0.72rem', padding: '5px 8px', justifyContent: 'center' }}
+                                                title="Reabrir análisis técnico volviendo el estado a Pendiente"
+                                            >
+                                                <RotateCcw size={12} />
+                                                <span>Reabrir Análisis</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+
                                 {/* Botón sutil en la esquina inferior derecha para reenviar email a Inocuidad */}
-                                {isReclamoAprobado && (
+                                {isAdmin && isReclamoAprobado && (
                                     <button
                                         type="button"
                                         className="wf-card-resend-btn"
@@ -707,8 +797,8 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                     )}
                                 </div>
 
-                                {/* Selector de supervisor disponible SOLO si está en recepción (antes de ser aprobado) */}
-                                {isEnRecepcion && (
+                                {/* Selector de supervisor disponible SOLO si está en recepción y es Administrador */}
+                                {isAdmin && isEnRecepcion && (
                                     <div className="wf-select-action-row" style={{ marginTop: 'auto' }}>
                                         <select
                                             value={selectedSupervisor || activeClaim.supervisor || ''}
@@ -778,7 +868,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
                                 )}
 
                                 {/* Botón sutil en la esquina inferior derecha para reenviar email al Supervisor */}
-                                {isReclamoAprobado && (
+                                {isAdmin && isReclamoAprobado && (
                                     <button
                                         type="button"
                                         className="wf-card-resend-btn"

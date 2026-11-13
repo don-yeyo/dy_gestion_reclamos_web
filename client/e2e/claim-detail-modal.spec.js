@@ -231,4 +231,27 @@ test.describe('CU-05, CU-06, CU-08: Gestión de Expediente en Modal de Detalle',
         await expect(cardIngreso).toContainText('Desaprobado');
         await expect(cardIngreso).toContainText('Producto con fecha de vencimiento expirada');
     });
+
+    test('Gestión de Calidad & Inocuidad: permite registrar dictamen Resuelto desde la Card 2', async ({ page }) => {
+        await page.goto('/reclamos');
+
+        // Abrir reclamo REC-2026-003 (Ya aprobado / En curso con estado_inocuidad Pendiente)
+        await page.locator('tr', { hasText: 'REC-2026-003' }).click();
+        await expect(page.locator('.modal-overlay').first()).toBeVisible();
+
+        const cardInocuidad = page.locator('.wf-branch-card', { hasText: '2. Calidad & Inocuidad' });
+        await expect(cardInocuidad).toBeVisible();
+
+        const btnDictamenResuelto = cardInocuidad.locator('[data-testid="btn-inocuidad-resuelto"]');
+        await expect(btnDictamenResuelto).toBeVisible();
+        await btnDictamenResuelto.click();
+
+        // Confirmar en modal de confirmación
+        const btnConfirmar = page.getByRole('button', { name: 'Confirmar Resuelto' });
+        await expect(btnConfirmar).toBeVisible();
+        await btnConfirmar.click();
+
+        await expect(page.getByText('Estado de inocuidad actualizado a "Resuelto".')).toBeVisible();
+        await expect(cardInocuidad).toContainText('Resuelto');
+    });
 });
