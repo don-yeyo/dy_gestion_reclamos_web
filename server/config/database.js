@@ -603,6 +603,19 @@ async function initDatabase() {
                     ON DUPLICATE KEY UPDATE categoria = VALUES(categoria), etiqueta = VALUES(etiqueta), descripcion = VALUES(descripcion), valor_defecto = VALUES(valor_defecto)
                 `, cfg);
             }
+        } else {
+            // Asegurar que las claves más recientes existan incluso en bases de datos ya sembradas previamente
+            const clavesRecientes = [
+                ['mensaje_conservar_muestra', 'Por favor, recordá conservar el producto reclamado junto a su envase y lote original para un eventual peritaje o análisis de laboratorio.', 'general', 'Mensaje de Conservación de Muestra', 'Texto de recomendación al registrar un nuevo reclamo', 'Por favor, recordá conservar el producto reclamado junto a su envase y lote original para un eventual peritaje o análisis de laboratorio.'],
+                ['mensaje_reapertura_personal', 'Si necesitás reconsiderar tu decisión o reabrir el expediente de este reclamo, por favor contactate con la Administración de Don Yeyo S.A. indicando el número de caso.', 'general', 'Mensaje de Reabrir Caso (Personal Interno / Supervisión / Inocuidad)', 'Texto de orientación mostrado a Supervisores o Personal de Calidad cuando intentan accionar sobre un reclamo que ya registró un cambio de estado previo.', 'Si necesitás reconsiderar tu decisión o reabrir el expediente de este reclamo, por favor contactate con la Administración de Don Yeyo S.A. indicando el número de caso.']
+            ];
+            for (const cfg of clavesRecientes) {
+                await connection.query(`
+                    INSERT INTO config_sistema (clave, valor, categoria, etiqueta, descripcion, valor_defecto)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE categoria = VALUES(categoria), etiqueta = VALUES(etiqueta), descripcion = VALUES(descripcion), valor_defecto = VALUES(valor_defecto)
+                `, cfg);
+            }
         }
 
         console.log('[MYSQL] Estructura de tablas, índices y triggers inicializados correctamente.');

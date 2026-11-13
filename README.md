@@ -576,6 +576,24 @@ Para garantizar la integridad del flujo de negocio y prevenir estados inconsiste
      - Un bloque destacado con instrucciones sobre cómo proceder si necesita reconsiderar su decisión o reabrir el caso.
    - **Texto de Reapertura Parametrizable:** El mensaje instructivo no se encuentra hardcodeado; se almacena bajo la clave `mensaje_reapertura_personal` en la tabla `config_sistema` y puede ser editado y restablecido a fábrica por los administradores desde `/configuracion/parametros`.
 
+3. **Aprobación o Rechazo Directo desde el Email del Administrador (con Protección Anti-Replay):**
+   - El correo inicial enviado a los administradores incorpora enlaces firmados para **`▶ Poner En Curso (Aprobar)`** y **`✕ Rechazar Reclamo`**, dirigiendo a `/api/public/actions/admin-quick?token=...` (con soporte de `?mode=desaprobar`).
+   - En la vista pública `admin-quick`, el administrador puede alternar entre **Aprobar Reclamo** (definiendo Nivel de Urgencia y Supervisor) y **Rechazar / Desaprobar Reclamo** (seleccionando el motivo formal visible al consumidor y la observación interna obligatoria de auditoría vía `POST /api/public/actions/admin-confirm-rejection`).
+   - Si el reclamo ya fue gestionado previamente (`estado_admin !== 'Pendiente'`), se bloquean nuevas modificaciones desde el correo mostrando el estado actual y su fecha de procesamiento.
+
+---
+
+## 🔬 Soporte Integral para el Rol Calidad / Inocuidad y Portal Público
+
+1. **Operación de Calidad & Inocuidad en el Gestor Web ([ReclamoDetailModal.jsx](file:///c:/Users/gabrielt/Documents/Proyectos/GestionReclamosWeb/dy_gestion_reclamos_web/client/src/pages/ReclamoDetailModal.jsx)):**
+   - Los usuarios autenticados con el rol `inocuidad` (`EMAILS_INOCUIDAD`) acceden al Dashboard, la Bandeja de Reclamos y el diagrama interactivo de estados de las 4 ramas.
+   - En la tarjeta **`2. Calidad & Inocuidad`** de un reclamo en curso, disponen de los botones de dictamen directo (**`Dictamen Resuelto`**, **`Imposibilidad Técnica`** y **`Reabrir Análisis`**) conectados a `PATCH /api/reclamos/:id/estado-inocuidad`, mientras que las acciones exclusivas de Administración (aprobar/desaprobar en Card 1, reasignación de supervisores y simulador temporal) permanecen restringidas al rol `admin`.
+2. **Centralización de URLs de Entorno ([server/config/urls.js](file:///c:/Users/gabrielt/Documents/Proyectos/GestionReclamosWeb/dy_gestion_reclamos_web/server/config/urls.js)):**
+   - En producción (Netlify), `PUBLIC_SITE_URL` unifica la URL base tanto del frontend como de las funciones `/api/*` (con detección automática de `process.env.URL` de Netlify), mientras que en desarrollo local se emplean `FRONTEND_URL` (`http://localhost:5173`) y `BACKEND_URL` (`http://localhost:3001`), manteniendo retrocompatibilidad con `APP_BASE_URL` y `API_BASE_URL`.
+3. **Endpoints Públicos para el Portal del Consumidor (`donyeyo.com.ar`):**
+   - `GET /api/public/config-consumidor`: Expone el parámetro configurable `mensaje_conservar_muestra` y el catálogo de estados de `consumidor` con sus descripciones amigables y colores.
+   - `GET /api/public/mis-reclamos/:id`: Devuelve el estado público del reclamo junto con su descripción amigable y motivo formal de cierre (sin exponer jamás observaciones internas de auditoría).
+
 ---
 
 ## 📄 Licencia y Confidencialidad

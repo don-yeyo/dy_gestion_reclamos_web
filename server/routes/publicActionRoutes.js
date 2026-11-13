@@ -28,6 +28,95 @@ router.get('/productos', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/public/config-consumidor
+ * Expone configuraciones públicas seguras para el portal web del consumidor (donyeyo.com.ar):
+ * - mensaje_conservar_muestra
+ * - estados_consumidor (con descripción amigable y color de badge)
+ */
+router.get('/config-consumidor', async (req, res) => {
+    try {
+        const configuracionService = require('../services/configuracionService');
+        const mensajeConservarMuestra = await configuracionService.get(
+            'mensaje_conservar_muestra',
+            'Por favor, recordá conservar el producto reclamado junto a su envase y lote original para un eventual peritaje o análisis de laboratorio.'
+        );
+
+        const allEstados = await reclamosDatabaseService.getWorkflowEstados();
+        const estadosConsumidor = (allEstados || [])
+            .filter(e => String(e.actor || '').toLowerCase() === 'consumidor')
+            .map(e => ({
+                codigo: e.codigo,
+                nombre: e.nombre,
+                descripcion: e.descripcion,
+                color: e.color || '#151C5B',
+                orden: e.orden
+            }));
+
+        const estadosMapa = {};
+        for (const est of estadosConsumidor) {
+            estadosMapa[est.codigo] = est;
+        }
+
+        res.json({
+            success: true,
+            mensaje_conservar_muestra: mensajeConservarMuestra,
+            estados_consumidor: estadosConsumidor,
+            estados_mapa: estadosMapa
+        });
+    } catch (err) {
+        console.error('[PUBLIC API] Error en config-consumidor:', err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * GET /api/public/mis-reclamos/:id
+ * Devuelve el estado público higienizado de un reclamo para la pantalla mis-reclamos de donyeyo.com.ar,
+ * incluyendo la descripción amigable del estado configurada en workflow_estados y ocultando
+ * estrictamente observaciones internas confidenciales.
+ */
+router.get('/mis-reclamos/:id', async (req, res) => {
+    const claimId = String(req.params.id || '').trim();
+    if (!claimId || !/^\d+$/.test(claimId)) {
+        return res.status(400).json({ success: false, error: 'Número de reclamo inválido.' });
+    }
+
+    try {
+        const claim = await googleSheetsService.getReclamoById(claimId);
+        if (!claim) {
+            return res.status(404).json({ success: false, error: 'Reclamo no encontrado.' });
+        }
+
+        const allEstados = await reclamosDatabaseService.getWorkflowEstados();
+        const estadosConsumidor = (allEstados || []).filter(e => String(e.actor || '').toLowerCase() === 'consumidor');
+        const estadoActual = claim.estado_consumidor || 'Pendiente';
+        const estadoObj = estadosConsumidor.find(e => e.codigo.toLowerCase() === estadoActual.toLowerCase()) || null;
+
+        let motivoCierrePublico = '';
+        if (claim.estado_admin === 'Desaprobado' && claim.tipo_desaprobacion) {
+            motivoCierrePublico = claim.tipo_desaprobacion;
+        } else if (claim.estado_supervisor === 'Imposibilidad' && claim.tipo_imposibilidad) {
+            motivoCierrePublico = claim.tipo_imposibilidad;
+        }
+
+        res.json({
+            success: true,
+            reclamo: {
+                id: claim.id,
+                fecha_ingreso: claim.fecha_alta || '',
+                estado: estadoActual,
+                estado_color: estadoObj?.color || '#151C5B',
+                estado_descripcion: estadoObj?.descripcion || '',
+                motivo_cierre_publico: motivoCierrePublico
+            }
+        });
+    } catch (err) {
+        console.error('[PUBLIC API] Error consultando mis-reclamos:', err.message);
+        res.status(500).json({ success: false, error: 'No se pudo consultar el estado del reclamo.' });
+    }
+});
+
 const SUPERVISORES_OFICIALES = [
     { nombre: 'Hugo Basile', email: 'hugob@donyeyo.com.ar' },
     { nombre: 'Gustavo Orgaz', email: 'gustavoeo@donyeyo.com.ar' },
