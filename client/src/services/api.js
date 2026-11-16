@@ -123,6 +123,7 @@ export const categoriasApi = {
     getAll: (params) => api.get('/categorias', { params }),
     create: (data) => api.post('/categorias', data),
     update: (id, data) => api.put(`/categorias/${id}`, data),
+    delete: (id) => api.delete(`/categorias/${id}`),
     toggle: (id) => api.patch(`/categorias/${id}/toggle`)
 };
 
@@ -131,7 +132,9 @@ export const productosApi = {
     searchPublic: (query) => api.get('/public/productos', { params: { q: query } }),
     create: (data) => api.post('/productos', data),
     update: (id, data) => api.put(`/productos/${id}`, data),
-    toggle: (id) => api.patch(`/productos/${id}/toggle`)
+    delete: (id) => api.delete(`/productos/${id}`),
+    toggle: (id) => api.patch(`/productos/${id}/toggle`),
+    syncCsv: () => api.post('/productos/sync-csv')
 };
 
 export const simuladorApi = {

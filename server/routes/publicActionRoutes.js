@@ -9,21 +9,48 @@ const productosService = require('../services/productosService');
 const { APP_BASE_URL, API_BASE_URL } = require('../config/urls');
 
 /**
- * GET /productos o /api/public/productos?q={busqueda}
- * Endpoint público con búsqueda predictiva por nombre de empaque ( packaging )
- * Orden alfabético ASC para selección ágil en formulario web de consumidores
+ * GET /productos o /api/public/productos?q={busqueda}&categoria={categoria}
+ * Endpoint público externo que obtiene la lista completa de productos y sus categorías
+ * Orden alfabético ASC para selección ágil en formulario web de consumidores y sistemas externos
  */
 router.get('/productos', async (req, res) => {
     try {
         const query = req.query.q || '';
-        const productos = await productosService.searchPublic(query);
+        const categoria = req.query.categoria || '';
+        const catalog = await productosService.getPublicCatalog(query, categoria);
         res.json({
             success: true,
-            total: productos.length,
-            data: productos
+            total: catalog.productos.length,
+            data: catalog.productos,
+            productos: catalog.productos,
+            categorias: catalog.categorias,
+            por_categoria: catalog.por_categoria
         });
     } catch (err) {
-        console.error('[PUBLIC API] Error en búsqueda predictiva de productos:', err.message);
+        console.error('[PUBLIC API] Error en consulta pública de productos y categorías:', err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * GET /catalogo-productos o /api/public/catalogo-productos
+ * Alias explícito para consulta externa de productos y categorías
+ */
+router.get('/catalogo-productos', async (req, res) => {
+    try {
+        const query = req.query.q || '';
+        const categoria = req.query.categoria || '';
+        const catalog = await productosService.getPublicCatalog(query, categoria);
+        res.json({
+            success: true,
+            total: catalog.productos.length,
+            data: catalog.productos,
+            productos: catalog.productos,
+            categorias: catalog.categorias,
+            por_categoria: catalog.por_categoria
+        });
+    } catch (err) {
+        console.error('[PUBLIC API] Error en catalogo-productos:', err.message);
         res.status(500).json({ success: false, message: err.message });
     }
 });

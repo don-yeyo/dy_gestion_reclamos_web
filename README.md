@@ -591,8 +591,15 @@ Para garantizar la integridad del flujo de negocio y prevenir estados inconsiste
 2. **Centralización de URLs de Entorno ([server/config/urls.js](file:///c:/Users/gabrielt/Documents/Proyectos/GestionReclamosWeb/dy_gestion_reclamos_web/server/config/urls.js)):**
    - En producción (Netlify), `PUBLIC_SITE_URL` unifica la URL base tanto del frontend como de las funciones `/api/*` (con detección automática de `process.env.URL` de Netlify), mientras que en desarrollo local se emplean `FRONTEND_URL` (`http://localhost:5173`) y `BACKEND_URL` (`http://localhost:3001`), manteniendo retrocompatibilidad con `APP_BASE_URL` y `API_BASE_URL`.
 3. **Endpoints Públicos para el Portal del Consumidor (`donyeyo.com.ar`):**
+   - `GET /api/public/productos` y `GET /api/public/catalogo-productos`: Expone de forma externa la lista completa de productos activos, las categorías activas (`PANIFICADOS`, `PASTA`, `TAPAS`, `OTROS`) y el objeto agrupado `por_categoria`, soportando filtrado por `?q=` y `?categoria=`.
    - `GET /api/public/config-consumidor`: Expone el parámetro configurable `mensaje_conservar_muestra` y el catálogo de estados de `consumidor` con sus descripciones amigables y colores.
    - `GET /api/public/mis-reclamos/:id`: Devuelve el estado público del reclamo junto con su descripción amigable y motivo formal de cierre (sin exponer jamás observaciones internas de auditoría).
+4. **CRUD de Productos y Categorías con Sincronización CSV (`/configuracion/productos` y `/configuracion/categorias`):**
+   - Gestión integral (Alta, Edición, Baja y Activación/Desactivación) de **Productos** (`productos`) y **Categorías** (`producto_categorias`) persistida en MySQL.
+   - Poblado inicial e importación bajo demanda (`POST /api/productos/sync-csv`) a partir del catálogo maestro `productos_reclamos.csv` (58 productos distribuidos en `PANIFICADOS`, `PASTA`, `TAPAS` y `OTROS`).
+5. **Grilla Avanzada de Reclamos y Dashboard Analítico:**
+   - En `/reclamos` ([ReclamosList.jsx](file:///c:/Users/gabrielt/Documents/Proyectos/GestionReclamosWeb/dy_gestion_reclamos_web/client/src/pages/ReclamosList.jsx)), la grilla incluye las columnas **Fecha de Ingreso** y **Urgencia**, permitiendo ordenar ascendente/descendentemente y filtrar de forma individual por **cualquier columna**.
+   - En `/` ([Dashboard.jsx](file:///c:/Users/gabrielt/Documents/Proyectos/GestionReclamosWeb/dy_gestion_reclamos_web/client/src/pages/Dashboard.jsx)), se exhiben gráficos de barras de evolución mensual (Reclamos Ingresados vs. Resueltos), gráfico de torta/donut de distribución por estado administrativo, distribución por nivel de urgencia y barras de progreso operativo por sector.
 
 ---
 

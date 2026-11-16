@@ -493,24 +493,6 @@ async function initDatabase() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
-        // Sembrado inicial de categorías de productos si está vacía
-        const [catsExistentes] = await connection.query(`SELECT COUNT(*) as cant FROM producto_categorias`);
-        if (catsExistentes && catsExistentes[0] && catsExistentes[0].cant === 0) {
-            console.log('[STARTUP] Sembrando categorías de productos iniciales con emails de inocuidad...');
-            const categoriasIniciales = [
-                ['Pastas Frescas', 'inocuidad.pastas@donyeyo.com.ar, calidad@donyeyo.com.ar', 1],
-                ['Tapas y Masas', 'inocuidad.tapas@donyeyo.com.ar, calidad@donyeyo.com.ar', 1],
-                ['Panificados y Secos', 'inocuidad.panificados@donyeyo.com.ar, calidad@donyeyo.com.ar', 1]
-            ];
-            for (const cat of categoriasIniciales) {
-                await connection.query(`
-                    INSERT INTO producto_categorias (nombre, inocuidad_emails, activo)
-                    VALUES (?, ?, ?)
-                    ON DUPLICATE KEY UPDATE inocuidad_emails = VALUES(inocuidad_emails)
-                `, cat);
-            }
-        }
-
         // 9. Tabla de Catálogo de Productos (nombre interno, packaging y categoría)
         await connection.query(`
             CREATE TABLE IF NOT EXISTS productos (
@@ -528,24 +510,12 @@ async function initDatabase() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
-        // Sembrado inicial de productos si está vacía
+        // Sembrado / sincronización inicial de categorías y productos desde productos_reclamos.csv
         const [prodsExistentes] = await connection.query(`SELECT COUNT(*) as cant FROM productos`);
-        if (prodsExistentes && prodsExistentes[0] && prodsExistentes[0].cant === 0) {
-            console.log('[STARTUP] Sembrando productos iniciales de catálogo...');
-            const productosIniciales = [
-                ['Ravioles de Ricota y Pollo 500g', 'Ravioles Ricota y Pollo Don Yeyo x 500g', 1, 1],
-                ['Ñoquis de Papa 500g', 'Ñoquis de Papa Clásicos Don Yeyo x 500g', 1, 1],
-                ['Tallarines al Huevo 500g', 'Fideos Tallarines al Huevo Don Yeyo x 500g', 1, 1],
-                ['Tapas de Empanadas Hojaldre x 12', 'Tapas para Empanadas Hojaldradas Don Yeyo 12 un', 2, 1],
-                ['Tapas de Pascualina Criolla x 2', 'Pascualina Criolla Don Yeyo x 2 discos', 2, 1],
-                ['Pan de Mesa Blanco 400g', 'Pan de Mesa Lactal Blanco Don Yeyo 400g', 3, 1]
-            ];
-            for (const prod of productosIniciales) {
-                await connection.query(`
-                    INSERT INTO productos (nombre_interno, nombre_empaque, categoria_id, activo)
-                    VALUES (?, ?, ?, ?)
-                `, prod);
-            }
+        if (!prodsExistentes || !prodsExistentes[0] || prodsExistentes[0].cant < 50) {
+            console.log('[STARTUP] Poblando catálogo de productos y categorías desde productos_reclamos.csv...');
+            const productosService = require('../services/productosService');
+            await productosService.syncFromCsv(connection);
         }
 
         // 10. Tabla de Configuración Global del Sistema (Textos de Emails, Botones y Parámetros)

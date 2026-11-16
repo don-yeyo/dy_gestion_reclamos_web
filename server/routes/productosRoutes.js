@@ -41,6 +41,17 @@ router.put('/categorias/:id', async (req, res) => {
     }
 });
 
+router.delete('/categorias/:id', async (req, res) => {
+    try {
+        const userEmail = req.headers['x-user-email'] || req.query.user || 'admin';
+        const eliminada = await productosService.deleteCategoria(req.params.id, userEmail);
+        res.json({ success: true, data: eliminada, message: 'Categoría eliminada exitosamente' });
+    } catch (err) {
+        console.error('[CATEGORIAS API] Error al eliminar categoría:', err.message);
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
 router.patch('/categorias/:id/toggle', async (req, res) => {
     try {
         const userEmail = req.headers['x-user-email'] || req.query.user || 'admin';
@@ -60,13 +71,30 @@ router.get('/productos', async (req, res) => {
     try {
         const filters = {
             categoria_id: req.query.categoria_id,
+            categoria: req.query.categoria,
             activo: req.query.activo,
             q: req.query.q
         };
         const productos = await productosService.getProductos(filters);
-        res.json({ success: true, data: productos });
+        const categorias = await productosService.getCategorias({ activo: req.query.activo });
+        res.json({ success: true, total: productos.length, data: productos, categorias });
     } catch (err) {
         console.error('[PRODUCTOS API] Error al obtener productos:', err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+router.post('/productos/sync-csv', async (req, res) => {
+    try {
+        const userEmail = req.headers['x-user-email'] || req.query.user || 'admin';
+        const result = await productosService.syncFromCsv(null, userEmail);
+        res.json({
+            success: true,
+            data: result,
+            message: `Catálogo sincronizado desde CSV (${result.inserted} nuevos, ${result.updated} actualizados).`
+        });
+    } catch (err) {
+        console.error('[PRODUCTOS API] Error sincronizando CSV:', err.message);
         res.status(500).json({ success: false, message: err.message });
     }
 });
@@ -89,6 +117,17 @@ router.put('/productos/:id', async (req, res) => {
         res.json({ success: true, data: actualizado, message: 'Producto actualizado exitosamente' });
     } catch (err) {
         console.error('[PRODUCTOS API] Error al actualizar producto:', err.message);
+        res.status(400).json({ success: false, message: err.message });
+    }
+});
+
+router.delete('/productos/:id', async (req, res) => {
+    try {
+        const userEmail = req.headers['x-user-email'] || req.query.user || 'admin';
+        const eliminado = await productosService.deleteProducto(req.params.id, userEmail);
+        res.json({ success: true, data: eliminado, message: 'Producto eliminado exitosamente' });
+    } catch (err) {
+        console.error('[PRODUCTOS API] Error al eliminar producto:', err.message);
         res.status(400).json({ success: false, message: err.message });
     }
 });

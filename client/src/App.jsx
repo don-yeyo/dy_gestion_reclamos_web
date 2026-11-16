@@ -33,6 +33,8 @@ export const App = () => {
                 <Route path="/logs" element={<LogsList />} />
                 <Route path="/logs/:id" element={<LogsList />} />
                 <Route path="/logs/:categoria/:id" element={<LogsList />} />
+                <Route path="/productos" element={<Navigate to="/configuracion/productos" replace />} />
+                <Route path="/categorias" element={<Navigate to="/configuracion/categorias" replace />} />
                 <Route path="/configuracion" element={<ConfiguracionPage />} />
                 <Route path="/configuracion/:tab" element={<ConfiguracionPage />} />
                 <Route path="/configuracion/:tab/:item" element={<ConfiguracionPage />} />

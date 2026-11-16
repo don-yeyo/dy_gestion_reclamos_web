@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Settings, Mail, Tag, Package, Sliders, Save, RotateCcw, Plus,
-    Edit2, Check, X, AlertCircle, Info, RefreshCw, Eye, ExternalLink,
+    Edit2, Trash2, Check, X, AlertCircle, Info, RefreshCw, Eye, ExternalLink,
     Search, CheckCircle2, Send, ShieldAlert, Sparkles, HelpCircle, Image
 } from 'lucide-react';
 import { configuracionApi, categoriasApi, productosApi } from '../services/api';
@@ -39,6 +39,8 @@ export const ConfiguracionPage = () => {
     // Estado para Productos (Tab 3)
     const [productos, setProductos] = useState([]);
     const [productosSearch, setProductosSearch] = useState('');
+    const [productosCatFilter, setProductosCatFilter] = useState('ALL');
+    const [syncingCsv, setSyncingCsv] = useState(false);
     const [editingProducto, setEditingProducto] = useState(null);
     const [productoModalOpen, setProductoModalOpen] = useState(false);
     const [productoForm, setProductoForm] = useState({ nombre_interno: '', nombre_empaque: '', categoria_id: '', activo: 1 });
@@ -331,6 +333,19 @@ export const ConfiguracionPage = () => {
         }
     };
 
+    const handleDeleteCategoria = async (cat) => {
+        if (!window.confirm(`¿Estás seguro de eliminar la categoría "${cat.nombre}"?`)) return;
+        try {
+            await categoriasApi.delete(cat.id);
+            const res = await categoriasApi.getAll();
+            if (res.data?.success) setCategorias(res.data.data);
+            showNotification(`Categoría "${cat.nombre}" eliminada.`);
+        } catch (err) {
+            console.error('Error eliminando categoría:', err);
+            showNotification(err.response?.data?.message || 'No se pudo eliminar la categoría.', true);
+        }
+    };
+
     // Operaciones sobre Productos
     const handleOpenProductoModal = (prod = null) => {
         if (prod) {
@@ -397,8 +412,41 @@ export const ConfiguracionPage = () => {
         }
     };
 
+    const handleDeleteProducto = async (prod) => {
+        if (!window.confirm(`¿Estás seguro de eliminar el producto "${prod.nombre_empaque}"?`)) return;
+        try {
+            await productosApi.delete(prod.id);
+            const [resProd, resCat] = await Promise.all([productosApi.getAll(), categoriasApi.getAll()]);
+            if (resProd.data?.success) setProductos(resProd.data.data);
+            if (resCat.data?.success) setCategorias(resCat.data.data);
+            showNotification(`Producto "${prod.nombre_empaque}" eliminado.`);
+        } catch (err) {
+            console.error('Error eliminando producto:', err);
+            showNotification(err.response?.data?.message || 'No se pudo eliminar el producto.', true);
+        }
+    };
+
+    const handleSyncCsv = async () => {
+        setSyncingCsv(true);
+        try {
+            const res = await productosApi.syncCsv();
+            const [resProd, resCat] = await Promise.all([productosApi.getAll(), categoriasApi.getAll()]);
+            if (resProd.data?.success) setProductos(resProd.data.data);
+            if (resCat.data?.success) setCategorias(resCat.data.data);
+            showNotification(res.data?.message || 'Catálogo sincronizado desde productos_reclamos.csv.');
+        } catch (err) {
+            console.error('Error sincronizando CSV:', err);
+            showNotification(err.response?.data?.message || 'Error al sincronizar desde CSV.', true);
+        } finally {
+            setSyncingCsv(false);
+        }
+    };
+
     // Filtro de productos
     const productosFiltrados = productos.filter(p => {
+        if (productosCatFilter !== 'ALL' && String(p.categoria_id) !== String(productosCatFilter) && String(p.categoria_nombre).toUpperCase() !== String(productosCatFilter).toUpperCase()) {
+            return false;
+        }
         if (!productosSearch.trim()) return true;
         const q = productosSearch.toLowerCase();
         return (
@@ -1323,7 +1371,10 @@ export const ConfiguracionPage = () => {
                                             {cat.id}
                                         </td>
                                         <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--heading-color)' }}>
-                                            {cat.nombre}
+                                            <div>{cat.nombre}</div>
+                                            <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                                                {cat.cantidad_productos || 0} productos asociados
+                                            </div>
                                         </td>
                                         <td style={{ padding: '12px 16px' }}>
                                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -1360,20 +1411,36 @@ export const ConfiguracionPage = () => {
                                             </button>
                                         </td>
                                         <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                            <button
-                                                onClick={() => handleOpenCategoriaModal(cat)}
-                                                style={{
-                                                    background: 'transparent',
-                                                    border: '1px solid var(--border)',
-                                                    color: 'var(--text-secondary)',
-                                                    padding: '5px 10px',
-                                                    borderRadius: '6px',
-                                                    cursor: 'pointer'
-                                                }}
-                                                title="Editar Categoría"
-                                            >
-                                                <Edit2 size={14} />
-                                            </button>
+                                            <div style={{ display: 'inline-flex', gap: 6 }}>
+                                                <button
+                                                    onClick={() => handleOpenCategoriaModal(cat)}
+                                                    style={{
+                                                        background: 'transparent',
+                                                        border: '1px solid var(--border)',
+                                                        color: 'var(--text-secondary)',
+                                                        padding: '5px 10px',
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                    title="Editar Categoría"
+                                                >
+                                                    <Edit2 size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteCategoria(cat)}
+                                                    style={{
+                                                        background: 'transparent',
+                                                        border: '1px solid rgba(239, 68, 68, 0.35)',
+                                                        color: 'var(--error)',
+                                                        padding: '5px 10px',
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                    title="Eliminar Categoría"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -1398,8 +1465,19 @@ export const ConfiguracionPage = () => {
                             </p>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                            <div style={{ position: 'relative', width: '280px' }}>
+                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <select
+                                value={productosCatFilter}
+                                onChange={(e) => setProductosCatFilter(e.target.value)}
+                                style={{ ...inputStyle, width: '190px', padding: '9px 12px' }}
+                            >
+                                <option value="ALL">Todas las categorías ({productos.length})</option>
+                                {categorias.map(c => (
+                                    <option key={c.id} value={c.id}>{c.nombre} ({c.cantidad_productos ?? ''})</option>
+                                ))}
+                            </select>
+
+                            <div style={{ position: 'relative', width: '250px' }}>
                                 <Search size={16} style={{ position: 'absolute', left: 12, top: 12, color: 'var(--text-muted)' }} />
                                 <input
                                     type="text"
@@ -1412,6 +1490,26 @@ export const ConfiguracionPage = () => {
                                     }}
                                 />
                             </div>
+
+                            <button
+                                onClick={handleSyncCsv}
+                                disabled={syncingCsv}
+                                className="btn btn-secondary"
+                                title="Sincronizar catálogo con productos_reclamos.csv"
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    padding: '8px 14px',
+                                    borderRadius: 'var(--radius-sm, 8px)',
+                                    cursor: 'pointer',
+                                    fontWeight: 600,
+                                    whiteSpace: 'nowrap'
+                                }}
+                            >
+                                <RefreshCw size={15} className={syncingCsv ? 'fa-spin' : ''} />
+                                <span>{syncingCsv ? 'Sincronizando...' : 'Sincronizar CSV'}</span>
+                            </button>
 
                             <button
                                 onClick={() => handleOpenProductoModal()}
@@ -1491,20 +1589,36 @@ export const ConfiguracionPage = () => {
                                             </button>
                                         </td>
                                         <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                            <button
-                                                onClick={() => handleOpenProductoModal(prod)}
-                                                style={{
-                                                    background: 'transparent',
-                                                    border: '1px solid var(--border)',
-                                                    color: 'var(--text-secondary)',
-                                                    padding: '5px 10px',
-                                                    borderRadius: '6px',
-                                                    cursor: 'pointer'
-                                                }}
-                                                title="Editar Producto"
-                                            >
-                                                <Edit2 size={14} />
-                                            </button>
+                                            <div style={{ display: 'inline-flex', gap: 6 }}>
+                                                <button
+                                                    onClick={() => handleOpenProductoModal(prod)}
+                                                    style={{
+                                                        background: 'transparent',
+                                                        border: '1px solid var(--border)',
+                                                        color: 'var(--text-secondary)',
+                                                        padding: '5px 10px',
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                    title="Editar Producto"
+                                                >
+                                                    <Edit2 size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteProducto(prod)}
+                                                    style={{
+                                                        background: 'transparent',
+                                                        border: '1px solid rgba(239, 68, 68, 0.35)',
+                                                        color: 'var(--error)',
+                                                        padding: '5px 10px',
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                    title="Eliminar Producto"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
