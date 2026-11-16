@@ -272,7 +272,7 @@ export const ReclamosList = () => {
 
     const isFiltered = activeFiltersCount > 0;
 
-    // Filtrado combinable y ordenamiento por cualquier columna usando appliedFilters
+    // Filtrado combinable y ordenamiento por cualquier columna
     const filteredReclamos = useMemo(() => {
         const f = appliedFilters;
         const filtered = reclamos.filter(r => {
@@ -758,15 +758,15 @@ export const ReclamosList = () => {
                                         {renderSortIcon('id')}
                                     </div>
                                 </th>
-                                <th style={{ width: '105px', ...sortableThStyle }} onClick={() => handleSort('fecha_ingreso')} title="Ordenar por Fecha de Ingreso">
+                                <th style={{ width: '95px', ...sortableThStyle }} onClick={() => handleSort('fecha_ingreso')} title="Ordenar por Fecha de Ingreso">
                                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                         <span>Fecha Ingreso</span>
                                         {renderSortIcon('fecha_ingreso')}
                                     </div>
                                 </th>
-                                <th style={{ width: '64px', textAlign: 'center', ...sortableThStyle }} onClick={() => handleSort('urgencia')} title="Ordenar por Nivel de Urgencia">
+                                <th style={{ width: '88px', textAlign: 'center', ...sortableThStyle }} onClick={() => handleSort('urgencia')} title="Ordenar por Nivel de Urgencia">
                                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                        <span>Urg.</span>
+                                        <span>Urgencia</span>
                                         {renderSortIcon('urgencia')}
                                     </div>
                                 </th>
@@ -878,7 +878,7 @@ export const ReclamosList = () => {
 
                                             {/* Fecha de Ingreso */}
                                             <td>
-                                                <div style={{ fontWeight: 600, fontSize: '0.81rem', whiteSpace: 'nowrap' }}>
+                                                <div className="claim-sub-text" style={{ whiteSpace: 'nowrap' }}>
                                                     {fechaCell.fecha}
                                                 </div>
                                                 {fechaCell.hora && (
@@ -888,27 +888,26 @@ export const ReclamosList = () => {
                                                 )}
                                             </td>
 
-                                            {/* Urgencia (Circular con Tooltip) */}
+                                            {/* Urgencia (Alta, Media, Baja; sin badge si no tiene asignada) */}
                                             <td style={{ textAlign: 'center' }}>
-                                                <span
-                                                    title={`Urgencia: ${urgMeta.label}`}
-                                                    style={{
-                                                        width: 28,
-                                                        height: 28,
-                                                        borderRadius: '50%',
-                                                        fontSize: '0.72rem',
-                                                        fontWeight: 800,
-                                                        background: urgMeta.bg,
-                                                        color: urgMeta.color,
-                                                        border: `1px solid ${urgMeta.border}`,
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        cursor: 'help'
-                                                    }}
-                                                >
-                                                    {urgMeta.abbr}
-                                                </span>
+                                                {urgMeta.order <= 3 && (
+                                                    <span
+                                                        title={`Urgencia: ${urgMeta.label}`}
+                                                        style={{
+                                                            display: 'inline-block',
+                                                            padding: '3px 9px',
+                                                            borderRadius: 999,
+                                                            fontSize: '0.72rem',
+                                                            fontWeight: 700,
+                                                            background: urgMeta.bg,
+                                                            color: urgMeta.color,
+                                                            border: `1px solid ${urgMeta.border}`,
+                                                            whiteSpace: 'nowrap'
+                                                        }}
+                                                    >
+                                                        {urgMeta.label}
+                                                    </span>
+                                                )}
                                             </td>
 
                                             {/* Consumidor (Nombre y Apellido) */}
