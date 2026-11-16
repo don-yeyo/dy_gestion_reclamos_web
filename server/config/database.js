@@ -129,6 +129,22 @@ async function initDatabase() {
             }
         }
 
+        // Reparación automática de fechas corruptas (< año 2000, ej. 1970-01-01 generadas por seriales de Google Sheets)
+        try {
+            await connection.query(`
+                UPDATE reclamos
+                SET fecha_carga = created_at
+                WHERE fecha_carga IS NOT NULL AND YEAR(fecha_carga) < 2000
+            `);
+            await connection.query(`
+                UPDATE reclamos
+                SET fecha_estado_admin = created_at
+                WHERE fecha_estado_admin IS NOT NULL AND YEAR(fecha_estado_admin) < 2000
+            `);
+        } catch (dateFixErr) {
+            console.warn('[MYSQL] Aviso al normalizar fechas históricas:', dateFixErr.message);
+        }
+
         // 3. Tabla de Prioridades del Workflow (Nivel de gravedad y reglas de cortesía)
         await connection.query(`
             CREATE TABLE IF NOT EXISTS workflow_prioridades (

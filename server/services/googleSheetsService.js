@@ -163,6 +163,78 @@ class GoogleSheetsService {
     }
 
     /**
+     * Convierte un número de serie de fecha de Google Sheets / Excel (días desde 1899-12-30)
+     * o una cadena de fecha a formato DD/MM/YYYY.
+     */
+    static parseSheetsDateToDdMmYyyy(val) {
+        if (val === null || val === undefined || val === '') return '';
+        const num = Number(val);
+        if (!isNaN(num) && num >= 20000 && num <= 90000 && (typeof val === 'number' || /^\d+(\.\d+)?$/.test(String(val).trim()))) {
+            const utcMs = Math.round((Math.floor(num) - 25569) * 86400 * 1000);
+            const d = new Date(utcMs);
+            const dd = String(d.getUTCDate()).padStart(2, '0');
+            const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+            const yyyy = d.getUTCFullYear();
+            return `${dd}/${mm}/${yyyy}`;
+        }
+        return String(val).trim();
+    }
+
+    /**
+     * Convierte un número de serie de fecha/hora de Google Sheets (en hora local Argentina UTC-3)
+     * o cadena de fecha/hora a ISO string válido (evitando que new Date(46342) genere 1970-01-01T00:00:46Z).
+     */
+    static parseSheetsDateTime(val, fallbackFechaAlta = '') {
+        if (val !== null && val !== undefined && val !== '') {
+            const num = Number(val);
+            if (!isNaN(num) && num >= 20000 && num <= 90000 && (typeof val === 'number' || /^\d+(\.\d+)?$/.test(String(val).trim()))) {
+                // El serial de Sheets representa la fecha/hora local de la hoja (Argentina UTC-3)
+                const wallClockUtcMs = Math.round((num - 25569) * 86400 * 1000);
+                const realUtcMs = wallClockUtcMs + (3 * 3600 * 1000);
+                return new Date(realUtcMs).toISOString();
+            }
+            const str = String(val).trim();
+            // Formato DD/MM/YYYY [HH:mm[:ss]]
+            const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:[,\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+            if (dmyMatch) {
+                const [, d, m, y, hh = '00', mm = '00', ss = '00'] = dmyMatch;
+                const parsed = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T${hh.padStart(2, '0')}:${mm.padStart(2, '0')}:${ss.padStart(2, '0')}-03:00`);
+                if (!isNaN(parsed.getTime()) && parsed.getFullYear() >= 2000) {
+                    return parsed.toISOString();
+                }
+            }
+            // Formato YYYY-MM-DD HH:mm:ss o ISO
+            const isoCandidate = new Date(str.includes('T') ? str : `${str.replace(' ', 'T')}-03:00`);
+            if (!isNaN(isoCandidate.getTime()) && isoCandidate.getFullYear() >= 2000) {
+                return isoCandidate.toISOString();
+            }
+            const fallbackParsed = new Date(str);
+            if (!isNaN(fallbackParsed.getTime()) && fallbackParsed.getFullYear() >= 2000) {
+                return fallbackParsed.toISOString();
+            }
+        }
+        if (fallbackFechaAlta) {
+            return GoogleSheetsService.parseSheetsDateTime(fallbackFechaAlta, '');
+        }
+        return '';
+    }
+
+    /**
+     * Convierte una fracción de día de Google Sheets (0 <= n < 1) a formato HH:mm
+     */
+    static parseSheetsTime(val) {
+        if (val === null || val === undefined || val === '') return '';
+        const num = Number(val);
+        if (!isNaN(num) && num >= 0 && num < 1 && (typeof val === 'number' || /^0\.\d+$/.test(String(val).trim()))) {
+            const totalMinutes = Math.round(num * 24 * 60);
+            const hh = String(Math.floor(totalMinutes / 60) % 24).padStart(2, '0');
+            const mm = String(totalMinutes % 60).padStart(2, '0');
+            return `${hh}:${mm}`;
+        }
+        return String(val).trim();
+    }
+
+    /**
      * Obtiene todos los reclamos desde la hoja de cálculo filtrados por corte numérico
     /**
      * Obtiene los reclamos consultando en primer término MySQL para máxima velocidad (<10ms).
@@ -238,23 +310,26 @@ class GoogleSheetsService {
                 producto: row[14] || '',
                 defecto: row[15] || '',
                 cantidad: row[16] || 1,
-                vto_reclamo: row[17] || '',
+                vto_reclamo: GoogleSheetsService.parseSheetsDateToDdMmYyyy(row[17]),
                 producto_cortesia: row[18] || '',
                 lote: row[22] || '',
-                hora: row[23] || '',
-                vto: row[24] || '',
+                hora: GoogleSheetsService.parseSheetsTime(row[23]),
+                vto: GoogleSheetsService.parseSheetsDateToDdMmYyyy(row[24]),
                 descripcion: row[26] || '',
                 marca: row[36] || 'Don Yeyo',
                 conserva_envase: row[37] || 'Sí'
             };
 
             if (!reclamosMap.has(idStr)) {
+                const fechaAltaNormalizada = GoogleSheetsService.parseSheetsDateToDdMmYyyy(row[2]);
+                const fechaCargaNormalizada = GoogleSheetsService.parseSheetsDateTime(row[39], fechaAltaNormalizada);
+
                 reclamosMap.set(idStr, {
                     id: idStr,
                     idNum: !isNaN(idNum) ? idNum : 0,
                     rowNumbers: [rowNum],
                     cliente: row[1] || 'Consumidor',
-                    fecha_alta: row[2] || '',
+                    fecha_alta: fechaAltaNormalizada,
                     mes: row[3] || '',
                     nombre: row[4] || '',
                     apellido: row[5] || '',
@@ -272,7 +347,7 @@ class GoogleSheetsService {
                     longitud: row[34] || '',
                     codigo_postal: row[35] || '',
                     evidencia_zip: row[38] || '',
-                    fecha_carga: row[39] || '',
+                    fecha_carga: fechaCargaNormalizada,
                     estado_admin: row[40] || 'Pendiente',
                     admin_motivo_desaprobado: row[41] || '',
                     estado_supervisor: row[42] || 'Pendiente',

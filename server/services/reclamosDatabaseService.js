@@ -2,14 +2,83 @@ const { pool } = require('../config/database');
 
 class ReclamosDatabaseService {
     /**
+     * Normaliza fecha_alta (convierte números de serie de Excel/Sheets p.ej. 46342 a DD/MM/YYYY)
+     */
+    normalizeFechaAlta(val) {
+        if (val === null || val === undefined || val === '') return '';
+        const num = Number(val);
+        if (!isNaN(num) && num >= 20000 && num <= 90000 && (typeof val === 'number' || /^\d+(\.\d+)?$/.test(String(val).trim()))) {
+            const utcMs = Math.round((Math.floor(num) - 25569) * 86400 * 1000);
+            const d = new Date(utcMs);
+            const dd = String(d.getUTCDate()).padStart(2, '0');
+            const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+            const yyyy = d.getUTCFullYear();
+            return `${dd}/${mm}/${yyyy}`;
+        }
+        return String(val).trim();
+    }
+
+    /**
+     * Convierte de forma segura cualquier valor de fecha_carga (Date, ISO, DD/MM/YYYY o serial de Sheets)
+     * evitando que números de serie como 46342 generen 1970-01-01T00:00:46.000Z.
+     */
+    parseClaimDate(val, fallbackFechaAlta = '') {
+        if (val instanceof Date) {
+            if (!isNaN(val.getTime()) && val.getFullYear() >= 2000) return val;
+        } else if (val !== null && val !== undefined && val !== '') {
+            const num = Number(val);
+            if (!isNaN(num) && num >= 20000 && num <= 90000 && (typeof val === 'number' || /^\d+(\.\d+)?$/.test(String(val).trim()))) {
+                const wallClockUtcMs = Math.round((num - 25569) * 86400 * 1000);
+                const realUtcMs = wallClockUtcMs + (3 * 3600 * 1000);
+                const d = new Date(realUtcMs);
+                if (!isNaN(d.getTime()) && d.getFullYear() >= 2000) return d;
+            }
+            const str = String(val).trim();
+            const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:[,\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+            if (dmyMatch) {
+                const [, d, m, y, hh = '00', mm = '00', ss = '00'] = dmyMatch;
+                const parsed = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T${hh.padStart(2, '0')}:${mm.padStart(2, '0')}:${ss.padStart(2, '0')}-03:00`);
+                if (!isNaN(parsed.getTime()) && parsed.getFullYear() >= 2000) return parsed;
+            }
+            const isoCandidate = new Date(str.includes('T') ? str : `${str.replace(' ', 'T')}-03:00`);
+            if (!isNaN(isoCandidate.getTime()) && isoCandidate.getFullYear() >= 2000) return isoCandidate;
+            const fallbackParsed = new Date(str);
+            if (!isNaN(fallbackParsed.getTime()) && fallbackParsed.getFullYear() >= 2000) return fallbackParsed;
+        }
+        if (fallbackFechaAlta) {
+            return this.parseClaimDate(fallbackFechaAlta, '');
+        }
+        return null;
+    }
+
+    /**
+     * Resuelve la fecha_carga de una fila leída de MySQL, descartando fechas corruptas (< año 2000)
+     */
+    resolveDbRowFechaCarga(r) {
+        if (r.fecha_carga instanceof Date && !isNaN(r.fecha_carga.getTime()) && r.fecha_carga.getFullYear() >= 2000) {
+            return r.fecha_carga.toISOString();
+        }
+        if (r.created_at) {
+            const cDate = new Date(r.created_at);
+            if (!isNaN(cDate.getTime()) && cDate.getFullYear() >= 2000) {
+                return cDate.toISOString();
+            }
+        }
+        const fromAlta = this.parseClaimDate(r.fecha_alta, '');
+        if (fromAlta) return fromAlta.toISOString();
+        return '';
+    }
+
+    /**
      * Mapea un objeto Reclamo (formato canónico de Google Sheets) a la fila en MySQL
      */
     mapClaimToDbRow(claim) {
+        const fechaAltaNorm = this.normalizeFechaAlta(claim.fecha_alta);
         return {
             id: String(claim.id).trim(),
             id_num: parseInt(claim.idNum || claim.id, 10) || 0,
             cliente: claim.cliente || 'Consumidor',
-            fecha_alta: claim.fecha_alta || '',
+            fecha_alta: fechaAltaNorm,
             mes: claim.mes || '',
             nombre: claim.nombre || '',
             apellido: claim.apellido || '',
@@ -27,7 +96,7 @@ class ReclamosDatabaseService {
             longitud: claim.longitud || '',
             codigo_postal: claim.codigo_postal || '',
             evidencia_zip: claim.evidencia_zip || '',
-            fecha_carga: claim.fecha_carga ? new Date(claim.fecha_carga) : null,
+            fecha_carga: this.parseClaimDate(claim.fecha_carga, fechaAltaNorm),
             estado_admin: claim.estado_admin || 'Pendiente',
             admin_motivo_desaprobado: claim.admin_motivo_desaprobado || '',
             estado_supervisor: claim.estado_supervisor || 'Pendiente',
@@ -331,7 +400,7 @@ class ReclamosDatabaseService {
             idNum: r.id_num,
             rowNumbers: typeof r.row_numbers === 'string' ? JSON.parse(r.row_numbers) : (r.row_numbers || []),
             cliente: r.cliente,
-            fecha_alta: r.fecha_alta,
+            fecha_alta: this.normalizeFechaAlta(r.fecha_alta),
             mes: r.mes,
             nombre: r.nombre,
             apellido: r.apellido,
@@ -349,9 +418,9 @@ class ReclamosDatabaseService {
             longitud: r.longitud,
             codigo_postal: r.codigo_postal,
             evidencia_zip: r.evidencia_zip,
-            fecha_carga: r.fecha_carga ? r.fecha_carga.toISOString() : '',
+            fecha_carga: this.resolveDbRowFechaCarga(r),
             estado_admin: r.estado_admin,
-            fecha_estado_admin: r.fecha_estado_admin ? r.fecha_estado_admin.toISOString() : (r.fecha_carga ? r.fecha_carga.toISOString() : (r.created_at ? new Date(r.created_at).toISOString() : null)),
+            fecha_estado_admin: (r.fecha_estado_admin && r.fecha_estado_admin.getFullYear() >= 2000) ? r.fecha_estado_admin.toISOString() : (this.resolveDbRowFechaCarga(r) || (r.created_at ? new Date(r.created_at).toISOString() : null)),
             admin_motivo_desaprobado: r.admin_motivo_desaprobado,
             estado_supervisor: r.estado_supervisor,
             fecha_estado_supervisor: r.fecha_estado_supervisor ? r.fecha_estado_supervisor.toISOString() : null,
@@ -395,7 +464,7 @@ class ReclamosDatabaseService {
             idNum: r.id_num,
             rowNumbers: typeof r.row_numbers === 'string' ? JSON.parse(r.row_numbers) : (r.row_numbers || []),
             cliente: r.cliente,
-            fecha_alta: r.fecha_alta,
+            fecha_alta: this.normalizeFechaAlta(r.fecha_alta),
             mes: r.mes,
             nombre: r.nombre,
             apellido: r.apellido,
@@ -413,9 +482,9 @@ class ReclamosDatabaseService {
             longitud: r.longitud,
             codigo_postal: r.codigo_postal,
             evidencia_zip: r.evidencia_zip,
-            fecha_carga: r.fecha_carga ? r.fecha_carga.toISOString() : '',
+            fecha_carga: this.resolveDbRowFechaCarga(r),
             estado_admin: r.estado_admin,
-            fecha_estado_admin: r.fecha_estado_admin ? r.fecha_estado_admin.toISOString() : (r.fecha_carga ? r.fecha_carga.toISOString() : (r.created_at ? new Date(r.created_at).toISOString() : null)),
+            fecha_estado_admin: (r.fecha_estado_admin && r.fecha_estado_admin.getFullYear() >= 2000) ? r.fecha_estado_admin.toISOString() : (this.resolveDbRowFechaCarga(r) || (r.created_at ? new Date(r.created_at).toISOString() : null)),
             admin_motivo_desaprobado: r.admin_motivo_desaprobado,
             estado_supervisor: r.estado_supervisor,
             fecha_estado_supervisor: r.fecha_estado_supervisor ? r.fecha_estado_supervisor.toISOString() : null,

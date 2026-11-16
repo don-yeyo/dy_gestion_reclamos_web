@@ -40,21 +40,92 @@ const SUPERVISORES_LISTA = [
     { nombre: 'Pablo Gallo', email: 'juanpablog@donyeyo.com.ar' }
 ];
 
+function parseSafeDate(val) {
+    if (!val) return null;
+    const num = Number(val);
+    if (!isNaN(num) && num >= 20000 && num <= 90000 && (typeof val === 'number' || /^\d+(\.\d+)?$/.test(String(val).trim()))) {
+        const wallClockUtcMs = Math.round((num - 25569) * 86400 * 1000);
+        const d = new Date(wallClockUtcMs + (3 * 3600 * 1000));
+        if (!isNaN(d.getTime()) && d.getFullYear() >= 2000) return d;
+    }
+    const str = String(val).trim();
+    const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:[,\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+    if (dmyMatch) {
+        const [, day, month, year, hh = '00', mm = '00', ss = '00'] = dmyMatch;
+        const hasTime = dmyMatch[4] !== undefined;
+        const d = new Date(Number(year), Number(month) - 1, Number(day), Number(hh), Number(mm), Number(ss));
+        if (!isNaN(d.getTime()) && d.getFullYear() >= 2000) {
+            d._dateOnly = !hasTime;
+            return d;
+        }
+    }
+    const d = new Date(str);
+    if (!isNaN(d.getTime()) && d.getFullYear() >= 2000) return d;
+    return null;
+}
+
 function formatFechaHoraSutil(isoStr) {
-    if (!isoStr) return null;
+    const d = parseSafeDate(isoStr);
+    if (!d) return null;
     try {
-        const d = new Date(isoStr);
-        if (isNaN(d.getTime())) return null;
+        if (d._dateOnly) {
+            return d.toLocaleDateString('es-AR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        }
         return d.toLocaleString('es-AR', {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric',
             hour: '2-digit',
-            minute: '2-digit'
+            minute: '2-digit',
+            hour12: true
         });
     } catch (e) {
         return null;
     }
+}
+
+function formatFechaCargaAmigable(fechaCarga, fechaAlta) {
+    const dCarga = parseSafeDate(fechaCarga);
+    if (dCarga) {
+        if (dCarga._dateOnly) {
+            return dCarga.toLocaleDateString('es-AR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        }
+        return dCarga.toLocaleString('es-AR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+    }
+    const dAlta = parseSafeDate(fechaAlta);
+    if (dAlta) {
+        if (dAlta._dateOnly) {
+            return dAlta.toLocaleDateString('es-AR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        }
+        return dAlta.toLocaleString('es-AR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+    }
+    return fechaAlta || 'S/F';
 }
 
 const TIPOS_DESAPROBACION = [
@@ -1053,7 +1124,7 @@ export const ReclamoDetailModal = ({ claim, isOpen, onClose, onRefresh }) => {
 
                         <div className="claim-info-item">
                             <span className="claim-info-label">Fecha de Carga</span>
-                            <span className="claim-info-val">{activeClaim.fecha_carga || activeClaim.fecha_alta || 'S/F'}</span>
+                            <span className="claim-info-val">{formatFechaCargaAmigable(activeClaim.fecha_carga, activeClaim.fecha_alta)}</span>
                         </div>
                     </div>
 
