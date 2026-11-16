@@ -40,7 +40,6 @@ export const ConfiguracionPage = () => {
     const [productos, setProductos] = useState([]);
     const [productosSearch, setProductosSearch] = useState('');
     const [productosCatFilter, setProductosCatFilter] = useState('ALL');
-    const [syncingCsv, setSyncingCsv] = useState(false);
     const [editingProducto, setEditingProducto] = useState(null);
     const [productoModalOpen, setProductoModalOpen] = useState(false);
     const [productoForm, setProductoForm] = useState({ nombre_interno: '', nombre_empaque: '', categoria_id: '', activo: 1 });
@@ -423,22 +422,6 @@ export const ConfiguracionPage = () => {
         } catch (err) {
             console.error('Error eliminando producto:', err);
             showNotification(err.response?.data?.message || 'No se pudo eliminar el producto.', true);
-        }
-    };
-
-    const handleSyncCsv = async () => {
-        setSyncingCsv(true);
-        try {
-            const res = await productosApi.syncCsv();
-            const [resProd, resCat] = await Promise.all([productosApi.getAll(), categoriasApi.getAll()]);
-            if (resProd.data?.success) setProductos(resProd.data.data);
-            if (resCat.data?.success) setCategorias(resCat.data.data);
-            showNotification(res.data?.message || 'Catálogo sincronizado desde productos_reclamos.csv.');
-        } catch (err) {
-            console.error('Error sincronizando CSV:', err);
-            showNotification(err.response?.data?.message || 'Error al sincronizar desde CSV.', true);
-        } finally {
-            setSyncingCsv(false);
         }
     };
 
@@ -1490,26 +1473,6 @@ export const ConfiguracionPage = () => {
                                     }}
                                 />
                             </div>
-
-                            <button
-                                onClick={handleSyncCsv}
-                                disabled={syncingCsv}
-                                className="btn btn-secondary"
-                                title="Sincronizar catálogo con productos_reclamos.csv"
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    padding: '8px 14px',
-                                    borderRadius: 'var(--radius-sm, 8px)',
-                                    cursor: 'pointer',
-                                    fontWeight: 600,
-                                    whiteSpace: 'nowrap'
-                                }}
-                            >
-                                <RefreshCw size={15} className={syncingCsv ? 'fa-spin' : ''} />
-                                <span>{syncingCsv ? 'Sincronizando...' : 'Sincronizar CSV'}</span>
-                            </button>
 
                             <button
                                 onClick={() => handleOpenProductoModal()}
