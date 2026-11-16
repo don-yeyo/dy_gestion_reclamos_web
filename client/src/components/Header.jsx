@@ -1,6 +1,7 @@
 import React from 'react';
 import { Menu, Sun, Moon, LogOut, Shield } from 'lucide-react';
 import { useAuth } from '../config/AuthContext';
+import donyeyoLogo from '../assets/donyeyo-logo.svg';
 
 export const Header = ({ onToggleDrawer, darkMode, onToggleTheme }) => {
     const { user, logout } = useAuth();
@@ -22,8 +23,12 @@ export const Header = ({ onToggleDrawer, darkMode, onToggleTheme }) => {
                 >
                     <Menu size={22} />
                 </button>
-                <div className="app-logo">
-                    <span style={{ color: 'var(--dy-red)', fontWeight: 900 }}>DON YEYO</span>
+                <div className="app-logo" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <img
+                        src={donyeyoLogo}
+                        alt="Don Yeyo"
+                        style={{ height: 34, width: 'auto', display: 'block', objectFit: 'contain' }}
+                    />
                     <span style={{ opacity: 0.85, fontSize: '0.95rem', fontWeight: 500 }}>Reclamos Web</span>
                 </div>
                 <span className="app-version-tag">v1.0.0</span>
