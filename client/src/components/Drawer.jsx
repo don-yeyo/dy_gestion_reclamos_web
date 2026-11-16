@@ -47,39 +47,6 @@ export const Drawer = ({ isOpen, onClose, onOpenCobertura, onOpenReglasCortesia 
                         <span>Bandeja de Reclamos</span>
                     </NavLink>
 
-                    <div className="drawer-section-title">Vistas por Actor</div>
-                    {isAdmin && (
-                        <>
-                            <NavLink
-                                to="/reclamos?filtro=admin_pendiente"
-                                onClick={onClose}
-                                className="drawer-nav-item"
-                            >
-                                <UserCheck size={18} color="#f59e0b" />
-                                <span>Pendientes de Aprobación</span>
-                            </NavLink>
-                            <NavLink
-                                to="/reclamos?filtro=supervisor_pendiente"
-                                onClick={onClose}
-                                className="drawer-nav-item"
-                            >
-                                <ChevronRight size={18} color="#151C5B" />
-                                <span>En Supervisión Comercial</span>
-                            </NavLink>
-                        </>
-                    )}
-
-                    {(isInocuidad || isAdmin) && (
-                        <NavLink
-                            to="/reclamos?filtro=inocuidad"
-                            onClick={onClose}
-                            className="drawer-nav-item"
-                        >
-                            <ShieldAlert size={18} color="#e40521" />
-                            <span>Inocuidad y Calidad</span>
-                        </NavLink>
-                    )}
-
                     {isAdmin && (
                         <>
                             <div className="drawer-section-title">Configuración</div>
