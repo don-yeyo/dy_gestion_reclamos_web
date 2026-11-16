@@ -6,7 +6,7 @@ test.describe('CU-03: Dashboard y Métricas Ejecutivas', () => {
         await setupMockApi(page);
     });
 
-    test('debe cargar el Dashboard y visualizar los KPIs y reclamos recientes', async ({ page }) => {
+    test('debe cargar el Dashboard y visualizar los KPIs y gráficos mensuales/torta/progreso', async ({ page }) => {
         await page.goto('/');
 
         // Título del Dashboard
@@ -19,38 +19,25 @@ test.describe('CU-03: Dashboard y Métricas Ejecutivas', () => {
         await expect(page.locator('.kpi-card', { hasText: 'Pendientes Admin' })).toBeVisible();
         await expect(page.locator('.kpi-card', { hasText: 'Pendientes Admin' }).locator('.kpi-value')).toContainText('2');
 
-        // Tabla de reclamos recientes
-        await expect(page.locator('text=Últimos Reclamos Ingresados')).toBeVisible();
-        await expect(page.locator('table')).toBeVisible();
+        // Verificar que la grilla de "Últimos Reclamos Ingresados" ya no existe
+        await expect(page.locator('text=Últimos Reclamos Ingresados')).toHaveCount(0);
 
-        // Verificar columnas de la tabla con exact match
-        await expect(page.getByRole('columnheader', { name: 'ID', exact: true })).toBeVisible();
-        await expect(page.getByRole('columnheader', { name: 'Consumidor', exact: true }).first()).toBeVisible();
+        // Verificar que se renderizan las gráficas de barras mensuales, torta y progreso
+        await expect(page.getByTestId('chart-mensual-barras')).toBeVisible();
+        await expect(page.locator('text=Evolución Mensual: Ingresados vs. Resueltos')).toBeVisible();
 
-        // Verificar reclamo REC-2026-001
-        await expect(page.locator('td', { hasText: 'REC-2026-001' })).toBeVisible();
-        await expect(page.locator('td', { hasText: 'Ana Laura Gómez' })).toBeVisible();
+        await expect(page.getByTestId('chart-torta-estados')).toBeVisible();
+        await expect(page.locator('text=Distribución por Estado Administrativo')).toBeVisible();
 
-        // Verificar badge FSR en REC-2026-004
-        await expect(page.locator('td', { hasText: 'REC-2026-004' })).toBeVisible();
-        await expect(page.locator('.badge', { hasText: 'FSR' })).toBeVisible();
+        await expect(page.getByTestId('chart-urgencia')).toBeVisible();
+        await expect(page.getByTestId('chart-progreso-sectores')).toBeVisible();
     });
 
-    test('debe abrir el modal de detalle al hacer click en un reclamo de la tabla', async ({ page }) => {
+    test('debe navegar a la bandeja de reclamos desde el botón del Dashboard', async ({ page }) => {
         await page.goto('/');
 
-        // Click en la fila del reclamo REC-2026-001 (navega a /reclamos?id=REC-2026-001)
-        const filaReclamo = page.locator('tr', { hasText: 'REC-2026-001' });
-        await filaReclamo.click();
-
-        // Debe desplegarse el modal sincronizado por query param id
-        await expect(page.locator('.modal-overlay')).toBeVisible();
-        await expect(page.locator('.modal-header')).toContainText('REC-2026-001');
-
-        // Debe contener las 4 cards del flujo
-        await expect(page.locator('text=1. Ingreso')).toBeVisible();
-        await expect(page.locator('text=2. Calidad & Inocuidad')).toBeVisible();
-        await expect(page.locator('text=3. Acción de Compensación')).toBeVisible();
-        await expect(page.locator('text=4. Consumidor')).toBeVisible();
+        await page.locator('button', { hasText: 'Ver Bandeja de Reclamos' }).click();
+        await expect(page).toHaveURL(/.*\/reclamos/);
+        await expect(page.locator('h1')).toContainText('Listado de Reclamos');
     });
 });
