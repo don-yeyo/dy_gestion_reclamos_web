@@ -1,4 +1,12 @@
 ### Pendientes
+-[x] Bug: esta saliendo esto en el modal de detalle del reclamo "Fecha de Carga 1970-01-01T00:00:46.000Z" es decir, hay algo mal en el calculo de la fecha, además de no mostrarse en un 
+formato mas aqmigable como "16/11/2026, 12:36 p. m."
+-[x] en la grilla de reclamos, agregar la columna Urgencia y la columna Fecha de Ingreso. Que dicha grilla se pueda ordenar y filtrar por cualquier columna
+-[x] quitar del drawer menu, la parte de "Vistas por actor" 
+-[x] En el dashboard, quitar la grilla de "Últimos Reclamos Ingresados", mejora poner algunas graficas de barra, torta o progreso mensuales. Ejemplo cantidad de reclamos ingresados en cada 
+mes / cnatidad resueltos
+-[x] CRUD de productos donde se pueda gestionar los productos y categorías de los mismos. Persistir en DB (nuevas tablas productos y categorias). Usar para poblar la DB usar el archivo C:\Users\gabrielt\Documents\Proyectos\SitioWeb\donyeyo.com.ar\productos_reclamos.csv. Además crear endpoint de consulta que obtenga la lista de productos y sus categorías de forma externa (un GET)
+-[x] Reemplazar "DON YEYO" del header por el logo https://donyeyo.com.ar/images/donyeyo-logo.svg (descargalo a tus assets) y tambien usalo como favicon
 -[x] Reglas de Seguimientos: sección con grilla completa para configurar momentos de seguimiento, repeticiones e intervalo N = SLA / Repeticiones con emails de elevación según rol, estado y prioridad. (Sistemas)
 -[x] En la pantalla de Reglas de Seguimiento, poder definir cuantos dias deben pasar para emitir el primer email, validar que no sea superior al valor de sla
 -[x] Corregir la perioricidad, en lugar de ser sla / repeticiones, deberia ser (sla - dias para el primer envío)/ repeticiones
@@ -13,23 +21,25 @@
 -[x] Submodal interactivo de desaprobación de reclamos (vía React Portal a document.body) en lugar de formulario inline, tipificación obligatoria de motivos formales e internos, y diseño responsivo sin desbordes.
 -[x] validar y evitar que si un rol, presionó uno de los botones hasheados y ello produzco un cambio en los estados del flujo de un caso, vuelve a apretar el mismo boton u otro del cuerpo del email, ya no le sea posible continuar. Mostrar una pantalla, en el caso del consumidor, que ya se cuenta con una accion anterior registrada (mostrar cual y en que fecha), en el caso de supervisores o rol de inocuidad, tambien avisarle pero aclararle que si necesita cambiar su desicion reabriendo el caso se dirija al bla bla bla... que ese texto se pueda setear desde configuracion
 -[x] Cambiar el texto del atributo "Prioridad" de los reclamos por "Urgencia" y sus derivados conjugados
--[ ] bug: al presionar en el boton de resuelto del cuerpo del primer email del supervisor o los sucesivos emails de seguimiento (tambien el reenviado), en enlace no esta llevando al supervisor a la pantalla esperada sino que va a: http://localhost:3001/api/public/actions/supervisor-quick?token=..... obteniendo el error Error al registrar la acción: API_BASE_URL is not defined
--[ ] optimizacion: en el .env veo API_BASE_URL=http://localhost:3001, APP_BASE_URL=http://localhost:5173, para que sirven cada una? se llaman muy similares y se presta a confusión, se podria mejorar?
+-[x] bug: al presionar en el boton de resuelto del cuerpo del primer email del supervisor o los sucesivos emails de seguimiento (tambien el reenviado), en enlace no esta llevando al supervisor a la pantalla esperada sino que va a: http://localhost:3001/api/public/actions/supervisor-quick?token=..... obteniendo el error Error al registrar la acción: API_BASE_URL is not defined
+-[x] optimizacion: en el .env veo API_BASE_URL=http://localhost:3001, APP_BASE_URL=http://localhost:5173, para que sirven cada una? se llaman muy similares y se presta a confusión, se podria mejorar?
 -[x] cuando un supervisor presiona en el boton de resuelto, en lugar de mostrar la pantalla con el cambio de estado realidado, antes de ello pedir confirmacion, advirtiendo que posterior a ello se enviará un email de aviso al consumidor (en esa pantalla debe poder cancelar, lo cual no hace mas que cerrar la ventana o aceptar y proceder a cambiar el estado a resuelto)
 -[x] la pantalla del supervisor tras clickear el boton del email de impedimiento se ve mal como si no estuviese tomando los estilos css
 -[x] Soportar que Inocuidad cuenta con dos grupos de email de notificacion según el tipo de producto involucrado en el reclamo
 -[x] Descripción de los estados: agregar una descripción a los estados para que se entienda qué significa cada uno. (Sistemas)
--[ ] Sopportar el rol calidad al gestor de reclamos
+-[x] Sopportar el rol calidad al gestor de reclamos
 -[no es posible] Imágenes adjuntas: agregar las imágenes en el cuerpo del mail que llega a calidad. (Sistemas)
 -[x] Soportar prioridad de reclamos Clasificación de reclamos
 -[x] Soporte para configurar los emails de elevación de los ejecutivos: revisar los correos de escalamiento (Mkt)
 
 ### Web
--[ ] Revisar pantalla de mis-reclamos para controlar que mensajes se le mustra al consumidor segun la descripcion de estados
--[ ] Para el email que le llega al admin, agregar boton para rechazar reclamo
--[ ] Agregar un mensaje que sugiera conservar el producto para un análisis posterior en la carga del reclamo.
+-[x] Revisar pantalla de mis-reclamos para controlar que mensajes se le muestra al consumidor segun la descripcion de estados
+-[x] En el email que le llega al admin, agregar boton para rechazar reclamo
+-[x] Agregar un mensaje que sugiera conservar el producto para un análisis posterior en la carga del reclamo.
 -[x] Nuevo reclamo consumidor: al recibir el mail, que se pueda acceder directamente al reclamo, sin tener que buscarlo manualmente por el número de reclamo.
--[ ] Primer mail del admin: boton para rechazar el reclamo desde el propio correo.
+-[x] Primer mail del admin: boton para rechazar el reclamo desde el propio correo.
+-[ ] Obtener la lista de productos desde un endpoint de productos con sus categorías (nombre web, nombre interno, categoria). Que el campo categoria en el formulario de reclamos, ahora sea oculto y se autocomplete de acuerdo a la seleccion del producto. El primer campo del producto a completar por el cunsumidor, ahora pasaría a ser el del nombre web del producto, siendo este un componente predictivo que por cada tipeo del usuario, deberia filt las opciones desplegadas ordenadas alfabeticamente ascendiente. Si el usuario no tipea nada, este componente funcionaría como una lista desplegable normal. Pero en cambio si tipea algo, siempre debe seleccionar una de las opciones disponibles, de lo contrario blanquear el campo y la categoría (esto evitaria enviar el formulario hasta tanto seleccione una de las opciones). Al enviar el formulario, escribir en base de datos y en el google sheet, tanto el nombre web como el nombre interno del producto con su categoría.
+
 
 ### Revisar
 -[ ] Vinculación de planillas: investigar cómo están vinculadas las planillas de marketing con las de calidad.

@@ -43,3 +43,4 @@ module.exports = {
     APP_BASE_URL: FRONTEND_URL,
     API_BASE_URL: BACKEND_URL
 };
+

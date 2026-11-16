@@ -49,14 +49,20 @@ export const StatusBadge = ({ status, actor = null, title = null, compact = fals
         if (!title && !dbDescripcion && (normalized === 'fsr' || normalized.includes('sin respuesta'))) {
             tooltipDesc = 'Finalizado Sin Respuesta: El consumidor no respondió a las solicitudes de seguimiento tras el plazo estipulado';
         }
-    } else if (normalized.includes('en curso')) {
-        badgeClass = 'badge-en-curso';
-    } else if (normalized.includes('aprobado') || normalized.includes('resuelto') || normalized.includes('conforme')) {
+    } else if (normalized.includes('aprobado') && !normalized.includes('desaprobado')) {
         badgeClass = 'badge-aprobado';
-    } else if (normalized.includes('desaprobado') || normalized.includes('imposibilidad') || normalized.includes('no resuelto')) {
+    } else if (normalized.includes('desaprobado')) {
         badgeClass = 'badge-desaprobado';
-    } else if (normalized.includes('sin respuesta') || normalized.includes('disconforme')) {
-        badgeClass = 'badge-pendiente';
+    } else if (normalized.includes('resuelto')) {
+        badgeClass = 'badge-resuelto';
+    } else if (normalized.includes('en curso') || normalized.includes('proceso')) {
+        badgeClass = 'badge-en-curso';
+    } else if (normalized.includes('imposibilidad')) {
+        badgeClass = 'badge-imposibilidad';
+    } else if (normalized.includes('no conforme') || normalized.includes('no resuelto')) {
+        badgeClass = 'badge-no-conforme';
+    } else if (normalized.includes('conforme')) {
+        badgeClass = 'badge-conforme';
     }
 
     const fullTooltip = tooltipDesc ? `${status}: ${tooltipDesc}` : String(status);
@@ -130,3 +136,4 @@ export const StatusBadge = ({ status, actor = null, title = null, compact = fals
         </span>
     );
 };
+export default StatusBadge;

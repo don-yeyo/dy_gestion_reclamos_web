@@ -176,7 +176,7 @@ export const ReclamosList = () => {
                         setSelectedReclamo(res.data.data);
                     }
                 })
-                .catch(() => {});
+                .catch(() => { });
         }
     }, [routeId, searchParams, reclamos, loading]);
 
@@ -531,7 +531,7 @@ export const ReclamosList = () => {
                         {/* Filtros combinables por columna */}
                         <div className="filter-selectors-grid">
                             <div className="filter-box">
-                                <label>ID del Reclamo</label>
+                                <label>ID</label>
                                 <input
                                     type="text"
                                     placeholder="Ej: 20233364"
@@ -543,7 +543,7 @@ export const ReclamosList = () => {
                             <div className="filter-box">
                                 <label>
                                     <Calendar size={14} style={{ color: 'var(--primary)' }} />
-                                    Fecha de Ingreso
+                                    Fecha
                                 </label>
                                 <input
                                     type="text"
@@ -582,7 +582,7 @@ export const ReclamosList = () => {
                             <div className="filter-box">
                                 <label>
                                     <Package size={14} style={{ color: 'var(--info)' }} />
-                                    Producto / Defecto / Lote
+                                    Producto
                                 </label>
                                 <input
                                     type="text"
@@ -593,7 +593,7 @@ export const ReclamosList = () => {
                             </div>
 
                             <div className="filter-box">
-                                <label>Supervisor Comercial</label>
+                                <label>Supervisor</label>
                                 <input
                                     type="text"
                                     placeholder="Nombre o email del supervisor..."
@@ -752,7 +752,7 @@ export const ReclamosList = () => {
                     <table className="claims-table">
                         <thead>
                             <tr>
-                                <th style={{ width: '80px', ...sortableThStyle }} onClick={() => handleSort('id')} title="Ordenar por ID">
+                                <th style={{ width: '100px', ...sortableThStyle }} onClick={() => handleSort('id')} title="Ordenar por ID">
                                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                         <span>ID</span>
                                         {renderSortIcon('id')}
@@ -760,7 +760,7 @@ export const ReclamosList = () => {
                                 </th>
                                 <th style={{ width: '95px', ...sortableThStyle }} onClick={() => handleSort('fecha_ingreso')} title="Ordenar por Fecha de Ingreso">
                                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                        <span>Fecha Ingreso</span>
+                                        <span>Fecha</span>
                                         {renderSortIcon('fecha_ingreso')}
                                     </div>
                                 </th>

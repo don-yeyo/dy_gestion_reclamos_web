@@ -7,112 +7,112 @@ test.describe('CU-04: Listado General y Filtros de Reclamos', () => {
         await setupMockApi(page);
     });
 
-    test('debe cargar la lista de reclamos y permitir búsqueda desde el acordeón de filtros con Aplicar/Eliminar filtro', async ({ page }) => {
-        await page.goto('/reclamos');
+        test('debe cargar la lista de reclamos y permitir búsqueda desde el acordeón de filtros con Aplicar/Eliminar filtro', async ({ page }) => {
+            await page.goto('/reclamos');
 
-        // Verificar título de la página
-        await expect(page.locator('h1')).toContainText('Listado de Reclamos');
+            // Verificar título de la página
+            await expect(page.locator('h1')).toContainText('Listado de Reclamos');
 
-        // Verificar que los 4 reclamos mock se muestran inicialmente
-        await expect(page.locator('table tbody tr')).toHaveCount(4);
+            // Verificar que los 4 reclamos mock se muestran inicialmente
+            await expect(page.locator('table tbody tr')).toHaveCount(4);
 
-        // Desplegar el acordeón de filtros (inicialmente cerrado)
-        await page.getByTestId('btn-toggle-filtros').click();
+            // Desplegar el acordeón de filtros (inicialmente cerrado)
+            await page.getByTestId('btn-toggle-filtros').click();
 
-        // Búsqueda por texto: "Ana" y presionar Aplicar filtro
-        const searchInput = page.locator('input[placeholder*="Buscar por ID"]');
-        await searchInput.fill('Ana');
-        await page.getByTestId('btn-aplicar-filtro').click();
+            // Búsqueda por texto: "Ana" y presionar Aplicar filtro
+            const searchInput = page.locator('input[placeholder*="Buscar por ID"]');
+            await searchInput.fill('Ana');
+            await page.getByTestId('btn-aplicar-filtro').click();
 
-        // Debe quedar solo REC-2026-001
-        await expect(page.locator('table tbody tr')).toHaveCount(1);
-        await expect(page.locator('td', { hasText: 'REC-2026-001' })).toBeVisible();
+            // Debe quedar solo REC-2026-001
+            await expect(page.locator('table tbody tr')).toHaveCount(1);
+            await expect(page.locator('td', { hasText: 'REC-2026-001' })).toBeVisible();
 
-        // Limpiar búsqueda con el botón Eliminar filtro
-        await page.getByTestId('btn-eliminar-filtro').click();
-        await expect(page.locator('table tbody tr')).toHaveCount(4);
-    });
+            // Limpiar búsqueda con el botón Eliminar filtro
+            await page.getByTestId('btn-eliminar-filtro').click();
+            await expect(page.locator('table tbody tr')).toHaveCount(4);
+        });
 
-    test('debe filtrar reclamos por Estado Administración al aplicar el filtro', async ({ page }) => {
-        await page.goto('/reclamos');
+            test('debe filtrar reclamos por Estado Administración al aplicar el filtro', async ({ page }) => {
+                await page.goto('/reclamos');
 
-        await page.getByTestId('btn-toggle-filtros').click();
+                await page.getByTestId('btn-toggle-filtros').click();
 
-        // Seleccionar filtro Estado Admin: "Finalizado"
-        const selectAdmin = page.locator('.filter-box', { hasText: 'Estado Administración' }).locator('select');
-        await selectAdmin.selectOption('Finalizado');
-        await page.getByTestId('btn-aplicar-filtro').click();
+                // Seleccionar filtro Estado Admin: "Finalizado"
+                const selectAdmin = page.locator('.filter-box', { hasText: 'Estado Administración' }).locator('select');
+                await selectAdmin.selectOption('Finalizado');
+                await page.getByTestId('btn-aplicar-filtro').click();
 
-        // Solo debe figurar REC-2026-004
-        await expect(page.locator('table tbody tr')).toHaveCount(1);
-        await expect(page.locator('td', { hasText: 'REC-2026-004' })).toBeVisible();
-    });
+                // Solo debe figurar REC-2026-004
+                await expect(page.locator('table tbody tr')).toHaveCount(1);
+                await expect(page.locator('td', { hasText: 'REC-2026-004' })).toBeVisible();
+            });
 
-    test('debe filtrar reclamos por Estado Consumidor (incluyendo FSR)', async ({ page }) => {
-        await page.goto('/reclamos');
+            test('debe filtrar reclamos por Estado Consumidor (incluyendo FSR)', async ({ page }) => {
+                await page.goto('/reclamos');
 
-        await page.getByTestId('btn-toggle-filtros').click();
+                await page.getByTestId('btn-toggle-filtros').click();
 
-        // Seleccionar filtro Estado Consumidor: "FSR"
-        const selectConsumidor = page.locator('.filter-box', { hasText: 'Estado Consumidor' }).locator('select');
-        await selectConsumidor.selectOption('FSR');
-        await page.getByTestId('btn-aplicar-filtro').click();
+                // Seleccionar filtro Estado Consumidor: "FSR"
+                const selectConsumidor = page.locator('.filter-box', { hasText: 'Estado Consumidor' }).locator('select');
+                await selectConsumidor.selectOption('FSR');
+                await page.getByTestId('btn-aplicar-filtro').click();
 
-        // Debe filtrar y mostrar únicamente el caso con FSR
-        await expect(page.locator('table tbody tr')).toHaveCount(1);
-        await expect(page.locator('td', { hasText: 'REC-2026-004' })).toBeVisible();
-        await expect(page.locator('.badge', { hasText: 'FSR' })).toBeVisible();
-    });
+                // Debe filtrar y mostrar únicamente el caso con FSR
+                await expect(page.locator('table tbody tr')).toHaveCount(1);
+                await expect(page.locator('td', { hasText: 'REC-2026-004' })).toBeVisible();
+                await expect(page.locator('.badge', { hasText: 'FSR' })).toBeVisible();
+            });
 
-    test('debe permitir filtrar reclamos por "Resuelto sin confirmar" en Estado Consumidor', async ({ page }) => {
-        const custom = [
-            ...mockReclamos,
-            {
-                id: 'REC-2026-005',
-                nro_reclamo: 'REC-2026-005',
-                fecha: '2026-10-15',
-                cliente: 'Consumidor',
-                nombre: 'Valeria',
-                apellido: 'Morales',
-                estado_admin: 'En curso',
-                estado_supervisor: 'Resuelto',
-                estado_inocuidad: 'Pendiente',
-                estado_consumidor: 'Resuelto sin confirmar',
-                items: []
-            }
-        ];
-        await setupMockApi(page, custom);
-        await page.goto('/reclamos');
+            test('debe permitir filtrar reclamos por "Resuelto sin confirmar" en Estado Consumidor', async ({ page }) => {
+                const custom = [
+                    ...mockReclamos,
+                    {
+                        id: 'REC-2026-005',
+                        nro_reclamo: 'REC-2026-005',
+                        fecha: '2026-10-15',
+                        cliente: 'Consumidor',
+                        nombre: 'Valeria',
+                        apellido: 'Morales',
+                        estado_admin: 'En curso',
+                        estado_supervisor: 'Resuelto',
+                        estado_inocuidad: 'Pendiente',
+                        estado_consumidor: 'Resuelto sin confirmar',
+                        items: []
+                    }
+                ];
+                await setupMockApi(page, custom);
+                await page.goto('/reclamos');
 
-        await page.getByTestId('btn-toggle-filtros').click();
+                await page.getByTestId('btn-toggle-filtros').click();
 
-        const selectConsumidor = page.locator('.filter-box', { hasText: 'Estado Consumidor' }).locator('select');
-        await selectConsumidor.selectOption('Resuelto sin confirmar');
-        await page.getByTestId('btn-aplicar-filtro').click();
+                const selectConsumidor = page.locator('.filter-box', { hasText: 'Estado Consumidor' }).locator('select');
+                await selectConsumidor.selectOption('Resuelto sin confirmar');
+                await page.getByTestId('btn-aplicar-filtro').click();
 
-        await expect(page.locator('table tbody tr')).toHaveCount(1);
-        await expect(page.locator('td', { hasText: 'REC-2026-005' })).toBeVisible();
-        await expect(page.locator('td', { hasText: 'Valeria Morales' })).toBeVisible();
-        await expect(page.locator('.badge', { hasText: 'Resuelto sin confirmar' })).toBeVisible();
-    });
+                await expect(page.locator('table tbody tr')).toHaveCount(1);
+                await expect(page.locator('td', { hasText: 'REC-2026-005' })).toBeVisible();
+                await expect(page.locator('td', { hasText: 'Valeria Morales' })).toBeVisible();
+                await expect(page.locator('.badge', { hasText: 'Resuelto sin confirmar' })).toBeVisible();
+            });
 
-    test('debe abrir el modal de detalle al hacer click en un reclamo de la grilla y actualizar la URL', async ({ page }) => {
-        await page.goto('/reclamos');
+            test('debe abrir el modal de detalle al hacer click en un reclamo de la grilla y actualizar la URL', async ({ page }) => {
+                await page.goto('/reclamos');
 
-        // Click en la fila de REC-2026-002
-        await page.locator('tr', { hasText: 'REC-2026-002' }).click();
+                // Click en la fila de REC-2026-002
+                await page.locator('tr', { hasText: 'REC-2026-002' }).click();
 
-        // Verificar URL dedicada y modal
-        await expect(page).toHaveURL(/.*\/reclamos\/REC-2026-002/);
-        await expect(page.locator('.modal-overlay')).toBeVisible();
-        await expect(page.locator('.modal-header')).toContainText('REC-2026-002');
-    });
+                // Verificar URL dedicada y modal
+                await expect(page).toHaveURL(/.*\/reclamos\/REC-2026-002/);
+                await expect(page.locator('.modal-overlay')).toBeVisible();
+                await expect(page.locator('.modal-header')).toContainText('REC-2026-002');
+            });
 
-    test('debe abrir directamente la grilla con el modal abierto al ingresar por enlace directo /reclamos/:id', async ({ page }) => {
-        await page.goto('/reclamos/REC-2026-002');
+            test('debe abrir directamente la grilla con el modal abierto al ingresar por enlace directo /reclamos/:id', async ({ page }) => {
+                await page.goto('/reclamos/REC-2026-002');
 
-        await expect(page.locator('h1')).toContainText('Listado de Reclamos');
-        await expect(page.locator('.modal-overlay')).toBeVisible();
-        await expect(page.locator('.modal-header')).toContainText('REC-2026-002');
-    });
-});
+                await expect(page.locator('h1')).toContainText('Listado de Reclamos');
+                await expect(page.locator('.modal-overlay')).toBeVisible();
+                await expect(page.locator('.modal-header')).toContainText('REC-2026-002');
+            });
+        });
