@@ -3,11 +3,86 @@ import { useSearchParams, useParams, useNavigate } from 'react-router-dom';
 import {
     Search, Filter, RefreshCw, AlertCircle,
     CheckCircle2, Clock, MapPin, Package, UserCheck, ShieldAlert,
-    RotateCcw, Inbox, ChevronLeft, ChevronRight, X, User
+    RotateCcw, Inbox, ChevronLeft, ChevronRight, X, User,
+    ArrowUpDown, ArrowUp, ArrowDown, Flame, Calendar
 } from 'lucide-react';
 import { reclamosApi } from '../services/api';
 import { StatusBadge } from '../components/StatusBadge';
 import { ReclamoDetailModal } from './ReclamoDetailModal';
+
+function parseSafeClaimDate(fechaCarga, fechaAlta, fallbackFecha) {
+    const parseSingle = (val) => {
+        if (!val) return null;
+        const num = Number(val);
+        if (!isNaN(num) && num >= 20000 && num <= 90000 && (typeof val === 'number' || /^\d+(\.\d+)?$/.test(String(val).trim()))) {
+            const wallClockUtcMs = Math.round((num - 25569) * 86400 * 1000);
+            const d = new Date(wallClockUtcMs + (3 * 3600 * 1000));
+            if (!isNaN(d.getTime()) && d.getFullYear() >= 2000) return d;
+        }
+        const str = String(val).trim();
+        const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:[,\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+        if (dmyMatch) {
+            const [, day, month, year, hh = '00', mm = '00', ss = '00'] = dmyMatch;
+            const d = new Date(Number(year), Number(month) - 1, Number(day), Number(hh), Number(mm), Number(ss));
+            if (!isNaN(d.getTime()) && d.getFullYear() >= 2000) {
+                d._hasTime = dmyMatch[4] !== undefined;
+                return d;
+            }
+        }
+        const d = new Date(str);
+        if (!isNaN(d.getTime()) && d.getFullYear() >= 2000) {
+            d._hasTime = str.includes(':');
+            return d;
+        }
+        return null;
+    };
+
+    return parseSingle(fechaCarga) || parseSingle(fechaAlta) || parseSingle(fallbackFecha);
+}
+
+function formatFechaIngresoCell(r) {
+    const d = parseSafeClaimDate(r.fecha_carga, r.fecha_alta, r.fecha);
+    if (!d) {
+        return {
+            fecha: r.fecha_alta || r.fecha || 'S/F',
+            hora: '',
+            fullText: r.fecha_alta || r.fecha || 'S/F',
+            timestamp: 0
+        };
+    }
+    const fechaStr = d.toLocaleDateString('es-AR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    });
+    const horaStr = d._hasTime
+        ? d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: true })
+        : '';
+    return {
+        fecha: fechaStr,
+        hora: horaStr,
+        fullText: horaStr ? `${fechaStr}, ${horaStr}` : fechaStr,
+        timestamp: d.getTime()
+    };
+}
+
+function getUrgenciaMeta(r) {
+    const code = r.prioridad !== null && r.prioridad !== undefined ? Number(r.prioridad) : null;
+    const rawName = (r.prioridad_nombre || '').trim();
+    if (code === 10 || rawName.toLowerCase() === 'alta') {
+        return { label: 'Alta', order: 1, bg: 'rgba(239, 68, 68, 0.14)', color: '#ef4444', border: 'rgba(239, 68, 68, 0.35)' };
+    }
+    if (code === 20 || rawName.toLowerCase() === 'media') {
+        return { label: 'Media', order: 2, bg: 'rgba(245, 158, 11, 0.14)', color: '#f59e0b', border: 'rgba(245, 158, 11, 0.35)' };
+    }
+    if (code === 30 || rawName.toLowerCase() === 'baja') {
+        return { label: 'Baja', order: 3, bg: 'rgba(59, 130, 246, 0.14)', color: '#3b82f6', border: 'rgba(59, 130, 246, 0.35)' };
+    }
+    if (rawName) {
+        return { label: rawName, order: 4, bg: 'rgba(148, 163, 184, 0.14)', color: 'var(--text-secondary)', border: 'var(--border)' };
+    }
+    return { label: 'Sin asignar', order: 99, bg: 'rgba(148, 163, 184, 0.1)', color: 'var(--text-muted)', border: 'var(--border)' };
+}
 
 export const ReclamosList = () => {
     const { id: routeId } = useParams();
@@ -19,18 +94,38 @@ export const ReclamosList = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedReclamo, setSelectedReclamo] = useState(null);
 
-    // Filtros
+    // Filtros superiores
     const [filterAdmin, setFilterAdmin] = useState('ALL');
     const [filterSupervisor, setFilterSupervisor] = useState('ALL');
     const [filterInocuidad, setFilterInocuidad] = useState('ALL');
     const [filterConsumidor, setFilterConsumidor] = useState('ALL');
+    const [filterUrgencia, setFilterUrgencia] = useState('ALL');
     const [filterConflicto, setFilterConflicto] = useState(false);
+
+    // Filtros por columna individual en la grilla
+    const [colFilters, setColFilters] = useState({
+        id: '',
+        fecha_ingreso: '',
+        urgencia: '',
+        consumidor: '',
+        ubicacion: '',
+        producto: '',
+        supervisor: '',
+        estado_admin: '',
+        estado_inocuidad: '',
+        estado_supervisor: '',
+        estado_consumidor: ''
+    });
+
+    // Ordenamiento por cualquier columna
+    const [sortField, setSortField] = useState('id');
+    const [sortDir, setSortDir] = useState('desc');
 
     // Paginación
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 15;
 
-    // Sincronizar filtro e ID desde ruta (/reclamos/:id) o query params (ej: Drawer: ?filtro=admin_pendiente, ?id=REC-001)
+    // Sincronizar filtro e ID desde ruta (/reclamos/:id) o query params
     useEffect(() => {
         const filtro = searchParams.get('filtro');
         if (filtro === 'admin_pendiente') {
@@ -70,9 +165,7 @@ export const ReclamosList = () => {
                         setSelectedReclamo(res.data.data);
                     }
                 })
-                .catch(() => {
-                    // Si no se encuentra por ID individual, mantener grilla visible
-                });
+                .catch(() => {});
         }
     }, [routeId, searchParams, reclamos, loading]);
 
@@ -131,32 +224,48 @@ export const ReclamosList = () => {
         };
     }, [reclamos]);
 
-    // Filtrado robusto
+    const handleSort = (field) => {
+        if (sortField === field) {
+            setSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'));
+        } else {
+            setSortField(field);
+            setSortDir(field === 'id' || field === 'fecha_ingreso' ? 'desc' : 'asc');
+        }
+        setCurrentPage(1);
+    };
+
+    const handleColFilterChange = (colKey, val) => {
+        setColFilters(prev => ({ ...prev, [colKey]: val }));
+        setCurrentPage(1);
+    };
+
+    // Filtrado y Ordenamiento por cualquier columna
     const filteredReclamos = useMemo(() => {
-        return reclamos.filter(r => {
-            // Búsqueda en texto
+        const filtered = reclamos.filter(r => {
+            const fechaMeta = formatFechaIngresoCell(r);
+            const urgMeta = getUrgenciaMeta(r);
+            const consumidorStr = `${r.cliente || ''} ${r.nombre || ''} ${r.apellido || ''} ${r.email || ''} ${r.telefono || ''}`.trim();
+            const ubicacionStr = `${r.localidad || ''} ${r.provincia || ''}`.trim();
+            const productosStr = (r.items || []).map(it => `${it.producto || ''} ${it.defecto || ''} ${it.lote || ''}`).join(' ');
+            const supervisorStr = `${r.supervisor || ''} ${r.supervisor_email || ''}`.trim();
+
+            // Búsqueda general en texto
             if (searchQuery.trim()) {
                 const query = searchQuery.toLowerCase().trim();
                 const idMatch = String(r.id || '').toLowerCase().includes(query);
-                const clienteMatch = String(r.cliente || '').toLowerCase().includes(query) ||
-                    String(r.nombre || '').toLowerCase().includes(query) ||
-                    String(r.apellido || '').toLowerCase().includes(query);
-                const supervisorMatch = String(r.supervisor || '').toLowerCase().includes(query) ||
-                    String(r.supervisor_email || '').toLowerCase().includes(query);
-                const productoMatch = (r.items || []).some(item =>
-                    String(item.producto || '').toLowerCase().includes(query) ||
-                    String(item.defecto || '').toLowerCase().includes(query) ||
-                    String(item.lote || '').toLowerCase().includes(query)
-                );
-                const localidadMatch = String(r.localidad || '').toLowerCase().includes(query);
-                const provinciaMatch = String(r.provincia || '').toLowerCase().includes(query);
+                const fechaMatch = fechaMeta.fullText.toLowerCase().includes(query);
+                const urgMatch = urgMeta.label.toLowerCase().includes(query);
+                const clienteMatch = consumidorStr.toLowerCase().includes(query);
+                const supervisorMatch = supervisorStr.toLowerCase().includes(query);
+                const productoMatch = productosStr.toLowerCase().includes(query);
+                const ubicacionMatch = ubicacionStr.toLowerCase().includes(query);
 
-                if (!idMatch && !clienteMatch && !supervisorMatch && !productoMatch && !localidadMatch && !provinciaMatch) {
+                if (!idMatch && !fechaMatch && !urgMatch && !clienteMatch && !supervisorMatch && !productoMatch && !ubicacionMatch) {
                     return false;
                 }
             }
 
-            // Filtro Admin
+            // Filtro Admin superior
             if (filterAdmin !== 'ALL') {
                 const estado = (r.estado_admin || 'Pendiente').toLowerCase();
                 if (filterAdmin === 'Pendiente' && estado !== 'pendiente') return false;
@@ -166,7 +275,7 @@ export const ReclamosList = () => {
                 if (filterAdmin === 'Desaprobado' && estado !== 'desaprobado') return false;
             }
 
-            // Filtro Supervisor
+            // Filtro Supervisor superior
             if (filterSupervisor !== 'ALL') {
                 const estado = (r.estado_supervisor || 'Pendiente').toLowerCase();
                 if (filterSupervisor === 'Pendiente' && estado !== 'pendiente') return false;
@@ -175,16 +284,18 @@ export const ReclamosList = () => {
                 if (filterSupervisor === 'Sin respuesta' && estado !== 'sin respuesta') return false;
             }
 
-            // Filtro Inocuidad
+            // Filtro Inocuidad superior
             if (filterInocuidad !== 'ALL') {
                 const estado = (r.estado_inocuidad || 'Sin acciones').toLowerCase();
                 if (filterInocuidad === 'Pendiente' && estado !== 'pendiente') return false;
+                if (filterInocuidad === 'Resuelto' && estado !== 'resuelto') return false;
+                if (filterInocuidad === 'Imposibilidad' && estado !== 'imposibilidad') return false;
                 if (filterInocuidad === 'Conforme' && !estado.includes('conforme')) return false;
                 if (filterInocuidad === 'No Conforme' && !estado.includes('no conforme')) return false;
                 if (filterInocuidad === 'Sin acciones' && estado !== 'sin acciones') return false;
             }
 
-            // Filtro Consumidor
+            // Filtro Consumidor superior
             if (filterConsumidor !== 'ALL') {
                 const estado = (r.estado_consumidor || 'Pendiente').toLowerCase();
                 if (filterConsumidor === 'Pendiente' && estado !== 'pendiente') return false;
@@ -194,7 +305,13 @@ export const ReclamosList = () => {
                 if (filterConsumidor === 'Resuelto disconforme' && !estado.includes('disconforme')) return false;
                 if (filterConsumidor === 'No resuelto' && !estado.includes('no resuelto')) return false;
                 if (filterConsumidor === 'FSR' && (!estado.includes('fsr') && !estado.includes('sin respuesta'))) return false;
+                if (filterConsumidor === 'Cerrado' && estado !== 'cerrado') return false;
                 if (filterConsumidor === 'Sin acciones' && estado !== 'sin acciones') return false;
+            }
+
+            // Filtro Urgencia superior
+            if (filterUrgencia !== 'ALL') {
+                if (urgMeta.label.toLowerCase() !== filterUrgencia.toLowerCase()) return false;
             }
 
             // Filtro Conflicto
@@ -202,16 +319,93 @@ export const ReclamosList = () => {
                 return false;
             }
 
+            // Filtros por cada columna de la grilla
+            if (colFilters.id.trim() && !String(r.id || '').toLowerCase().includes(colFilters.id.toLowerCase().trim())) return false;
+            if (colFilters.fecha_ingreso.trim() && !fechaMeta.fullText.toLowerCase().includes(colFilters.fecha_ingreso.toLowerCase().trim())) return false;
+            if (colFilters.urgencia.trim() && !urgMeta.label.toLowerCase().includes(colFilters.urgencia.toLowerCase().trim())) return false;
+            if (colFilters.consumidor.trim() && !consumidorStr.toLowerCase().includes(colFilters.consumidor.toLowerCase().trim())) return false;
+            if (colFilters.ubicacion.trim() && !ubicacionStr.toLowerCase().includes(colFilters.ubicacion.toLowerCase().trim())) return false;
+            if (colFilters.producto.trim() && !productosStr.toLowerCase().includes(colFilters.producto.toLowerCase().trim())) return false;
+            if (colFilters.supervisor.trim() && !supervisorStr.toLowerCase().includes(colFilters.supervisor.toLowerCase().trim())) return false;
+            if (colFilters.estado_admin.trim() && !String(r.estado_admin || 'Pendiente').toLowerCase().includes(colFilters.estado_admin.toLowerCase().trim())) return false;
+            if (colFilters.estado_inocuidad.trim() && !String(r.estado_inocuidad || 'Sin acciones').toLowerCase().includes(colFilters.estado_inocuidad.toLowerCase().trim())) return false;
+            if (colFilters.estado_supervisor.trim() && !String(r.estado_supervisor || 'Pendiente').toLowerCase().includes(colFilters.estado_supervisor.toLowerCase().trim())) return false;
+            if (colFilters.estado_consumidor.trim() && !String(r.estado_consumidor || 'Pendiente').toLowerCase().includes(colFilters.estado_consumidor.toLowerCase().trim())) return false;
+
             return true;
         });
-    }, [reclamos, searchQuery, filterAdmin, filterSupervisor, filterInocuidad, filterConsumidor, filterConflicto]);
+
+        // Ordenar por la columna activa
+        const dirMultiplier = sortDir === 'asc' ? 1 : -1;
+        return [...filtered].sort((a, b) => {
+            switch (sortField) {
+                case 'id': {
+                    const numA = parseInt(String(a.id).replace(/\D/g, ''), 10) || 0;
+                    const numB = parseInt(String(b.id).replace(/\D/g, ''), 10) || 0;
+                    if (numA !== numB) return (numA - numB) * dirMultiplier;
+                    return String(a.id || '').localeCompare(String(b.id || '')) * dirMultiplier;
+                }
+                case 'fecha_ingreso': {
+                    const tA = formatFechaIngresoCell(a).timestamp;
+                    const tB = formatFechaIngresoCell(b).timestamp;
+                    return (tA - tB) * dirMultiplier;
+                }
+                case 'urgencia': {
+                    const uA = getUrgenciaMeta(a).order;
+                    const uB = getUrgenciaMeta(b).order;
+                    return (uA - uB) * dirMultiplier;
+                }
+                case 'consumidor': {
+                    const cA = (a.cliente || `${a.nombre || ''} ${a.apellido || ''}`.trim() || '').toLowerCase();
+                    const cB = (b.cliente || `${b.nombre || ''} ${b.apellido || ''}`.trim() || '').toLowerCase();
+                    return cA.localeCompare(cB, 'es') * dirMultiplier;
+                }
+                case 'ubicacion': {
+                    const lA = `${a.localidad || ''} ${a.provincia || ''}`.trim().toLowerCase();
+                    const lB = `${b.localidad || ''} ${b.provincia || ''}`.trim().toLowerCase();
+                    return lA.localeCompare(lB, 'es') * dirMultiplier;
+                }
+                case 'producto': {
+                    const pA = (a.items?.[0]?.producto || '').toLowerCase();
+                    const pB = (b.items?.[0]?.producto || '').toLowerCase();
+                    return pA.localeCompare(pB, 'es') * dirMultiplier;
+                }
+                case 'supervisor': {
+                    const sA = (a.supervisor || '').toLowerCase();
+                    const sB = (b.supervisor || '').toLowerCase();
+                    return sA.localeCompare(sB, 'es') * dirMultiplier;
+                }
+                case 'estado_admin':
+                    return String(a.estado_admin || '').localeCompare(String(b.estado_admin || ''), 'es') * dirMultiplier;
+                case 'estado_inocuidad':
+                    return String(a.estado_inocuidad || '').localeCompare(String(b.estado_inocuidad || ''), 'es') * dirMultiplier;
+                case 'estado_supervisor':
+                    return String(a.estado_supervisor || '').localeCompare(String(b.estado_supervisor || ''), 'es') * dirMultiplier;
+                case 'estado_consumidor':
+                    return String(a.estado_consumidor || '').localeCompare(String(b.estado_consumidor || ''), 'es') * dirMultiplier;
+                default:
+                    return 0;
+            }
+        });
+    }, [
+        reclamos, searchQuery, filterAdmin, filterSupervisor, filterInocuidad,
+        filterConsumidor, filterUrgencia, filterConflicto, colFilters, sortField, sortDir
+    ]);
 
     // Paginación
     const totalPages = Math.ceil(filteredReclamos.length / itemsPerPage) || 1;
     const startIndex = (currentPage - 1) * itemsPerPage;
     const paginatedReclamos = filteredReclamos.slice(startIndex, startIndex + itemsPerPage);
 
-    const isFiltered = searchQuery.trim() !== '' || filterAdmin !== 'ALL' || filterSupervisor !== 'ALL' || filterInocuidad !== 'ALL' || filterConsumidor !== 'ALL' || filterConflicto;
+    const hasColFilter = Object.values(colFilters).some(v => v.trim() !== '');
+    const isFiltered = searchQuery.trim() !== '' ||
+        filterAdmin !== 'ALL' ||
+        filterSupervisor !== 'ALL' ||
+        filterInocuidad !== 'ALL' ||
+        filterConsumidor !== 'ALL' ||
+        filterUrgencia !== 'ALL' ||
+        filterConflicto ||
+        hasColFilter;
 
     const handleClearFilters = () => {
         setSearchQuery('');
@@ -219,7 +413,21 @@ export const ReclamosList = () => {
         setFilterSupervisor('ALL');
         setFilterInocuidad('ALL');
         setFilterConsumidor('ALL');
+        setFilterUrgencia('ALL');
         setFilterConflicto(false);
+        setColFilters({
+            id: '',
+            fecha_ingreso: '',
+            urgencia: '',
+            consumidor: '',
+            ubicacion: '',
+            producto: '',
+            supervisor: '',
+            estado_admin: '',
+            estado_inocuidad: '',
+            estado_supervisor: '',
+            estado_consumidor: ''
+        });
         setCurrentPage(1);
         if (searchParams.get('filtro')) {
             setSearchParams({});
@@ -228,6 +436,31 @@ export const ReclamosList = () => {
 
     const handleReclamoUpdated = () => {
         fetchReclamos();
+    };
+
+    const renderSortIcon = (field) => {
+        if (sortField !== field) {
+            return <ArrowUpDown size={12} style={{ opacity: 0.45, flexShrink: 0 }} />;
+        }
+        return sortDir === 'asc'
+            ? <ArrowUp size={12} style={{ color: 'var(--dy-gold)', flexShrink: 0 }} />
+            : <ArrowDown size={12} style={{ color: 'var(--dy-gold)', flexShrink: 0 }} />;
+    };
+
+    const sortableThStyle = {
+        cursor: 'pointer',
+        userSelect: 'none',
+        whiteSpace: 'nowrap'
+    };
+
+    const colFilterInputStyle = {
+        width: '100%',
+        padding: '4px 6px',
+        fontSize: '0.72rem',
+        borderRadius: 4,
+        border: '1px solid var(--border)',
+        background: 'var(--surface)',
+        color: 'var(--text)'
     };
 
     return (
@@ -261,7 +494,7 @@ export const ReclamosList = () => {
             <div className="claims-summary-chips">
                 <div
                     className="summary-chip"
-                    onClick={() => { setFilterAdmin('ALL'); setFilterSupervisor('ALL'); setFilterInocuidad('ALL'); setCurrentPage(1); }}
+                    onClick={() => { setFilterAdmin('ALL'); setFilterSupervisor('ALL'); setFilterInocuidad('ALL'); setFilterUrgencia('ALL'); setCurrentPage(1); }}
                     style={{ cursor: 'pointer' }}
                 >
                     <div className="summary-chip-icon" style={{ background: 'rgba(59, 130, 246, 0.12)', color: 'var(--primary)' }}>
@@ -343,7 +576,7 @@ export const ReclamosList = () => {
                         <Search size={18} className="search-icon-svg" />
                         <input
                             type="text"
-                            placeholder="Buscar por ID, consumidor, producto, defecto, lote, localidad, supervisor..."
+                            placeholder="Buscar por ID, fecha, urgencia, consumidor, producto, defecto, lote, localidad, supervisor..."
                             value={searchQuery}
                             onChange={(e) => {
                                 setSearchQuery(e.target.value);
@@ -365,6 +598,23 @@ export const ReclamosList = () => {
                 </div>
 
                 <div className="filter-selectors-grid">
+                    <div className="filter-box">
+                        <label>
+                            <Flame size={14} style={{ color: '#ef4444' }} />
+                            Nivel de Urgencia
+                        </label>
+                        <select
+                            value={filterUrgencia}
+                            onChange={(e) => { setFilterUrgencia(e.target.value); setCurrentPage(1); }}
+                        >
+                            <option value="ALL">Todas las urgencias</option>
+                            <option value="Alta">Alta</option>
+                            <option value="Media">Media</option>
+                            <option value="Baja">Baja</option>
+                            <option value="Sin asignar">Sin asignar</option>
+                        </select>
+                    </div>
+
                     <div className="filter-box">
                         <label>
                             <UserCheck size={14} style={{ color: 'var(--dy-gold)' }} />
@@ -411,6 +661,8 @@ export const ReclamosList = () => {
                         >
                             <option value="ALL">Todos los estados</option>
                             <option value="Pendiente">Pendiente</option>
+                            <option value="Resuelto">Resuelto</option>
+                            <option value="Imposibilidad">Imposibilidad</option>
                             <option value="Conforme">Conforme</option>
                             <option value="No Conforme">No Conforme</option>
                             <option value="Sin acciones">Sin acciones</option>
@@ -434,6 +686,7 @@ export const ReclamosList = () => {
                             <option value="Resuelto disconforme">Resuelto disconforme</option>
                             <option value="No resuelto">No resuelto</option>
                             <option value="FSR">Finalizado Sin Respuesta (FSR)</option>
+                            <option value="Cerrado">Cerrado</option>
                             <option value="Sin acciones">Sin acciones</option>
                         </select>
                     </div>
@@ -458,21 +711,180 @@ export const ReclamosList = () => {
                     <table className="claims-table">
                         <thead>
                             <tr>
-                                <th style={{ width: '85px' }}>ID / Fecha</th>
-                                <th style={{ width: '16%' }}>Consumidor</th>
-                                <th style={{ width: '13%' }}>Ubicación</th>
-                                <th style={{ width: '19%' }}>Producto / Defecto</th>
-                                <th style={{ width: '14%' }}>Supervisor</th>
-                                <th style={{ width: '9.5%', textAlign: 'center' }}>Admin</th>
-                                <th style={{ width: '9.5%', textAlign: 'center' }}>Inocuidad</th>
-                                <th style={{ width: '9.5%', textAlign: 'center' }}>Supervisor</th>
-                                <th style={{ width: '9.5%', textAlign: 'center' }}>Consumidor</th>
+                                <th style={{ width: '80px', ...sortableThStyle }} onClick={() => handleSort('id')} title="Ordenar por ID">
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <span>ID</span>
+                                        {renderSortIcon('id')}
+                                    </div>
+                                </th>
+                                <th style={{ width: '110px', ...sortableThStyle }} onClick={() => handleSort('fecha_ingreso')} title="Ordenar por Fecha de Ingreso">
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <span>Fecha de Ingreso</span>
+                                        {renderSortIcon('fecha_ingreso')}
+                                    </div>
+                                </th>
+                                <th style={{ width: '92px', textAlign: 'center', ...sortableThStyle }} onClick={() => handleSort('urgencia')} title="Ordenar por Nivel de Urgencia">
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <span>Urgencia</span>
+                                        {renderSortIcon('urgencia')}
+                                    </div>
+                                </th>
+                                <th style={{ width: '14%', ...sortableThStyle }} onClick={() => handleSort('consumidor')} title="Ordenar por Consumidor">
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <span>Consumidor</span>
+                                        {renderSortIcon('consumidor')}
+                                    </div>
+                                </th>
+                                <th style={{ width: '11%', ...sortableThStyle }} onClick={() => handleSort('ubicacion')} title="Ordenar por Ubicación">
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <span>Ubicación</span>
+                                        {renderSortIcon('ubicacion')}
+                                    </div>
+                                </th>
+                                <th style={{ width: '16%', ...sortableThStyle }} onClick={() => handleSort('producto')} title="Ordenar por Producto / Defecto">
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <span>Producto / Defecto</span>
+                                        {renderSortIcon('producto')}
+                                    </div>
+                                </th>
+                                <th style={{ width: '12%', ...sortableThStyle }} onClick={() => handleSort('supervisor')} title="Ordenar por Supervisor">
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <span>Supervisor</span>
+                                        {renderSortIcon('supervisor')}
+                                    </div>
+                                </th>
+                                <th style={{ width: '8.5%', textAlign: 'center', ...sortableThStyle }} onClick={() => handleSort('estado_admin')} title="Ordenar por Estado Admin">
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <span>Admin</span>
+                                        {renderSortIcon('estado_admin')}
+                                    </div>
+                                </th>
+                                <th style={{ width: '8.5%', textAlign: 'center', ...sortableThStyle }} onClick={() => handleSort('estado_inocuidad')} title="Ordenar por Estado Inocuidad">
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <span>Inocuidad</span>
+                                        {renderSortIcon('estado_inocuidad')}
+                                    </div>
+                                </th>
+                                <th style={{ width: '8.5%', textAlign: 'center', ...sortableThStyle }} onClick={() => handleSort('estado_supervisor')} title="Ordenar por Estado Supervisor">
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <span>Supervisor</span>
+                                        {renderSortIcon('estado_supervisor')}
+                                    </div>
+                                </th>
+                                <th style={{ width: '8.5%', textAlign: 'center', ...sortableThStyle }} onClick={() => handleSort('estado_consumidor')} title="Ordenar por Estado Consumidor">
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        <span>Consumidor</span>
+                                        {renderSortIcon('estado_consumidor')}
+                                    </div>
+                                </th>
+                            </tr>
+                            {/* Fila de filtrado individual por columna */}
+                            <tr className="claims-column-filters-row" style={{ background: 'var(--surface-subtle)' }}>
+                                <th style={{ padding: '6px 8px' }}>
+                                    <input
+                                        type="text"
+                                        placeholder="Filtrar ID..."
+                                        value={colFilters.id}
+                                        onChange={e => handleColFilterChange('id', e.target.value)}
+                                        style={colFilterInputStyle}
+                                    />
+                                </th>
+                                <th style={{ padding: '6px 8px' }}>
+                                    <input
+                                        type="text"
+                                        placeholder="dd/mm/aaaa..."
+                                        value={colFilters.fecha_ingreso}
+                                        onChange={e => handleColFilterChange('fecha_ingreso', e.target.value)}
+                                        style={colFilterInputStyle}
+                                    />
+                                </th>
+                                <th style={{ padding: '6px 8px' }}>
+                                    <input
+                                        type="text"
+                                        placeholder="Urgencia..."
+                                        value={colFilters.urgencia}
+                                        onChange={e => handleColFilterChange('urgencia', e.target.value)}
+                                        style={colFilterInputStyle}
+                                    />
+                                </th>
+                                <th style={{ padding: '6px 8px' }}>
+                                    <input
+                                        type="text"
+                                        placeholder="Consumidor..."
+                                        value={colFilters.consumidor}
+                                        onChange={e => handleColFilterChange('consumidor', e.target.value)}
+                                        style={colFilterInputStyle}
+                                    />
+                                </th>
+                                <th style={{ padding: '6px 8px' }}>
+                                    <input
+                                        type="text"
+                                        placeholder="Localidad..."
+                                        value={colFilters.ubicacion}
+                                        onChange={e => handleColFilterChange('ubicacion', e.target.value)}
+                                        style={colFilterInputStyle}
+                                    />
+                                </th>
+                                <th style={{ padding: '6px 8px' }}>
+                                    <input
+                                        type="text"
+                                        placeholder="Producto..."
+                                        value={colFilters.producto}
+                                        onChange={e => handleColFilterChange('producto', e.target.value)}
+                                        style={colFilterInputStyle}
+                                    />
+                                </th>
+                                <th style={{ padding: '6px 8px' }}>
+                                    <input
+                                        type="text"
+                                        placeholder="Supervisor..."
+                                        value={colFilters.supervisor}
+                                        onChange={e => handleColFilterChange('supervisor', e.target.value)}
+                                        style={colFilterInputStyle}
+                                    />
+                                </th>
+                                <th style={{ padding: '6px 8px' }}>
+                                    <input
+                                        type="text"
+                                        placeholder="Admin..."
+                                        value={colFilters.estado_admin}
+                                        onChange={e => handleColFilterChange('estado_admin', e.target.value)}
+                                        style={colFilterInputStyle}
+                                    />
+                                </th>
+                                <th style={{ padding: '6px 8px' }}>
+                                    <input
+                                        type="text"
+                                        placeholder="Inocuidad..."
+                                        value={colFilters.estado_inocuidad}
+                                        onChange={e => handleColFilterChange('estado_inocuidad', e.target.value)}
+                                        style={colFilterInputStyle}
+                                    />
+                                </th>
+                                <th style={{ padding: '6px 8px' }}>
+                                    <input
+                                        type="text"
+                                        placeholder="Sup..."
+                                        value={colFilters.estado_supervisor}
+                                        onChange={e => handleColFilterChange('estado_supervisor', e.target.value)}
+                                        style={colFilterInputStyle}
+                                    />
+                                </th>
+                                <th style={{ padding: '6px 8px' }}>
+                                    <input
+                                        type="text"
+                                        placeholder="Cons..."
+                                        value={colFilters.estado_consumidor}
+                                        onChange={e => handleColFilterChange('estado_consumidor', e.target.value)}
+                                        style={colFilterInputStyle}
+                                    />
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan="9" style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)' }}>
+                                    <td colSpan="11" style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)' }}>
                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                                             <RefreshCw size={24} style={{ animation: 'spin 1s linear infinite', color: 'var(--primary)' }} />
                                             <span style={{ fontWeight: 500 }}>Cargando registros sincronizados...</span>
@@ -481,7 +893,7 @@ export const ReclamosList = () => {
                                 </tr>
                             ) : paginatedReclamos.length === 0 ? (
                                 <tr>
-                                    <td colSpan="9" style={{ textAlign: 'center', padding: '56px 20px', color: 'var(--text-muted)' }}>
+                                    <td colSpan="11" style={{ textAlign: 'center', padding: '56px 20px', color: 'var(--text-muted)' }}>
                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, maxWidth: 400, margin: '0 auto' }}>
                                             <AlertCircle size={36} style={{ color: 'var(--text-muted)', opacity: 0.6 }} />
                                             <h3 style={{ margin: 0, color: 'var(--text)', fontSize: '1.05rem' }}>No se encontraron reclamos</h3>
@@ -503,6 +915,8 @@ export const ReclamosList = () => {
                                 paginatedReclamos.map((r) => {
                                     const itemCount = r.items?.length || 1;
                                     const firstItem = r.items?.[0] || {};
+                                    const fechaCell = formatFechaIngresoCell(r);
+                                    const urgMeta = getUrgenciaMeta(r);
                                     return (
                                         <tr
                                             key={r.id}
@@ -510,7 +924,7 @@ export const ReclamosList = () => {
                                             onClick={() => handleOpenReclamo(r)}
                                             title={r.en_conflicto ? "⚠️ RECLAMO EN CONFLICTO (posible fraude/discrepancia): Clic para ver auditoría" : "Clic para ver detalle y gestionar acciones"}
                                         >
-                                            {/* ID y Fecha */}
+                                            {/* ID */}
                                             <td>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                                     <div className="claim-id-tag">#{r.id}</div>
@@ -520,7 +934,35 @@ export const ReclamosList = () => {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div className="claim-sub-text">{r.fecha_alta || 'S/F'}</div>
+                                            </td>
+
+                                            {/* Fecha de Ingreso */}
+                                            <td>
+                                                <div style={{ fontWeight: 600, fontSize: '0.81rem', whiteSpace: 'nowrap' }}>
+                                                    {fechaCell.fecha}
+                                                </div>
+                                                {fechaCell.hora && (
+                                                    <div className="claim-sub-text" style={{ whiteSpace: 'nowrap' }}>
+                                                        {fechaCell.hora}
+                                                    </div>
+                                                )}
+                                            </td>
+
+                                            {/* Urgencia */}
+                                            <td style={{ textAlign: 'center' }}>
+                                                <span style={{
+                                                    display: 'inline-block',
+                                                    padding: '3px 9px',
+                                                    borderRadius: 999,
+                                                    fontSize: '0.72rem',
+                                                    fontWeight: 700,
+                                                    background: urgMeta.bg,
+                                                    color: urgMeta.color,
+                                                    border: `1px solid ${urgMeta.border}`,
+                                                    whiteSpace: 'nowrap'
+                                                }}>
+                                                    {urgMeta.label}
+                                                </span>
                                             </td>
 
                                             {/* Consumidor */}
