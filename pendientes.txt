@@ -47,3 +47,5 @@ mes / cnatidad resueltos
 ### No es parte del MVP
 -[ ] refrescar grilla gestor cada x segundos
 -[ ] evaluar si es posible asociar codigos de productos a los items de resarcimiento con el objetivo de crear el mecanismo de autogeneracion de solicitudes de notas de credito
+-[ ] exportar grilla de reclamos a excel
+-[ ] exportar dashboard a pdf

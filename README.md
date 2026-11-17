@@ -2,6 +2,8 @@
 
 Sistema integral corporativo para la recepción, triaje geográfico, aprobación administrativa, seguimiento de supervisores y dictamen de calidad/inocuidad de reclamos de consumidores de **Don Yeyo S.A.**
 
+> 📖 **Documentación:** Para consultar la guía paso a paso con capturas de pantalla de todas las vistas, consulte el [Manual de Usuario y Guía de Configuración Operativa](MANUAL_DE_USUARIO.md).
+
 ---
 
 ## 🏗 Arquitectura del Proyecto
