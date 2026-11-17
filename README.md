@@ -590,8 +590,13 @@ Para garantizar la integridad del flujo de negocio y prevenir estados inconsiste
    - En la tarjeta **`2. Calidad & Inocuidad`** de un reclamo en curso, disponen de los botones de dictamen directo (**`Dictamen Resuelto`**, **`Imposibilidad Técnica`** y **`Reabrir Análisis`**) conectados a `PATCH /api/reclamos/:id/estado-inocuidad`, mientras que las acciones exclusivas de Administración (aprobar/desaprobar en Card 1, reasignación de supervisores y simulador temporal) permanecen restringidas al rol `admin`.
 2. **Centralización de URLs de Entorno ([server/config/urls.js](file:///c:/Users/gabrielt/Documents/Proyectos/GestionReclamosWeb/dy_gestion_reclamos_web/server/config/urls.js)):**
    - En producción (Netlify), `PUBLIC_SITE_URL` unifica la URL base tanto del frontend como de las funciones `/api/*` (con detección automática de `process.env.URL` de Netlify), mientras que en desarrollo local se emplean `FRONTEND_URL` (`http://localhost:5173`) y `BACKEND_URL` (`http://localhost:3001`), manteniendo retrocompatibilidad con `APP_BASE_URL` y `API_BASE_URL`.
-3. **Endpoints Públicos para el Portal del Consumidor (`donyeyo.com.ar`):**
-   - `GET /api/public/productos` y `GET /api/public/catalogo-productos`: Expone de forma externa la lista completa de productos activos, las categorías activas (`PANIFICADOS`, `PASTA`, `TAPAS`, `OTROS`) y el objeto agrupado `por_categoria`, soportando filtrado por `?q=` y `?categoria=`.
+3. **Endpoints Públicos y Externos con Autenticación HTTP Basic (`donyeyo.com.ar` y Consumos Externos):**
+   - `GET /api/public/productos` y `GET /api/public/catalogo-productos`: Expone de forma externa la lista completa de productos activos, las categorías activas (`PANES`, `PASTAS`, `TAPAS`, `PIZZAS`) y el mapa `por_categoria`, soportando filtrado por `?q=` y `?categoria=`.
+     - **Autenticación HTTP Basic:** Protegido mediante credenciales configurables por variables de entorno (`PRODUCTOS_API_BASIC_USER` y `PRODUCTOS_API_BASIC_PASS`).
+     - **Ejemplo con cURL:**
+       ```bash
+       curl -u donyeyo_api:dy_prod_2026_secure "http://localhost:3001/api/public/productos?q=pan"
+       ```
    - `GET /api/public/config-consumidor`: Expone el parámetro configurable `mensaje_conservar_muestra` y el catálogo de estados de `consumidor` con sus descripciones amigables y colores.
    - `GET /api/public/mis-reclamos/:id`: Devuelve el estado público del reclamo junto con su descripción amigable y motivo formal de cierre (sin exponer jamás observaciones internas de auditoría).
 4. **CRUD de Productos y Categorías con Sincronización CSV (`/configuracion/productos` y `/configuracion/categorias`):**

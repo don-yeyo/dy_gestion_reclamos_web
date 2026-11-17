@@ -6,14 +6,15 @@ const emailWorkflowService = require('../services/emailWorkflowService');
 const supervisorLookupService = require('../services/supervisorLookupService');
 const prioridadesService = require('../services/prioridadesService');
 const productosService = require('../services/productosService');
+const { basicAuthProductos } = require('../middlewares/basicAuthMiddleware');
 const { APP_BASE_URL, API_BASE_URL } = require('../config/urls');
 
 /**
  * GET /productos o /api/public/productos?q={busqueda}&categoria={categoria}
- * Endpoint público externo que obtiene la lista completa de productos y sus categorías
+ * Endpoint de consulta externa de catálogo completo de productos y categorías con autenticación HTTP Basic.
  * Orden alfabético ASC para selección ágil en formulario web de consumidores y sistemas externos
  */
-router.get('/productos', async (req, res) => {
+router.get('/productos', basicAuthProductos, async (req, res) => {
     try {
         const query = req.query.q || '';
         const categoria = req.query.categoria || '';
@@ -34,9 +35,9 @@ router.get('/productos', async (req, res) => {
 
 /**
  * GET /catalogo-productos o /api/public/catalogo-productos
- * Alias explícito para consulta externa de productos y categorías
+ * Alias explícito para consulta externa de productos y categorías con autenticación HTTP Basic
  */
-router.get('/catalogo-productos', async (req, res) => {
+router.get('/catalogo-productos', basicAuthProductos, async (req, res) => {
     try {
         const query = req.query.q || '';
         const categoria = req.query.categoria || '';
