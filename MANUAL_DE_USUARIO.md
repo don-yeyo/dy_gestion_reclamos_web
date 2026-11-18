@@ -1,6 +1,6 @@
 # 📘 Manual de Usuario y Guía de Configuración Operativa
 ## Sistema de Gestión de Reclamos Web — Don Yeyo S.A.
-**Versión:** 1.0.0 | **Área:** Sistemas & Operaciones | **Última Actualización:** Noviembre 2026
+**Versión:** 1.0.0 | **Área:** Sistemas & Marketing | **Última Actualización:** Noviembre 2026
 
 ---
 
@@ -39,8 +39,7 @@ El flujo de trabajo se divide en **4 ramas de responsabilidad sincronizadas**:
 ### 2.1 Acceso al Sistema
 Para ingresar al gestor corporativo, abra su navegador web en la dirección institucional provista:
 ```
-http://localhost:5173/   (Entorno Local de Pruebas)
-https://gestionreclamos.donyeyo.com.ar/   (Entorno de Producción)
+https://dy-reclamos.netlify.app/
 ```
 
 ### 2.2 Autenticación con Microsoft Entra ID (Office 365)
@@ -49,9 +48,21 @@ El acceso se encuentra integrado con las cuentas corporativas de Microsoft de Do
 2. Ingrese su correo `@donyeyo.com.ar` y contraseña corporativa.
 3. El sistema verificará criptográficamente su identidad y resolverá su rol en el servidor.
 
-### 2.3 Roles de Usuario
-- **Administrador (`admin`):** Acceso total a todas las funciones: aprobación/desaprobación de reclamos, configuración global, gestión de supervisores, catálogo de productos, reglas de seguimiento y auditoría.
-- **Calidad & Inocuidad (`inocuidad`):** Acceso al Dashboard, bandeja de reclamos y facultad de emitir dictámenes técnicos en la tarjeta de Calidad e Inocuidad de cada expediente.
+### 2.3 Roles de Usuario y Política de Acceso por Lista Blanca Estricta
+El acceso al sistema está gobernado por una **política de lista blanca estricta y cerrada**. No basta con poseer una cuenta de correo con dominio `@donyeyo.com.ar`: **únicamente pueden ingresar aquellas cuentas que se encuentren explícitamente configuradas en las variables de entorno del servidor**.
+
+- **Superadministrador (`sysadmin` - Variable `EMAILS_SYSADMINS`):**
+  - Acceso total e irrestricto a todas las funcionalidades del sistema (Administración, Calidad, Configuración Global, Supervisores, Auditoría, Simuladores y Logs).
+  - Configurado en `server/.env`: `EMAILS_SYSADMINS=gabrielt@donyeyo.com.ar,sistemas@donyeyo.com.ar`.
+- **Administrador Comercial (`admin` - Variable `EMAILS_ADMINS`):**
+  - Gestión operativa de reclamos: aprobación/rechazo de expedientes (Tarjeta 1), asignación de nivel de Urgencia e ítems de cortesía, asignación de supervisores comerciales y administración de catálogo de productos y reglas de seguimiento.
+  - Configurado en `server/.env`: `EMAILS_ADMINS=administracion@donyeyo.com.ar,gabrielt@donyeyo.com.ar`.
+- **Calidad & Inocuidad (`inocuidad` - Variable `EMAILS_INOCUIDAD`):**
+  - Acceso al Dashboard analítico y Bandeja de Reclamos. Facultad exclusiva de emitir dictamen técnico en la Tarjeta 2 (*Dictamen Resuelto*, *Imposibilidad Técnica* o *Reabrir Análisis*).
+  - Tienen restringidas las aprobaciones comerciales de la Tarjeta 1 y las configuraciones de zonas de supervisores.
+  - Configurado en `server/.env`: `EMAILS_INOCUIDAD=inocuidad@donyeyo.com.ar,gabrielt@donyeyo.com.ar`.
+- **Sin Acceso (`invitado` - Bloqueo Automático):**
+  - Si un usuario inicia sesión con una cuenta corporativa `@donyeyo.com.ar` que **NO** figura en ninguna de las tres listas anteriores (por ejemplo, personal de choferes, expedición, producción no autorizada), o con cualquier cuenta externa ajena a la empresa, el backend le asigna automáticamente el rol `invitado` y **rechaza su acceso con error HTTP 403 Forbidden**.
 
 ---
 

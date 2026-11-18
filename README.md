@@ -192,7 +192,10 @@ Este sistema implementa un modelo de seguridad estricto para evitar elevación d
 | `GOOGLE_SERVICE_ACCOUNT_JSON_BASE64` | Contenido del JSON en Base64 (Recomendado para Netlify) | *(string base64)* |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Contenido del JSON en texto plano (alternativa Netlify) | *(JSON string)* |
 | `RECLAMOS_NUMERO_CORTE` | ID numérico de corte a partir del cual se gestionan | `20233357` |
-| `EMAILS_ADMINS` | Correos con rol de Administrador | `admin1@empresa.com,admin2@empresa.com` |
+| `EMAILS_SYSADMINS` | Superadministradores con acceso total e irrestricto (separados por coma) | `gabrielt@donyeyo.com.ar,sistemas@donyeyo.com.ar` |
+| `EMAILS_ADMINS` | Correos autorizados con rol Administrador Comercial (separados por coma) | `administracion@donyeyo.com.ar,gabrielt@donyeyo.com.ar` |
+| `EMAILS_INOCUIDAD` | Correos autorizados con rol Calidad e Inocuidad Técnica (separados por coma) | `inocuidad@donyeyo.com.ar,gabrielt@donyeyo.com.ar` |
+| `EMAILS_ELEVACION` | Correos de escalamiento directivo por mora del supervisor (separados por coma) | `calidad@donyeyo.com.ar,gerencia@donyeyo.com.ar` |
 | `SMTP_*` | Servidor SMTP saliente para correos a **Consumidores** (`SMTP_HOST`, `PORT`, `USER`, `PASSWORD`, `NAME`, `ENCRYPT`) | Servidor saliente institucional Don Yeyo |
 | `ALERTA_SMTP_*` | Servidor SMTP saliente para **Alertas y Notificaciones Internas** (supervisores, calidad, administración, elevación) | `smtp-mail.outlook.com`, puerto `587`, TLS |
 | `CRON_CONSUMIDOR_DIAS_FIN_SIN_RESPUESTA` | Días (J) sin respuesta del consumidor tras el último requerimiento para pasar a **FSR** | `7` |
