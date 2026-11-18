@@ -55,32 +55,32 @@ function resolveUserRole(email) {
     if (!email || typeof email !== 'string') return 'invitado';
     const normalized = email.trim().toLowerCase();
 
-    // 1. Superadministradores
-    if (getSysadminEmails().includes(normalized)) {
-        return 'sysadmin';
-    }
+        // 1. Superadministradores
+        if (getSysadminEmails().includes(normalized)) {
+            return 'sysadmin';
+        }
 
-    // 2. Administradores comerciales
-    if (getAdminEmails().includes(normalized)) {
-        return 'admin';
-    }
+            // 2. Administradores comerciales
+            if (getAdminEmails().includes(normalized)) {
+                return 'admin';
+            }
 
-    // 3. Calidad e Inocuidad
-    if (getInocuidadEmails().includes(normalized)) {
-        return 'inocuidad';
-    }
+                // 3. Calidad e Inocuidad
+                if (getInocuidadEmails().includes(normalized)) {
+                    return 'inocuidad';
+                }
 
-    // LISTA BLANCA CERRADA: Si no está explícitamente autorizado, es 'invitado' (acceso denegado)
-    return 'invitado';
-}
+                // LISTA BLANCA CERRADA: Si no está explícitamente autorizado, es 'invitado' (acceso denegado)
+                return 'invitado';
+            }
 
-module.exports = {
+            module.exports = {
     getSysadminEmails,
-    getAdminEmails,
-    getInocuidadEmails,
-    resolveUserRole,
-    // Propiedades de retrocompatibilidad getter
-    get SYSADMIN_EMAILS() { return getSysadminEmails(); },
-    get ADMIN_EMAILS() { return getAdminEmails(); },
-    get INOCUIDAD_EMAILS() { return getInocuidadEmails(); }
-};
+                getAdminEmails,
+                getInocuidadEmails,
+                resolveUserRole,
+                // Propiedades de retrocompatibilidad getter
+                get SYSADMIN_EMAILS() { return getSysadminEmails(); },
+                get ADMIN_EMAILS() { return getAdminEmails(); },
+                get INOCUIDAD_EMAILS() { return getInocuidadEmails(); }
+            };
