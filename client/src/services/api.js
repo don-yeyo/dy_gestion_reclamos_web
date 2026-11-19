@@ -1,6 +1,36 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+/**
+ * Resuelve la URL base de la API de forma resiliente para desarrollo y producción:
+ * 1. En producción en la nube (como Netlify en dy-reclamos.netlify.app o dominios remotos),
+ *    la API se sirve bajo la ruta relativa '/api', que es enrutada a la función serverless.
+ *    Si VITE_API_URL apuntaba a localhost, se descarta para evitar que el navegador del usuario intente
+ *    conectarse a su propio puerto 3001 local.
+ * 2. En desarrollo local, respeta VITE_API_URL (o usa '/api' mediante el proxy de Vite o http://localhost:3001/api).
+ */
+const resolveApiBaseUrl = () => {
+    const isBrowser = typeof window !== 'undefined';
+    const isLocalhost = isBrowser && (
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname === '0.0.0.0'
+    );
+
+    const envUrl = import.meta.env.VITE_API_URL;
+
+    // En producción (Netlify u otro hosting remoto)
+    if (isBrowser && !isLocalhost) {
+        if (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
+            return '/api';
+        }
+        return envUrl;
+    }
+
+    // En desarrollo local
+    return envUrl || '/api';
+};
+
+const API_URL = resolveApiBaseUrl();
 
 const api = axios.create({
     baseURL: API_URL,

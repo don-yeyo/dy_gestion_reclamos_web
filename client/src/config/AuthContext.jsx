@@ -56,7 +56,11 @@ export const AuthProvider = ({ children }) => {
                         setAuthError(null);
                     }
                 } catch (e) {
-                    const errMsg = e.response?.data?.error || (e.message?.includes('Network Error') ? 'No se pudo conectar con el servidor API (puerto 3001).' : 'Tu cuenta no tiene autorización en el sistema.');
+                    const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+                    const netErrDesc = isLocalhost
+                        ? 'No se pudo conectar con el servidor API local (puerto 3001). Asegurate de que el backend esté ejecutándose.'
+                        : 'No se pudo conectar con el servidor API.';
+                    const errMsg = e.response?.data?.error || (e.message?.includes('Network Error') ? netErrDesc : 'Tu cuenta no tiene autorización en el sistema.');
                     setAuthError(errMsg);
                     setIsAuthenticated(false);
                     setUser(null);
@@ -111,7 +115,10 @@ export const AuthProvider = ({ children }) => {
             } else if (e.errorCode === 'user_cancelled') {
                 // Cancelado por el usuario
             } else if (e.message?.includes('Network Error')) {
-                setAuthError('No se pudo conectar con el servidor API backend (puerto 3001).');
+                const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+                setAuthError(isLocalhost
+                    ? 'No se pudo conectar con el servidor API local (puerto 3001). Asegurate de que el backend esté ejecutándose.'
+                    : 'No se pudo conectar con el servidor API del sistema.');
             } else {
                 setAuthError(e.message || 'No se pudo completar el inicio de sesión con Microsoft.');
             }
